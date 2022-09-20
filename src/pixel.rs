@@ -1,7 +1,9 @@
-use num_traits::{FromPrimitive, Num, ToPrimitive};
+use num_traits::{AsPrimitive, FromPrimitive, Num, PrimInt, ToPrimitive};
 
-pub trait Pixel: Num + ToPrimitive + FromPrimitive + Clone + Copy {}
+pub trait YuvPixel:
+    Num + PrimInt + ToPrimitive + FromPrimitive + AsPrimitive<f32> + Clone + Copy
+{
+}
 
-impl Pixel for u8 {}
-impl Pixel for u16 {}
-impl Pixel for f32 {}
+impl YuvPixel for u8 {}
+impl YuvPixel for u16 {}

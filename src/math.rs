@@ -1,9 +1,9 @@
-use anyhow::{bail, Result};
-use av_data::pixel::TransferCharacteristic;
-use debug_unreachable::debug_unreachable;
+#![allow(clippy::many_single_char_names)]
+
+use av_data::pixel::{MatrixCoefficients, TransferCharacteristic};
 use num_traits::clamp;
 
-use crate::YCbCr;
+use crate::{YuvPixel, YUV};
 
 // const BT709_TO_RGB_MATRIX: [[f32; 3]; 3] = todo!();
 // const BT2020_TO_RGB_MATRIX: [[f32; 3]; 3] = todo!();
@@ -29,67 +29,119 @@ use crate::YCbCr;
 // ];
 // const RGB_TO_BT709_MATRIX: [[f32; 3]; 3] = todo!();
 // const RGB_TO_BT2020_MATRIX: [[f32; 3]; 3] = todo!();
+// #[must_use]
+// fn build_xyb_to_yuv_matrix() -> [[f32; 3]; 3] {
+//     todo!()
+// }
 
-fn build_xyb_to_yuv_matrix() -> [[f32; 3]; 3] {
-    todo!()
-}
-
-/// The BT.601 formula only works for 8-bit data. It's kind of garbage, given
-/// that it was made in 1982 and designed for TVs from 1982. Those are the
-/// limitations we hold to for this conversion. If you want higher precision
-/// conversion, make sure your data is in a more recent color matrix such as
-/// BT.709.
-///
-/// The returned RGB data is gamma encoded.
+/// Converts 8- or 16-bit YUV data to 32-bit floating point Linear RGB
+/// in a range of 0.0..=1.0;
 #[must_use]
-pub fn bt601_limited_to_rgb(input: &YCbCr<u8>) -> Vec<[u8; 3]> {
-    let mut output = vec![[0, 0, 0]; input.data().len()];
-    let height = input.height() as usize;
-    let width = input.width() as usize;
-    let ss_y = input.config().subsampling_y;
-    let ss_x = input.config().subsampling_x;
-    let data = input.data();
-    for y in 0..height {
-        for x in 0..width {
-            let y_pos = y * width + x;
-            let c_pos = (y >> ss_y) * (width >> ss_x) + (x >> ss_x);
-            // SAFETY: The YCbCr struct has its bounds validated when it is constructed, and
-            // it is immutable, so we know the length of the data array matches the
-            // specified bounds.
-            unsafe {
-                let y_adj = (255.0 / 219.0) * (f32::from(*data[0].get_unchecked(y_pos)) - 16.0);
-                let cr_adj = (255.0 / 224.0) * (f32::from(*data[1].get_unchecked(c_pos)) - 128.0);
-                let cb_adj = (255.0 / 224.0) * (f32::from(*data[2].get_unchecked(c_pos)) - 128.0);
-
-                let r = clamp(1.402f32.mul_add(cr_adj, y_adj), 0.0, 255.0) as u8;
-                let g = clamp(
-                    y_adj - 1.772 * 0.114 / 0.587 * cb_adj - 1.402 * 0.299 / 0.587 * cr_adj,
-                    0.0,
-                    255.0,
-                ) as u8;
-                let b = clamp(1.772f32.mul_add(cb_adj, y_adj), 0.0, 255.0) as u8;
-                *output.get_unchecked_mut(y_pos) = [r, g, b];
+pub fn yuv_to_linear_rgb<T: YuvPixel>(input: &YUV<T>) -> Vec<[f32; 3]> {
+    let rgb = match input.config().matrix_coefficients {
+        MatrixCoefficients::BT470BG | MatrixCoefficients::ST170M => {
+            if input.config().full_range {
+                bt601_full_to_rgb(input)
+            } else {
+                bt601_limited_to_rgb(input)
             }
         }
-    }
-    output
+        MatrixCoefficients::BT2020ConstantLuminance
+        | MatrixCoefficients::BT2020NonConstantLuminance => {
+            if input.config().full_range {
+                bt2020_full_to_rgb(input)
+            } else {
+                bt2020_limited_to_rgb(input)
+            }
+        }
+        // If the matrix is unknown, unimplemented, or unspecified, fallback to BT.709, as that's
+        // the safest guess.
+        _ => {
+            if input.config().full_range {
+                bt709_full_to_rgb(input)
+            } else {
+                bt709_limited_to_rgb(input)
+            }
+        }
+    };
+    rgb_gamma_decode(&rgb, input.config().transfer_characteristics)
 }
 
-/// # Errors
-/// - If the specified transfer function is not implemented
-pub fn rgb_gamma_encode(
-    input: &[[f32; 3]],
-    transfer: TransferCharacteristic,
-) -> Result<Vec<[f32; 3]>> {
+// TODO: Use const generics once float generic params are stable.
+macro_rules! yuv_to_rgb {
+    (
+        $name:expr,
+        $full_range:expr,
+        $rv_coeff:expr,
+        $gu_coeff:expr,
+        $gv_coeff:expr,
+        $bu_coeff:expr
+    ) => {
+        paste::item! {
+            #[must_use]
+            fn [<$name _to_rgb>]<T: YuvPixel>(input: &YUV<T>) -> Vec<[f32; 3]> {
+                let mut output = vec![[0.0, 0.0, 0.0]; input.data().len()];
+                let height = input.height() as usize;
+                let width = input.width() as usize;
+                let ss_y = input.config().subsampling_y;
+                let ss_x = input.config().subsampling_x;
+                let data = input.data();
+                let max_val = f32::from(255u16 << (input.config().bit_depth - 8));
+                let limited_shift = f32::from(16u16 << (input.config().bit_depth - 8));
+                for y in 0..height {
+                    for x in 0..width {
+                        let y_pos = y * width + x;
+                        let c_pos = (y >> ss_y) * (width >> ss_x) + (x >> ss_x);
+                        // SAFETY: The YUV struct has its bounds validated when it is constructed, and
+                        // it is immutable, so we know the length of the data array matches the
+                        // specified bounds.
+                        unsafe {
+                            let y = if $full_range {
+                                data[0].get_unchecked(y_pos).as_()
+                            } else {
+                                // This can be left as 255/219 because the resulting value
+                                // will be the same for all bit depths
+                                (255.0 / 219.0) * (data[0].get_unchecked(y_pos).as_() - limited_shift)
+                            };
+                            let u = data[1].get_unchecked(c_pos).as_();
+                            let v = data[2].get_unchecked(c_pos).as_();
+
+                            let r = clamp(v.mul_add($rv_coeff, y), 0.0, max_val) / max_val;
+                            let g = clamp(v.mul_add($gv_coeff, u.mul_add($gu_coeff, y)), 0.0, max_val) / max_val;
+                            let b = clamp(u.mul_add($bu_coeff, y), 0.0, max_val) / max_val;
+                            *output.get_unchecked_mut(y_pos) = [r, g, b];
+                        }
+                    }
+                }
+                output
+            }
+        }
+    };
+}
+
+yuv_to_rgb!(bt601_limited, false, 1.596, -0.391, -0.813, 2.018);
+yuv_to_rgb!(bt601_full, true, 1.402, -0.34414, -0.71414, 1.772);
+yuv_to_rgb!(bt709_limited, false, 1.793, -0.213, -0.533, 2.112);
+yuv_to_rgb!(bt709_full, true, 1.5748, -0.18732, -0.46812, 1.772);
+yuv_to_rgb!(
+    bt2020_limited,
+    false,
+    1.67867,
+    -0.187_326,
+    -0.65042,
+    2.14177
+);
+yuv_to_rgb!(bt2020_full, true, 1.4746, -0.164_553, -0.571_353, 1.8814);
+
+/// Converts Linear RGB to gamma-encoded RGB
+#[must_use]
+pub fn rgb_gamma_encode(input: &[[f32; 3]], transfer: TransferCharacteristic) -> Vec<[f32; 3]> {
     todo!()
 }
 
-/// # Errors
-/// - If the specified transfer function is not implemented
-pub fn rgb_gamma_decode(
-    input: &[[f32; 3]],
-    transfer: TransferCharacteristic,
-) -> Result<Vec<[f32; 3]>> {
+/// Converts gamma-encoded RGB to Linear RGB
+#[must_use]
+pub fn rgb_gamma_decode(input: &[[f32; 3]], transfer: TransferCharacteristic) -> Vec<[f32; 3]> {
     #[inline(always)]
     fn to_linear_srgb(c: f32) -> f32 {
         if c <= 0.04045 {
@@ -105,35 +157,8 @@ pub fn rgb_gamma_decode(
     }
 
     match transfer {
-        TransferCharacteristic::Linear => Ok(input.to_vec()),
-        TransferCharacteristic::BT1886
-        | TransferCharacteristic::ST170M
-        | TransferCharacteristic::BT2020Ten
-        | TransferCharacteristic::BT2020Twelve
-        | TransferCharacteristic::BT470M
-        | TransferCharacteristic::BT470BG => {
-            let gamma: f32 = match transfer {
-                TransferCharacteristic::BT1886
-                | TransferCharacteristic::ST170M
-                | TransferCharacteristic::BT2020Ten
-                | TransferCharacteristic::BT2020Twelve => 2.4,
-                TransferCharacteristic::BT470M => 2.2,
-                TransferCharacteristic::BT470BG => 2.8,
-                // Safety: We are only in this code block if the transfer is one of the above
-                _ => unsafe { debug_unreachable!() },
-            };
-            Ok(input
-                .iter()
-                .map(|pix| {
-                    [
-                        to_linear_pow(pix[0], gamma),
-                        to_linear_pow(pix[1], gamma),
-                        to_linear_pow(pix[2], gamma),
-                    ]
-                })
-                .collect())
-        }
-        TransferCharacteristic::SRGB => Ok(input
+        TransferCharacteristic::Linear => input.to_vec(),
+        TransferCharacteristic::SRGB => input
             .iter()
             .map(|pix| {
                 [
@@ -142,19 +167,27 @@ pub fn rgb_gamma_decode(
                     to_linear_srgb(pix[2]),
                 ]
             })
-            .collect()),
-        TransferCharacteristic::Reserved0
-        | TransferCharacteristic::Unspecified
-        | TransferCharacteristic::Reserved
-        | TransferCharacteristic::ST240M
-        | TransferCharacteristic::Logarithmic100
-        | TransferCharacteristic::Logarithmic316
-        | TransferCharacteristic::XVYCC
-        | TransferCharacteristic::BT1361E
-        | TransferCharacteristic::PerceptualQuantizer
-        | TransferCharacteristic::ST428
-        | TransferCharacteristic::HybridLogGamma => {
-            bail!("Conversion not yet implemented for this transfer function")
+            .collect(),
+        TransferCharacteristic::PerceptualQuantizer => todo!("Handling HDR is important"),
+        TransferCharacteristic::HybridLogGamma => todo!("Handling HDR is important"),
+        // If the transfer function is unknown, unimplemented, or unspecified, fallback to BT.1886,
+        // as that's the safest guess.
+        _ => {
+            let gamma: f32 = match transfer {
+                TransferCharacteristic::BT470M => 2.2,
+                TransferCharacteristic::BT470BG => 2.8,
+                _ => 2.4,
+            };
+            input
+                .iter()
+                .map(|pix| {
+                    [
+                        to_linear_pow(pix[0], gamma),
+                        to_linear_pow(pix[1], gamma),
+                        to_linear_pow(pix[2], gamma),
+                    ]
+                })
+                .collect()
         }
     }
 }

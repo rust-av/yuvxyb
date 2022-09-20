@@ -53,16 +53,16 @@ use math::*;
 pub use pixel::*;
 
 #[derive(Clone)]
-pub struct Xyb<T: Pixel> {
-    data: Vec<[T; 3]>,
+pub struct Xyb {
+    data: Vec<[f32; 3]>,
     width: u32,
     height: u32,
 }
 
-impl<T: Pixel> Xyb<T> {
+impl Xyb {
     /// # Errors
     /// - If data length does not match `width * height`
-    pub fn new(data: Vec<[T; 3]>, width: u32, height: u32) -> Result<Self> {
+    pub fn new(data: Vec<[f32; 3]>, width: u32, height: u32) -> Result<Self> {
         if data.len() != (width * height) as usize {
             bail!("Data length does not match specified dimensions");
         }
@@ -75,7 +75,7 @@ impl<T: Pixel> Xyb<T> {
     }
 
     #[must_use]
-    pub fn data(&self) -> &[[T; 3]] {
+    pub fn data(&self) -> &[[f32; 3]] {
         &self.data
     }
 
@@ -91,15 +91,15 @@ impl<T: Pixel> Xyb<T> {
 }
 
 #[derive(Clone)]
-pub struct YCbCr<T: Pixel> {
+pub struct YUV<T: YuvPixel> {
     data: [Vec<T>; 3],
     width: u32,
     height: u32,
-    config: YCbCrConfig,
+    config: YuvConfig,
 }
 
 #[derive(Clone, Copy)]
-pub struct YCbCrConfig {
+pub struct YuvConfig {
     pub bit_depth: u8,
     pub subsampling_x: u8,
     pub subsampling_y: u8,
@@ -109,7 +109,7 @@ pub struct YCbCrConfig {
     pub color_primaries: ColorPrimaries,
 }
 
-impl<T: Pixel> YCbCr<T> {
+impl<T: YuvPixel> YUV<T> {
     /// # Errors
     /// - If luma plane length does not match `width * height`
     /// - If chroma plane lengths do not match `(width * height) >>
@@ -118,7 +118,7 @@ impl<T: Pixel> YCbCr<T> {
     ///   2
     /// - If `data` contains values which are not valid for the specified bit
     ///   depth (note: out-of-range values for limited range are allowed)
-    pub fn new(data: [Vec<T>; 3], width: u32, height: u32, config: YCbCrConfig) -> Result<Self> {
+    pub fn new(data: [Vec<T>; 3], width: u32, height: u32, config: YuvConfig) -> Result<Self> {
         if width % (1 << config.subsampling_x) != 0 {
             bail!(
                 "Width must be a multiple of {} to support this chroma subsampling",
@@ -179,135 +179,39 @@ impl<T: Pixel> YCbCr<T> {
     }
 
     #[must_use]
-    pub const fn config(&self) -> YCbCrConfig {
+    pub const fn config(&self) -> YuvConfig {
         self.config
     }
 }
 
-impl From<YCbCr<u8>> for YCbCr<f32> {
-    fn from(other: YCbCr<u8>) -> Self {
-        let data = if other.config.full_range {
-            [
-                other.data[0]
-                    .iter()
-                    .map(|pix| f32::from(*pix) / 255.0)
-                    .collect(),
-                other.data[1]
-                    .iter()
-                    .map(|pix| f32::from(*pix) / 255.0)
-                    .collect(),
-                other.data[2]
-                    .iter()
-                    .map(|pix| f32::from(*pix) / 255.0)
-                    .collect(),
-            ]
-        } else {
-            todo!()
-        };
-        let mut config = other.config;
-        config.full_range = true;
-        config.bit_depth = 32;
-        YCbCr {
-            data,
-            width: other.width,
-            height: other.height,
-            config,
-        }
-    }
-}
-
-impl From<YCbCr<u16>> for YCbCr<f32> {
-    fn from(other: YCbCr<u16>) -> Self {
-        let data = if other.config.full_range {
-            let max_val = f32::from(255u16 << (other.config.bit_depth - 8));
-            [
-                other.data[0]
-                    .iter()
-                    .map(|pix| f32::from(*pix) / max_val)
-                    .collect(),
-                other.data[1]
-                    .iter()
-                    .map(|pix| f32::from(*pix) / max_val)
-                    .collect(),
-                other.data[2]
-                    .iter()
-                    .map(|pix| f32::from(*pix) / max_val)
-                    .collect(),
-            ]
-        } else {
-            todo!()
-        };
-        let mut config = other.config;
-        config.full_range = true;
-        config.bit_depth = 32;
-        YCbCr {
-            data,
-            width: other.width,
-            height: other.height,
-            config,
-        }
-    }
-}
-
-impl From<YCbCr<f32>> for YCbCr<u8> {
-    fn from(other: YCbCr<f32>) -> Self {
+impl From<YUV<u8>> for Xyb {
+    fn from(other: YUV<u8>) -> Self {
         todo!()
     }
 }
 
-impl From<YCbCr<f32>> for YCbCr<u16> {
-    fn from(other: YCbCr<f32>) -> Self {
+impl From<YUV<u16>> for Xyb {
+    fn from(other: YUV<u16>) -> Self {
         todo!()
     }
 }
 
-impl From<YCbCr<u8>> for Xyb<f32> {
-    fn from(other: YCbCr<u8>) -> Self {
-        Xyb::<f32>::from(YCbCr::<f32>::from(other))
-    }
-}
+impl TryFrom<(Xyb, YuvConfig)> for YUV<u8> {
+    type Error = anyhow::Error;
 
-impl From<YCbCr<u16>> for Xyb<f32> {
-    fn from(other: YCbCr<u16>) -> Self {
-        Xyb::<f32>::from(YCbCr::<f32>::from(other))
-    }
-}
-
-impl From<YCbCr<f32>> for Xyb<f32> {
-    fn from(other: YCbCr<f32>) -> Self {
+    /// # Errors
+    /// - If the `YuvConfig` would produce an invalid image
+    fn try_from(other: (Xyb, YuvConfig)) -> Result<Self> {
         todo!()
     }
 }
 
-impl TryFrom<(Xyb<f32>, YCbCrConfig)> for YCbCr<u8> {
+impl TryFrom<(Xyb, YuvConfig)> for YUV<u16> {
     type Error = anyhow::Error;
 
     /// # Errors
-    /// - If subsampling is requested for a dimension that is not a multiple of
-    ///   2
-    fn try_from(other: (Xyb<f32>, YCbCrConfig)) -> Result<Self> {
-        Ok(YCbCr::<u8>::from(YCbCr::<f32>::try_from(other)?))
-    }
-}
-
-impl TryFrom<(Xyb<f32>, YCbCrConfig)> for YCbCr<u16> {
-    type Error = anyhow::Error;
-
-    /// # Errors
-    /// - If subsampling is requested for a dimension that is not a multiple of
-    ///   2
-    fn try_from(other: (Xyb<f32>, YCbCrConfig)) -> Result<Self> {
-        Ok(YCbCr::<u16>::from(YCbCr::<f32>::try_from(other)?))
-    }
-}
-
-impl TryFrom<(Xyb<f32>, YCbCrConfig)> for YCbCr<f32> {
-    type Error = anyhow::Error;
-
-    /// # Errors
-    /// - If subsampling is requested for a dimension that is not a multiple of
-    ///   2
-    fn try_from(other: (Xyb<f32>, YCbCrConfig)) -> Result<Self> {
+    /// - If the `YuvConfig` would produce an invalid image
+    fn try_from(other: (Xyb, YuvConfig)) -> Result<Self> {
         todo!()
     }
 }
