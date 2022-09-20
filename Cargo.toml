@@ -4,6 +4,9 @@ description = "Direct conversions between YUV (YCbCr) and XYB colorspaces"
 version = "0.1.0"
 edition = "2021"
 license = "MIT"
+documentation = "https://docs.rs/yuvxyb"
+homepage = "https://github.com/shssoichiro/yuvxyb"
+repository = "https://github.com/shssoichiro/yuvxyb"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
