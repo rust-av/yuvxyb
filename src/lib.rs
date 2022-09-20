@@ -39,12 +39,17 @@
 #![warn(clippy::use_debug)]
 #![warn(clippy::verbose_file_reads)]
 
+// This is pub and doc hidden so it can be run through cargo asm for
+// optimization easier
+#[doc(hidden)]
+pub mod math;
 mod pixel;
 
 use std::mem::size_of;
 
 use anyhow::{bail, Result};
 pub use av_data::pixel::{ColorPrimaries, MatrixCoefficients, TransferCharacteristic};
+use math::*;
 pub use pixel::*;
 
 #[derive(Clone)]
@@ -86,15 +91,15 @@ impl<T: Pixel> Xyb<T> {
 }
 
 #[derive(Clone)]
-pub struct Yuv<T: Pixel> {
+pub struct YCbCr<T: Pixel> {
     data: [Vec<T>; 3],
     width: u32,
     height: u32,
-    config: YuvConfig,
+    config: YCbCrConfig,
 }
 
 #[derive(Clone, Copy)]
-pub struct YuvConfig {
+pub struct YCbCrConfig {
     pub bit_depth: u8,
     pub subsampling_x: u8,
     pub subsampling_y: u8,
@@ -104,7 +109,7 @@ pub struct YuvConfig {
     pub color_primaries: ColorPrimaries,
 }
 
-impl<T: Pixel> Yuv<T> {
+impl<T: Pixel> YCbCr<T> {
     /// # Errors
     /// - If luma plane length does not match `width * height`
     /// - If chroma plane lengths do not match `(width * height) >>
@@ -113,7 +118,7 @@ impl<T: Pixel> Yuv<T> {
     ///   2
     /// - If `data` contains values which are not valid for the specified bit
     ///   depth (note: out-of-range values for limited range are allowed)
-    pub fn new(data: [Vec<T>; 3], width: u32, height: u32, config: YuvConfig) -> Result<Self> {
+    pub fn new(data: [Vec<T>; 3], width: u32, height: u32, config: YCbCrConfig) -> Result<Self> {
         if width % (1 << config.subsampling_x) != 0 {
             bail!(
                 "Width must be a multiple of {} to support this chroma subsampling",
@@ -174,15 +179,15 @@ impl<T: Pixel> Yuv<T> {
     }
 
     #[must_use]
-    pub const fn config(&self) -> YuvConfig {
+    pub const fn config(&self) -> YCbCrConfig {
         self.config
     }
 }
 
-impl From<Yuv<u8>> for Yuv<f32> {
-    fn from(other: Yuv<u8>) -> Self {
-        if other.config.full_range {
-            let data = [
+impl From<YCbCr<u8>> for YCbCr<f32> {
+    fn from(other: YCbCr<u8>) -> Self {
+        let data = if other.config.full_range {
+            [
                 other.data[0]
                     .iter()
                     .map(|pix| f32::from(*pix) / 255.0)
@@ -195,24 +200,27 @@ impl From<Yuv<u8>> for Yuv<f32> {
                     .iter()
                     .map(|pix| f32::from(*pix) / 255.0)
                     .collect(),
-            ];
-            Yuv {
-                data,
-                width: other.width,
-                height: other.height,
-                config: other.config,
-            }
+            ]
         } else {
             todo!()
+        };
+        let mut config = other.config;
+        config.full_range = true;
+        config.bit_depth = 32;
+        YCbCr {
+            data,
+            width: other.width,
+            height: other.height,
+            config,
         }
     }
 }
 
-impl From<Yuv<u16>> for Yuv<f32> {
-    fn from(other: Yuv<u16>) -> Self {
-        if other.config.full_range {
+impl From<YCbCr<u16>> for YCbCr<f32> {
+    fn from(other: YCbCr<u16>) -> Self {
+        let data = if other.config.full_range {
             let max_val = f32::from(255u16 << (other.config.bit_depth - 8));
-            let data = [
+            [
                 other.data[0]
                     .iter()
                     .map(|pix| f32::from(*pix) / max_val)
@@ -225,78 +233,81 @@ impl From<Yuv<u16>> for Yuv<f32> {
                     .iter()
                     .map(|pix| f32::from(*pix) / max_val)
                     .collect(),
-            ];
-            Yuv {
-                data,
-                width: other.width,
-                height: other.height,
-                config: other.config,
-            }
+            ]
         } else {
             todo!()
+        };
+        let mut config = other.config;
+        config.full_range = true;
+        config.bit_depth = 32;
+        YCbCr {
+            data,
+            width: other.width,
+            height: other.height,
+            config,
         }
     }
 }
 
-impl From<Yuv<f32>> for Yuv<u8> {
-    fn from(other: Yuv<f32>) -> Self {
+impl From<YCbCr<f32>> for YCbCr<u8> {
+    fn from(other: YCbCr<f32>) -> Self {
         todo!()
     }
 }
 
-impl From<Yuv<f32>> for Yuv<u16> {
-    fn from(other: Yuv<f32>) -> Self {
+impl From<YCbCr<f32>> for YCbCr<u16> {
+    fn from(other: YCbCr<f32>) -> Self {
         todo!()
     }
 }
 
-impl From<Yuv<u8>> for Xyb<f32> {
-    fn from(other: Yuv<u8>) -> Self {
-        Xyb::<f32>::from(Yuv::<f32>::from(other))
+impl From<YCbCr<u8>> for Xyb<f32> {
+    fn from(other: YCbCr<u8>) -> Self {
+        Xyb::<f32>::from(YCbCr::<f32>::from(other))
     }
 }
 
-impl From<Yuv<u16>> for Xyb<f32> {
-    fn from(other: Yuv<u16>) -> Self {
-        Xyb::<f32>::from(Yuv::<f32>::from(other))
+impl From<YCbCr<u16>> for Xyb<f32> {
+    fn from(other: YCbCr<u16>) -> Self {
+        Xyb::<f32>::from(YCbCr::<f32>::from(other))
     }
 }
 
-impl From<Yuv<f32>> for Xyb<f32> {
-    fn from(other: Yuv<f32>) -> Self {
+impl From<YCbCr<f32>> for Xyb<f32> {
+    fn from(other: YCbCr<f32>) -> Self {
         todo!()
     }
 }
 
-impl TryFrom<(Xyb<f32>, YuvConfig)> for Yuv<u8> {
+impl TryFrom<(Xyb<f32>, YCbCrConfig)> for YCbCr<u8> {
     type Error = anyhow::Error;
 
     /// # Errors
     /// - If subsampling is requested for a dimension that is not a multiple of
     ///   2
-    fn try_from(other: (Xyb<f32>, YuvConfig)) -> Result<Self> {
-        Ok(Yuv::<u8>::from(Yuv::<f32>::try_from(other)?))
+    fn try_from(other: (Xyb<f32>, YCbCrConfig)) -> Result<Self> {
+        Ok(YCbCr::<u8>::from(YCbCr::<f32>::try_from(other)?))
     }
 }
 
-impl TryFrom<(Xyb<f32>, YuvConfig)> for Yuv<u16> {
+impl TryFrom<(Xyb<f32>, YCbCrConfig)> for YCbCr<u16> {
     type Error = anyhow::Error;
 
     /// # Errors
     /// - If subsampling is requested for a dimension that is not a multiple of
     ///   2
-    fn try_from(other: (Xyb<f32>, YuvConfig)) -> Result<Self> {
-        Ok(Yuv::<u16>::from(Yuv::<f32>::try_from(other)?))
+    fn try_from(other: (Xyb<f32>, YCbCrConfig)) -> Result<Self> {
+        Ok(YCbCr::<u16>::from(YCbCr::<f32>::try_from(other)?))
     }
 }
 
-impl TryFrom<(Xyb<f32>, YuvConfig)> for Yuv<f32> {
+impl TryFrom<(Xyb<f32>, YCbCrConfig)> for YCbCr<f32> {
     type Error = anyhow::Error;
 
     /// # Errors
     /// - If subsampling is requested for a dimension that is not a multiple of
     ///   2
-    fn try_from(other: (Xyb<f32>, YuvConfig)) -> Result<Self> {
+    fn try_from(other: (Xyb<f32>, YCbCrConfig)) -> Result<Self> {
         todo!()
     }
 }
