@@ -142,7 +142,7 @@ impl<T: YuvPixel> Yuv<T> {
             bail!("Cr plane length does not match specified dimensions");
         }
         if size_of::<T>() == 2 && config.bit_depth < 16 {
-            let max_value = 255u16 << (config.bit_depth - 8);
+            let max_value = u16::MAX >> (16 - config.bit_depth);
             if data.iter().any(|plane| {
                 plane
                     .iter()

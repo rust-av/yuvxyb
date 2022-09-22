@@ -150,7 +150,7 @@ macro_rules! yuv_to_rgb {
                 let ss_y = input.config().subsampling_y;
                 let ss_x = input.config().subsampling_x;
                 let data = input.data();
-                let max_val = f32::from(255u16 << (input.config().bit_depth - 8));
+                let max_val = f32::from(u16::MAX >> (16 - input.config().bit_depth));
                 let limited_shift = f32::from(16u16 << (input.config().bit_depth - 8));
                 for y in 0..height {
                     for x in 0..width {
@@ -232,8 +232,8 @@ macro_rules! rgb_to_yuv {
                 let height = height as usize;
                 let width = width as usize;
 
-                let max_luma_val = f32::from(if $full_range { 255u16 } else { 235u16 } << (config.bit_depth - 8));
-                let max_chroma_val = f32::from(if $full_range { 255u16 } else { 240u16 } << (config.bit_depth - 8));
+                let max_luma_val = f32::from(if $full_range { u16::MAX >> (16 - config.bit_depth) } else { 235u16 << (config.bit_depth - 8) });
+                let max_chroma_val = f32::from(if $full_range { u16::MAX >> (16 - config.bit_depth) } else { 240u16 << (config.bit_depth - 8) });
                 let mult = f32::from(1u16 << (config.bit_depth - 8));
                 for y in 0..height {
                     for x in 0..width {
