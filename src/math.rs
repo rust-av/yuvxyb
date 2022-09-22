@@ -12,7 +12,7 @@
 //! to attempt to approximate the human vision system. The XYZ to LMS matrix
 //! chosen is from the Stockman & Sharpe model, which is the most recent model
 //! based on physiological functionality of the human eye.
-//! https://en.wikipedia.org/wiki/LMS_color_space#Stockman_&_Sharpe_(2000)
+//! <https://en.wikipedia.org/wiki/LMS_color_space#Stockman_&_Sharpe_(2000)>
 
 #![allow(clippy::many_single_char_names)]
 
