@@ -49,7 +49,7 @@ use std::mem::size_of;
 
 use anyhow::{bail, Result};
 pub use av_data::pixel::{ColorPrimaries, MatrixCoefficients, TransferCharacteristic};
-use math::*;
+use math::{linear_rgb_to_xyb, linear_rgb_to_yuv, xyb_to_linear_rgb, yuv_to_linear_rgb};
 pub use pixel::*;
 
 #[derive(Clone)]
@@ -91,7 +91,7 @@ impl Xyb {
 }
 
 #[derive(Clone)]
-pub struct YUV<T: YuvPixel> {
+pub struct Yuv<T: YuvPixel> {
     data: [Vec<T>; 3],
     width: u32,
     height: u32,
@@ -109,7 +109,7 @@ pub struct YuvConfig {
     pub color_primaries: ColorPrimaries,
 }
 
-impl<T: YuvPixel> YUV<T> {
+impl<T: YuvPixel> Yuv<T> {
     /// # Errors
     /// - If luma plane length does not match `width * height`
     /// - If chroma plane lengths do not match `(width * height) >>
@@ -184,34 +184,24 @@ impl<T: YuvPixel> YUV<T> {
     }
 }
 
-impl From<YUV<u8>> for Xyb {
-    fn from(other: YUV<u8>) -> Self {
-        todo!()
+impl<T: YuvPixel> From<Yuv<T>> for Xyb {
+    fn from(other: Yuv<T>) -> Self {
+        let lrgb = yuv_to_linear_rgb(&other);
+        Xyb {
+            data: linear_rgb_to_xyb(&lrgb),
+            width: other.width(),
+            height: other.height(),
+        }
     }
 }
 
-impl From<YUV<u16>> for Xyb {
-    fn from(other: YUV<u16>) -> Self {
-        todo!()
-    }
-}
-
-impl TryFrom<(Xyb, YuvConfig)> for YUV<u8> {
+impl<T: YuvPixel> TryFrom<(Xyb, YuvConfig)> for Yuv<T> {
     type Error = anyhow::Error;
 
     /// # Errors
     /// - If the `YuvConfig` would produce an invalid image
     fn try_from(other: (Xyb, YuvConfig)) -> Result<Self> {
-        todo!()
-    }
-}
-
-impl TryFrom<(Xyb, YuvConfig)> for YUV<u16> {
-    type Error = anyhow::Error;
-
-    /// # Errors
-    /// - If the `YuvConfig` would produce an invalid image
-    fn try_from(other: (Xyb, YuvConfig)) -> Result<Self> {
-        todo!()
+        let lrgb = xyb_to_linear_rgb(&other.0.data);
+        linear_rgb_to_yuv(&lrgb, other.0.width(), other.0.height(), other.1)
     }
 }
