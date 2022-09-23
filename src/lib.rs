@@ -52,7 +52,7 @@ pub use av_data::pixel::{ColorPrimaries, MatrixCoefficients, TransferCharacteris
 use math::{linear_rgb_to_xyb, linear_rgb_to_yuv, xyb_to_linear_rgb, yuv_to_linear_rgb};
 pub use pixel::*;
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct Xyb {
     data: Vec<[f32; 3]>,
     width: u32,
@@ -90,7 +90,7 @@ impl Xyb {
     }
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct Yuv<T: YuvPixel> {
     data: [Vec<T>; 3],
     width: u32,
@@ -98,7 +98,7 @@ pub struct Yuv<T: YuvPixel> {
     config: YuvConfig,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct YuvConfig {
     pub bit_depth: u8,
     pub subsampling_x: u8,
@@ -106,7 +106,6 @@ pub struct YuvConfig {
     pub full_range: bool,
     pub matrix_coefficients: MatrixCoefficients,
     pub transfer_characteristics: TransferCharacteristic,
-    pub color_primaries: ColorPrimaries,
 }
 
 impl<T: YuvPixel> Yuv<T> {
@@ -203,5 +202,361 @@ impl<T: YuvPixel> TryFrom<(Xyb, YuvConfig)> for Yuv<T> {
     fn try_from(other: (Xyb, YuvConfig)) -> Result<Self> {
         let lrgb = xyb_to_linear_rgb(&other.0.data);
         linear_rgb_to_yuv(&lrgb, other.0.width(), other.0.height(), other.1)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use interpolate_name::interpolate_test;
+    use rand::Rng;
+
+    use super::*;
+
+    #[interpolate_test(bt601_420, MatrixCoefficients::ST170M, TransferCharacteristic::ST170M, (1, 1), false)]
+    #[interpolate_test(bt601_422, MatrixCoefficients::ST170M, TransferCharacteristic::ST170M, (1, 0), false)]
+    #[interpolate_test(bt601_444, MatrixCoefficients::ST170M, TransferCharacteristic::ST170M, (0, 0), false)]
+    #[interpolate_test(bt601_444_full, MatrixCoefficients::ST170M, TransferCharacteristic::ST170M, (0, 0), true)]
+    #[interpolate_test(bt709_420, MatrixCoefficients::BT709, TransferCharacteristic::BT1886, (1, 1), false)]
+    #[interpolate_test(bt709_422, MatrixCoefficients::BT709, TransferCharacteristic::BT1886, (1, 0), false)]
+    #[interpolate_test(bt709_444, MatrixCoefficients::BT709, TransferCharacteristic::BT1886, (0, 0), false)]
+    #[interpolate_test(bt709_444_full, MatrixCoefficients::BT709, TransferCharacteristic::BT1886, (0, 0), true)]
+    fn yuv_xyb_yuv_ident_8b(
+        mc: MatrixCoefficients,
+        tc: TransferCharacteristic,
+        ss: (u8, u8),
+        full_range: bool,
+    ) {
+        let y_dims = (320usize, 240usize);
+        let uv_dims = (y_dims.0 >> ss.0, y_dims.1 >> ss.1);
+        let mut data = [
+            vec![0u8; y_dims.0 * y_dims.1],
+            vec![0u8; uv_dims.0 * uv_dims.1],
+            vec![0u8; uv_dims.0 * uv_dims.1],
+        ];
+        let mut rng = rand::thread_rng();
+        for (i, plane) in data.iter_mut().enumerate() {
+            for val in plane.iter_mut() {
+                *val = rng.gen_range(if full_range {
+                    0..=255
+                } else if i == 0 {
+                    16..=235
+                } else {
+                    16..=240
+                });
+            }
+        }
+        let yuv = Yuv::new(data, y_dims.0 as u32, y_dims.1 as u32, YuvConfig {
+            bit_depth: 8,
+            subsampling_x: ss.0,
+            subsampling_y: ss.1,
+            full_range,
+            matrix_coefficients: mc,
+            transfer_characteristics: tc,
+        })
+        .unwrap();
+        let xyb = Xyb::from(yuv.clone());
+        let yuv2 = Yuv::<u8>::try_from((xyb, yuv.config())).unwrap();
+        // assert_eq!(yuv.data(), yuv2.data());
+        assert_eq!(yuv.width(), yuv2.width());
+        assert_eq!(yuv.height(), yuv2.height());
+        assert_eq!(yuv.config(), yuv2.config());
+    }
+
+    #[interpolate_test(bt601_420, MatrixCoefficients::ST170M, TransferCharacteristic::ST170M, (1, 1), false)]
+    #[interpolate_test(bt601_422, MatrixCoefficients::ST170M, TransferCharacteristic::ST170M, (1, 0), false)]
+    #[interpolate_test(bt601_444, MatrixCoefficients::ST170M, TransferCharacteristic::ST170M, (0, 0), false)]
+    #[interpolate_test(bt601_444_full, MatrixCoefficients::ST170M, TransferCharacteristic::ST170M, (0, 0), true)]
+    #[interpolate_test(bt709_420, MatrixCoefficients::BT709, TransferCharacteristic::BT1886, (1, 1), false)]
+    #[interpolate_test(bt709_422, MatrixCoefficients::BT709, TransferCharacteristic::BT1886, (1, 0), false)]
+    #[interpolate_test(bt709_444, MatrixCoefficients::BT709, TransferCharacteristic::BT1886, (0, 0), false)]
+    #[interpolate_test(bt709_444_full, MatrixCoefficients::BT709, TransferCharacteristic::BT1886, (0, 0), true)]
+    fn xyb_yuv_xyb_ident_8b(
+        mc: MatrixCoefficients,
+        tc: TransferCharacteristic,
+        ss: (u8, u8),
+        full_range: bool,
+    ) {
+        let dims = (320usize, 240usize);
+        let mut data = vec![[0.0f32; 3]; dims.0 * dims.1];
+        let mut rng = rand::thread_rng();
+        for plane in &mut data {
+            for val in plane.iter_mut() {
+                *val = rng.gen_range(0.0..=1.0);
+            }
+        }
+        let config = YuvConfig {
+            bit_depth: 8,
+            subsampling_x: ss.0,
+            subsampling_y: ss.1,
+            full_range,
+            matrix_coefficients: mc,
+            transfer_characteristics: tc,
+        };
+        let xyb = Xyb::new(data, dims.0 as u32, dims.1 as u32).unwrap();
+        let yuv = Yuv::<u8>::try_from((xyb.clone(), config)).unwrap();
+        let xyb2 = Xyb::from(yuv);
+        assert_eq!(xyb.data().len(), xyb2.data().len());
+        for (pix1, pix2) in xyb.data().iter().zip(xyb2.data().iter()) {
+            assert!((pix1[0] - pix2[0]).abs() < f32::EPSILON);
+            assert!((pix1[1] - pix2[1]).abs() < f32::EPSILON);
+            assert!((pix1[2] - pix2[2]).abs() < f32::EPSILON);
+        }
+        assert_eq!(xyb.width(), xyb2.width());
+        assert_eq!(xyb.height(), xyb2.height());
+    }
+
+    #[interpolate_test(bt709_420, MatrixCoefficients::BT709, TransferCharacteristic::BT1886, (1, 1), false)]
+    #[interpolate_test(bt709_422, MatrixCoefficients::BT709, TransferCharacteristic::BT1886, (1, 0), false)]
+    #[interpolate_test(bt709_444, MatrixCoefficients::BT709, TransferCharacteristic::BT1886, (0, 0), false)]
+    #[interpolate_test(bt709_444_full, MatrixCoefficients::BT709, TransferCharacteristic::BT1886, (0, 0), true)]
+    #[interpolate_test(
+        bt2020_420,
+        MatrixCoefficients::BT2020NonConstantLuminance,
+        TransferCharacteristic::BT2020Ten,
+        (1, 1),
+        false
+    )]
+    #[interpolate_test(
+        bt2020_422,
+        MatrixCoefficients::BT2020NonConstantLuminance,
+        TransferCharacteristic::BT2020Ten,
+        (1, 0),
+        false
+    )]
+    #[interpolate_test(
+        bt2020_444,
+        MatrixCoefficients::BT2020NonConstantLuminance,
+        TransferCharacteristic::BT2020Ten,
+        (0, 0),
+        false
+    )]
+    #[interpolate_test(
+        bt2020_444_full,
+        MatrixCoefficients::BT2020NonConstantLuminance,
+        TransferCharacteristic::BT2020Ten,
+        (0, 0),
+        true
+    )]
+    #[interpolate_test(
+        pq_420,
+        MatrixCoefficients::BT2020NonConstantLuminance,
+        TransferCharacteristic::PerceptualQuantizer,
+        (1, 1),
+        false
+    )]
+    #[interpolate_test(
+        pq_422,
+        MatrixCoefficients::BT2020NonConstantLuminance,
+        TransferCharacteristic::PerceptualQuantizer,
+        (1, 0),
+        false
+    )]
+    #[interpolate_test(
+        pq_444,
+        MatrixCoefficients::BT2020NonConstantLuminance,
+        TransferCharacteristic::PerceptualQuantizer,
+        (0, 0),
+        false
+    )]
+    #[interpolate_test(
+        pq_444_full,
+        MatrixCoefficients::BT2020NonConstantLuminance,
+        TransferCharacteristic::PerceptualQuantizer,
+        (0, 0),
+        true
+    )]
+    #[interpolate_test(
+        hlg_420,
+        MatrixCoefficients::BT2020NonConstantLuminance,
+        TransferCharacteristic::HybridLogGamma,
+        (1, 1),
+        false
+    )]
+    #[interpolate_test(
+        hlg_422,
+        MatrixCoefficients::BT2020NonConstantLuminance,
+        TransferCharacteristic::HybridLogGamma,
+        (1, 0),
+        false
+    )]
+    #[interpolate_test(
+        hlg_444,
+        MatrixCoefficients::BT2020NonConstantLuminance,
+        TransferCharacteristic::HybridLogGamma,
+        (0, 0),
+        false
+    )]
+    #[interpolate_test(
+        hlg_444_full,
+        MatrixCoefficients::BT2020NonConstantLuminance,
+        TransferCharacteristic::HybridLogGamma,
+        (0, 0),
+        true
+    )]
+    fn yuv_xyb_yuv_ident_10b(
+        mc: MatrixCoefficients,
+        tc: TransferCharacteristic,
+        ss: (u8, u8),
+        full_range: bool,
+    ) {
+        let y_dims = (320usize, 240usize);
+        let uv_dims = (y_dims.0 >> ss.0, y_dims.1 >> ss.1);
+        let mut data = [
+            vec![0u16; y_dims.0 * y_dims.1],
+            vec![0u16; uv_dims.0 * uv_dims.1],
+            vec![0u16; uv_dims.0 * uv_dims.1],
+        ];
+        let mut rng = rand::thread_rng();
+        for (i, plane) in data.iter_mut().enumerate() {
+            for val in plane.iter_mut() {
+                *val = rng.gen_range(if full_range {
+                    0..=1023
+                } else if i == 0 {
+                    64..=940
+                } else {
+                    64..=960
+                });
+            }
+        }
+        let yuv = Yuv::new(data, y_dims.0 as u32, y_dims.1 as u32, YuvConfig {
+            bit_depth: 10,
+            subsampling_x: ss.0,
+            subsampling_y: ss.1,
+            full_range,
+            matrix_coefficients: mc,
+            transfer_characteristics: tc,
+        })
+        .unwrap();
+        let xyb = Xyb::from(yuv.clone());
+        let yuv2 = Yuv::<u16>::try_from((xyb, yuv.config())).unwrap();
+        // assert_eq!(yuv.data(), yuv2.data());
+        assert_eq!(yuv.width(), yuv2.width());
+        assert_eq!(yuv.height(), yuv2.height());
+        assert_eq!(yuv.config(), yuv2.config());
+    }
+
+    #[interpolate_test(bt709_420, MatrixCoefficients::BT709, TransferCharacteristic::BT1886, (1, 1), false)]
+    #[interpolate_test(bt709_422, MatrixCoefficients::BT709, TransferCharacteristic::BT1886, (1, 0), false)]
+    #[interpolate_test(bt709_444, MatrixCoefficients::BT709, TransferCharacteristic::BT1886, (0, 0), false)]
+    #[interpolate_test(bt709_444_full, MatrixCoefficients::BT709, TransferCharacteristic::BT1886, (0, 0), true)]
+    #[interpolate_test(
+        bt2020_420,
+        MatrixCoefficients::BT2020NonConstantLuminance,
+        TransferCharacteristic::BT2020Ten,
+        (1, 1),
+        false
+    )]
+    #[interpolate_test(
+        bt2020_422,
+        MatrixCoefficients::BT2020NonConstantLuminance,
+        TransferCharacteristic::BT2020Ten,
+        (1, 0),
+        false
+    )]
+    #[interpolate_test(
+        bt2020_444,
+        MatrixCoefficients::BT2020NonConstantLuminance,
+        TransferCharacteristic::BT2020Ten,
+        (0, 0),
+        false
+    )]
+    #[interpolate_test(
+        bt2020_444_full,
+        MatrixCoefficients::BT2020NonConstantLuminance,
+        TransferCharacteristic::BT2020Ten,
+        (0, 0),
+        true
+    )]
+    #[interpolate_test(
+        pq_420,
+        MatrixCoefficients::BT2020NonConstantLuminance,
+        TransferCharacteristic::PerceptualQuantizer,
+        (1, 1),
+        false
+    )]
+    #[interpolate_test(
+        pq_422,
+        MatrixCoefficients::BT2020NonConstantLuminance,
+        TransferCharacteristic::PerceptualQuantizer,
+        (1, 0),
+        false
+    )]
+    #[interpolate_test(
+        pq_444,
+        MatrixCoefficients::BT2020NonConstantLuminance,
+        TransferCharacteristic::PerceptualQuantizer,
+        (0, 0),
+        false
+    )]
+    #[interpolate_test(
+        pq_444_full,
+        MatrixCoefficients::BT2020NonConstantLuminance,
+        TransferCharacteristic::PerceptualQuantizer,
+        (0, 0),
+        true
+    )]
+    #[interpolate_test(
+        hlg_420,
+        MatrixCoefficients::BT2020NonConstantLuminance,
+        TransferCharacteristic::HybridLogGamma,
+        (1, 1),
+        false
+    )]
+    #[interpolate_test(
+        hlg_422,
+        MatrixCoefficients::BT2020NonConstantLuminance,
+        TransferCharacteristic::HybridLogGamma,
+        (1, 0),
+        false
+    )]
+    #[interpolate_test(
+        hlg_444,
+        MatrixCoefficients::BT2020NonConstantLuminance,
+        TransferCharacteristic::HybridLogGamma,
+        (0, 0),
+        false
+    )]
+    #[interpolate_test(
+        hlg_444_full,
+        MatrixCoefficients::BT2020NonConstantLuminance,
+        TransferCharacteristic::HybridLogGamma,
+        (0, 0),
+        true
+    )]
+    fn xyb_yuv_xyb_ident_10b(
+        mc: MatrixCoefficients,
+        tc: TransferCharacteristic,
+        ss: (u8, u8),
+        full_range: bool,
+    ) {
+        let dims = (320usize, 240usize);
+        let mut data = vec![[0.0f32; 3]; dims.0 * dims.1];
+        let mut rng = rand::thread_rng();
+        for plane in &mut data {
+            for val in plane.iter_mut() {
+                *val = rng.gen_range(0.0..=1.0);
+            }
+        }
+        let config = YuvConfig {
+            bit_depth: 10,
+            subsampling_x: ss.0,
+            subsampling_y: ss.1,
+            full_range,
+            matrix_coefficients: mc,
+            transfer_characteristics: tc,
+        };
+        let xyb = Xyb::new(data, dims.0 as u32, dims.1 as u32).unwrap();
+        let yuv = Yuv::<u16>::try_from((xyb.clone(), config)).unwrap();
+        dbg!(&yuv.data()[0][0..8]);
+        let xyb2 = Xyb::from(yuv);
+        assert_eq!(xyb.data().len(), xyb2.data().len());
+        // dbg!((&xyb.data()[0..8], &xyb2.data()[0..8]));
+        for (pix1, pix2) in xyb.data().iter().zip(xyb2.data().iter()) {
+            assert!((pix1[0] - pix2[0]).abs() < f32::EPSILON);
+            assert!((pix1[1] - pix2[1]).abs() < f32::EPSILON);
+            assert!((pix1[2] - pix2[2]).abs() < f32::EPSILON);
+        }
+        assert_eq!(xyb.width(), xyb2.width());
+        assert_eq!(xyb.height(), xyb2.height());
     }
 }

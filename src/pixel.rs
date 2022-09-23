@@ -1,7 +1,9 @@
-use num_traits::{AsPrimitive, FromPrimitive, Num, PrimInt, ToPrimitive};
+use std::fmt::Debug;
+
+use num_traits::{AsPrimitive, FromPrimitive, Num, PrimInt, ToPrimitive, Zero};
 
 pub trait YuvPixel:
-    Num + PrimInt + ToPrimitive + FromPrimitive + AsPrimitive<f32> + Clone + Copy
+    Num + PrimInt + Zero + FromPrimitive + ToPrimitive + AsPrimitive<f32> + Clone + Copy + Debug
 {
 }
 

@@ -144,7 +144,7 @@ macro_rules! yuv_to_rgb {
         paste::item! {
             #[must_use]
             fn [<$name _to_rgb>]<T: YuvPixel>(input: &Yuv<T>) -> Vec<[f32; 3]> {
-                let mut output = vec![[0.0, 0.0, 0.0]; input.data().len()];
+                let mut output = vec![[0.0, 0.0, 0.0]; input.data()[0].len()];
                 let height = input.height() as usize;
                 let width = input.width() as usize;
                 let ss_y = input.config().subsampling_y;
@@ -160,19 +160,19 @@ macro_rules! yuv_to_rgb {
                         // it is immutable, so we know the length of the data array matches the
                         // specified bounds.
                         unsafe {
-                            let y = if $full_range {
+                            let y: f32 = if $full_range {
                                 data[0].get_unchecked(y_pos).as_()
                             } else {
                                 // This can be left as 255/219 because the resulting value
                                 // will be the same for all bit depths
                                 (255.0 / 219.0) * (data[0].get_unchecked(y_pos).as_() - limited_shift)
                             };
-                            let u = data[1].get_unchecked(c_pos).as_() - 128.0;
-                            let v = data[2].get_unchecked(c_pos).as_() - 128.0;
+                            let u: f32 = data[1].get_unchecked(c_pos).as_() - 128.0;
+                            let v: f32 = data[2].get_unchecked(c_pos).as_() - 128.0;
 
-                            let r = clamp(v.mul_add($rv_coeff, y), 0.0, max_val) / max_val;
-                            let g = clamp(v.mul_add($gv_coeff, u.mul_add($gu_coeff, y)), 0.0, max_val) / max_val;
-                            let b = clamp(u.mul_add($bu_coeff, y), 0.0, max_val) / max_val;
+                            let r = clamp(v.mul_add($rv_coeff, y) / max_val, 0.0, 1.0);
+                            let g = clamp(v.mul_add($gv_coeff, u.mul_add($gu_coeff, y)) / max_val, 0.0, 1.0);
+                            let b = clamp(u.mul_add($bu_coeff, y) / max_val, 0.0, 1.0);
                             *output.get_unchecked_mut(y_pos) = [r, g, b];
                         }
                     }
@@ -225,9 +225,9 @@ macro_rules! rgb_to_yuv {
                 let y_len = input.len();
                 let c_len = (input.len() >> ss_y) >> ss_x;
                 let mut output: [Vec<T>; 3] = [
-                    vec![T::from_u16(0).expect("u16 is the largest YuvPixel type"); y_len],
-                    vec![T::from_u16(0).expect("u16 is the largest YuvPixel type"); c_len],
-                    vec![T::from_u16(0).expect("u16 is the largest YuvPixel type"); c_len]
+                    vec![T::zero(); y_len],
+                    vec![T::zero(); c_len],
+                    vec![T::zero(); c_len]
                 ];
                 let height = height as usize;
                 let width = width as usize;
@@ -248,12 +248,20 @@ macro_rules! rgb_to_yuv {
                             let u = r.mul_add($ur_coeff, g.mul_add($ug_coeff, b.mul_add($ub_coeff, 128.0))) * mult;
                             let v = r.mul_add($vr_coeff, g.mul_add($vg_coeff, b.mul_add($vb_coeff, 128.0))) * mult;
 
-                            let y = T::from_f32(clamp(y.round(), if $full_range { 0.0 } else { 16.0 }, max_luma_val)).expect("rounded floats can convert to f32");
-                            let u = T::from_f32(clamp(u.round(), if $full_range { 0.0 } else { 16.0 }, max_chroma_val)).expect("rounded floats can convert to f32");
-                            let v = T::from_f32(clamp(v.round(), if $full_range { 0.0 } else { 16.0 }, max_chroma_val)).expect("rounded floats can convert to f32");
-                            *output[0].get_unchecked_mut(y_pos) = y;
-                            *output[1].get_unchecked_mut(c_pos) = u;
-                            *output[2].get_unchecked_mut(c_pos) = v;
+                            let y = clamp(y.round(), if $full_range { 0.0 } else { 16.0 }, max_luma_val) as u16;
+                            let u = clamp(u.round(), if $full_range { 0.0 } else { 16.0 }, max_chroma_val) as u16;
+                            let v = clamp(v.round(), if $full_range { 0.0 } else { 16.0 }, max_chroma_val) as u16;
+                            // There's no simple "as T" implementation in num-traits, and `T::from_u16` will panic
+                            // if `T` is `u8` because a `u16` can't fit in a `u8`. So we have to do this.
+                            if size_of::<T>() == 1 {
+                                *output[0].get_unchecked_mut(y_pos) = T::from_u8(y as u8).expect("This is a u8");
+                                *output[1].get_unchecked_mut(c_pos) = T::from_u8(u as u8).expect("This is a u8");
+                                *output[2].get_unchecked_mut(c_pos) = T::from_u8(v as u8).expect("This is a u8");
+                            } else {
+                                *output[0].get_unchecked_mut(y_pos) = T::from_u16(y).expect("This is a u16");
+                                *output[1].get_unchecked_mut(c_pos) = T::from_u16(u).expect("This is a u16");
+                                *output[2].get_unchecked_mut(c_pos) = T::from_u16(v).expect("This is a u16");
+                            }
                         }
                     }
                 }
@@ -558,5 +566,786 @@ fn rgb_gamma_decode(input: &[[f32; 3]], transfer: TransferCharacteristic) -> Vec
                 ]
             })
             .collect(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn bt601_full_to_rgb_8b() {
+        // These values were manually chosen semi-randomly
+        let yuv_pixels: Vec<(u8, u8, u8)> =
+            vec![(168, 152, 92), (71, 57, 230), (122, 122, 79), (133, 96, 39)];
+        let rgb_pixels: Vec<(f32, f32, f32)> = vec![
+            (115.0 / 255.0, 191.0 / 255.0, 180.0 / 255.0),
+            (238.0 / 255.0, 28.0 / 255.0, 39.0 / 255.0),
+            (84.0 / 255.0, 117.0 / 255.0, 178.0 / 255.0),
+            (82.0 / 255.0, 106.0 / 255.0, 254.0 / 255.0),
+        ];
+        let config = YuvConfig {
+            bit_depth: 8,
+            subsampling_x: 0,
+            subsampling_y: 0,
+            full_range: true,
+            matrix_coefficients: MatrixCoefficients::ST170M,
+            transfer_characteristics: TransferCharacteristic::BT1886,
+        };
+        let input = Yuv::new(
+            [
+                yuv_pixels.iter().map(|pix| pix.0).collect(),
+                yuv_pixels.iter().map(|pix| pix.1).collect(),
+                yuv_pixels.iter().map(|pix| pix.2).collect(),
+            ],
+            2,
+            2,
+            config,
+        )
+        .unwrap();
+        let rgb = bt601_full_to_rgb(&input);
+        dbg!(&rgb);
+        dbg!(&rgb_pixels);
+        for (output, expected) in rgb.iter().zip(rgb_pixels.iter()) {
+            assert!(
+                (output[0] - expected.0).abs() < 0.005,
+                "{:.4} != expected {:.4}",
+                output[0],
+                expected.0
+            );
+            assert!(
+                (output[1] - expected.1).abs() < 0.005,
+                "{:.4} != expected {:.4}",
+                output[1],
+                expected.1
+            );
+            assert!(
+                (output[2] - expected.2).abs() < 0.005,
+                "{:.4} != expected {:.4}",
+                output[2],
+                expected.2
+            );
+        }
+        let yuv: Yuv<u8> = rgb_to_bt601_full(&rgb, 2, 2, config).unwrap();
+        for (i, expected) in yuv_pixels.iter().enumerate() {
+            assert_eq!(yuv.data()[0][i], expected.0);
+            assert_eq!(yuv.data()[1][i], expected.1);
+            assert_eq!(yuv.data()[2][i], expected.2);
+        }
+    }
+
+    #[test]
+    fn bt601_limited_to_rgb_8b() {
+        // These values were manually chosen semi-randomly
+        let yuv_pixels: Vec<(u8, u8, u8)> = vec![
+            (160, 149, 97),
+            (77, 67, 215),
+            (121, 123, 86),
+            (130, 101, 52),
+        ];
+        let rgb_pixels: Vec<(f32, f32, f32)> = vec![
+            (115.0 / 255.0, 191.0 / 255.0, 180.0 / 255.0),
+            (238.0 / 255.0, 28.0 / 255.0, 39.0 / 255.0),
+            (84.0 / 255.0, 117.0 / 255.0, 178.0 / 255.0),
+            (82.0 / 255.0, 106.0 / 255.0, 254.0 / 255.0),
+        ];
+        let config = YuvConfig {
+            bit_depth: 8,
+            subsampling_x: 0,
+            subsampling_y: 0,
+            full_range: false,
+            matrix_coefficients: MatrixCoefficients::ST170M,
+            transfer_characteristics: TransferCharacteristic::BT1886,
+        };
+        let input = Yuv::new(
+            [
+                yuv_pixels.iter().map(|pix| pix.0).collect(),
+                yuv_pixels.iter().map(|pix| pix.1).collect(),
+                yuv_pixels.iter().map(|pix| pix.2).collect(),
+            ],
+            2,
+            2,
+            config,
+        )
+        .unwrap();
+        let rgb = bt601_limited_to_rgb(&input);
+        dbg!(&rgb);
+        dbg!(&rgb_pixels);
+        for (output, expected) in rgb.iter().zip(rgb_pixels.iter()) {
+            assert!(
+                (output[0] - expected.0).abs() < 0.005,
+                "{:.4} != expected {:.4}",
+                output[0],
+                expected.0
+            );
+            assert!(
+                (output[1] - expected.1).abs() < 0.005,
+                "{:.4} != expected {:.4}",
+                output[1],
+                expected.1
+            );
+            assert!(
+                (output[2] - expected.2).abs() < 0.005,
+                "{:.4} != expected {:.4}",
+                output[2],
+                expected.2
+            );
+        }
+        let yuv: Yuv<u8> = rgb_to_bt601_limited(&rgb, 2, 2, config).unwrap();
+        for (i, expected) in yuv_pixels.iter().enumerate() {
+            assert_eq!(yuv.data()[0][i], expected.0);
+            assert_eq!(yuv.data()[1][i], expected.1);
+            assert_eq!(yuv.data()[2][i], expected.2);
+        }
+    }
+
+    #[test]
+    fn bt601_full_to_rgb_10b() {
+        // These values were manually chosen semi-randomly
+        let yuv_pixels: Vec<(u16, u16, u16)> = vec![
+            (674, 609, 367),
+            (286, 226, 920),
+            (491, 487, 315),
+            (532, 385, 155),
+        ];
+        let rgb_pixels: Vec<(f32, f32, f32)> = vec![
+            (115.0 / 255.0, 191.0 / 255.0, 180.0 / 255.0),
+            (238.0 / 255.0, 28.0 / 255.0, 39.0 / 255.0),
+            (84.0 / 255.0, 117.0 / 255.0, 178.0 / 255.0),
+            (82.0 / 255.0, 106.0 / 255.0, 254.0 / 255.0),
+        ];
+        let config = YuvConfig {
+            bit_depth: 10,
+            subsampling_x: 0,
+            subsampling_y: 0,
+            full_range: true,
+            matrix_coefficients: MatrixCoefficients::ST170M,
+            transfer_characteristics: TransferCharacteristic::BT1886,
+        };
+        let input = Yuv::new(
+            [
+                yuv_pixels.iter().map(|pix| pix.0).collect(),
+                yuv_pixels.iter().map(|pix| pix.1).collect(),
+                yuv_pixels.iter().map(|pix| pix.2).collect(),
+            ],
+            2,
+            2,
+            config,
+        )
+        .unwrap();
+        let rgb = bt601_full_to_rgb(&input);
+        dbg!(&rgb);
+        dbg!(&rgb_pixels);
+        for (output, expected) in rgb.iter().zip(rgb_pixels.iter()) {
+            assert!(
+                (output[0] - expected.0).abs() < 0.005,
+                "{:.4} != expected {:.4}",
+                output[0],
+                expected.0
+            );
+            assert!(
+                (output[1] - expected.1).abs() < 0.005,
+                "{:.4} != expected {:.4}",
+                output[1],
+                expected.1
+            );
+            assert!(
+                (output[2] - expected.2).abs() < 0.005,
+                "{:.4} != expected {:.4}",
+                output[2],
+                expected.2
+            );
+        }
+        let yuv: Yuv<u16> = rgb_to_bt601_full(&rgb, 2, 2, config).unwrap();
+        for (i, expected) in yuv_pixels.iter().enumerate() {
+            assert_eq!(yuv.data()[0][i], expected.0);
+            assert_eq!(yuv.data()[1][i], expected.1);
+            assert_eq!(yuv.data()[2][i], expected.2);
+        }
+    }
+
+    #[test]
+    fn bt601_limited_to_rgb_10b() {
+        // These values were manually chosen semi-randomly
+        let yuv_pixels: Vec<(u16, u16, u16)> = vec![
+            (641, 595, 388),
+            (309, 267, 861),
+            (484, 490, 344),
+            (520, 403, 206),
+        ];
+        let rgb_pixels: Vec<(f32, f32, f32)> = vec![
+            (115.0 / 255.0, 191.0 / 255.0, 180.0 / 255.0),
+            (238.0 / 255.0, 28.0 / 255.0, 39.0 / 255.0),
+            (84.0 / 255.0, 117.0 / 255.0, 178.0 / 255.0),
+            (82.0 / 255.0, 106.0 / 255.0, 254.0 / 255.0),
+        ];
+        let config = YuvConfig {
+            bit_depth: 10,
+            subsampling_x: 0,
+            subsampling_y: 0,
+            full_range: false,
+            matrix_coefficients: MatrixCoefficients::ST170M,
+            transfer_characteristics: TransferCharacteristic::BT1886,
+        };
+        let input = Yuv::new(
+            [
+                yuv_pixels.iter().map(|pix| pix.0).collect(),
+                yuv_pixels.iter().map(|pix| pix.1).collect(),
+                yuv_pixels.iter().map(|pix| pix.2).collect(),
+            ],
+            2,
+            2,
+            config,
+        )
+        .unwrap();
+        let rgb = bt601_limited_to_rgb(&input);
+        dbg!(&rgb);
+        dbg!(&rgb_pixels);
+        for (output, expected) in rgb.iter().zip(rgb_pixels.iter()) {
+            assert!(
+                (output[0] - expected.0).abs() < 0.005,
+                "{:.4} != expected {:.4}",
+                output[0],
+                expected.0
+            );
+            assert!(
+                (output[1] - expected.1).abs() < 0.005,
+                "{:.4} != expected {:.4}",
+                output[1],
+                expected.1
+            );
+            assert!(
+                (output[2] - expected.2).abs() < 0.005,
+                "{:.4} != expected {:.4}",
+                output[2],
+                expected.2
+            );
+        }
+        let yuv: Yuv<u16> = rgb_to_bt601_limited(&rgb, 2, 2, config).unwrap();
+        for (i, expected) in yuv_pixels.iter().enumerate() {
+            assert_eq!(yuv.data()[0][i], expected.0);
+            assert_eq!(yuv.data()[1][i], expected.1);
+            assert_eq!(yuv.data()[2][i], expected.2);
+        }
+    }
+
+    #[test]
+    fn bt709_full_to_rgb_8b() {
+        // These values were manually chosen semi-randomly
+        let yuv_pixels: Vec<(u8, u8, u8)> = vec![
+            (174, 131, 91),
+            (73, 109, 232),
+            (114, 162, 109),
+            (112, 205, 109),
+        ];
+        let rgb_pixels: Vec<(f32, f32, f32)> = vec![
+            (115.0 / 255.0, 191.0 / 255.0, 180.0 / 255.0),
+            (238.0 / 255.0, 28.0 / 255.0, 39.0 / 255.0),
+            (84.0 / 255.0, 117.0 / 255.0, 178.0 / 255.0),
+            (82.0 / 255.0, 106.0 / 255.0, 254.0 / 255.0),
+        ];
+        let config = YuvConfig {
+            bit_depth: 8,
+            subsampling_x: 0,
+            subsampling_y: 0,
+            full_range: true,
+            matrix_coefficients: MatrixCoefficients::BT709,
+            transfer_characteristics: TransferCharacteristic::BT1886,
+        };
+        let input = Yuv::new(
+            [
+                yuv_pixels.iter().map(|pix| pix.0).collect(),
+                yuv_pixels.iter().map(|pix| pix.1).collect(),
+                yuv_pixels.iter().map(|pix| pix.2).collect(),
+            ],
+            2,
+            2,
+            config,
+        )
+        .unwrap();
+        let rgb = bt709_full_to_rgb(&input);
+        dbg!(&rgb);
+        dbg!(&rgb_pixels);
+        for (output, expected) in rgb.iter().zip(rgb_pixels.iter()) {
+            assert!(
+                (output[0] - expected.0).abs() < 0.005,
+                "{:.4} != expected {:.4}",
+                output[0],
+                expected.0
+            );
+            assert!(
+                (output[1] - expected.1).abs() < 0.005,
+                "{:.4} != expected {:.4}",
+                output[1],
+                expected.1
+            );
+            assert!(
+                (output[2] - expected.2).abs() < 0.005,
+                "{:.4} != expected {:.4}",
+                output[2],
+                expected.2
+            );
+        }
+        let yuv: Yuv<u8> = rgb_to_bt709_full(&rgb, 2, 2, config).unwrap();
+        for (i, expected) in yuv_pixels.iter().enumerate() {
+            assert_eq!(yuv.data()[0][i], expected.0);
+            assert_eq!(yuv.data()[1][i], expected.1);
+            assert_eq!(yuv.data()[2][i], expected.2);
+        }
+    }
+
+    #[test]
+    fn bt709_limited_to_rgb_8b() {
+        // These values were manually chosen semi-randomly
+        let yuv_pixels: Vec<(u8, u8, u8)> = vec![
+            (165, 131, 95),
+            (79, 112, 220),
+            (114, 158, 111),
+            (112, 195, 111),
+        ];
+        let rgb_pixels: Vec<(f32, f32, f32)> = vec![
+            (115.0 / 255.0, 191.0 / 255.0, 180.0 / 255.0),
+            (238.0 / 255.0, 28.0 / 255.0, 39.0 / 255.0),
+            (84.0 / 255.0, 117.0 / 255.0, 178.0 / 255.0),
+            (82.0 / 255.0, 106.0 / 255.0, 254.0 / 255.0),
+        ];
+        let config = YuvConfig {
+            bit_depth: 8,
+            subsampling_x: 0,
+            subsampling_y: 0,
+            full_range: false,
+            matrix_coefficients: MatrixCoefficients::BT709,
+            transfer_characteristics: TransferCharacteristic::BT1886,
+        };
+        let input = Yuv::new(
+            [
+                yuv_pixels.iter().map(|pix| pix.0).collect(),
+                yuv_pixels.iter().map(|pix| pix.1).collect(),
+                yuv_pixels.iter().map(|pix| pix.2).collect(),
+            ],
+            2,
+            2,
+            config,
+        )
+        .unwrap();
+        let rgb = bt709_limited_to_rgb(&input);
+        dbg!(&rgb);
+        dbg!(&rgb_pixels);
+        for (output, expected) in rgb.iter().zip(rgb_pixels.iter()) {
+            assert!(
+                (output[0] - expected.0).abs() < 0.005,
+                "{:.4} != expected {:.4}",
+                output[0],
+                expected.0
+            );
+            assert!(
+                (output[1] - expected.1).abs() < 0.005,
+                "{:.4} != expected {:.4}",
+                output[1],
+                expected.1
+            );
+            assert!(
+                (output[2] - expected.2).abs() < 0.005,
+                "{:.4} != expected {:.4}",
+                output[2],
+                expected.2
+            );
+        }
+        let yuv: Yuv<u8> = rgb_to_bt709_limited(&rgb, 2, 2, config).unwrap();
+        for (i, expected) in yuv_pixels.iter().enumerate() {
+            assert_eq!(yuv.data()[0][i], expected.0);
+            assert_eq!(yuv.data()[1][i], expected.1);
+            assert_eq!(yuv.data()[2][i], expected.2);
+        }
+    }
+
+    #[test]
+    fn bt709_full_to_rgb_10b() {
+        // These values were manually chosen semi-randomly
+        let yuv_pixels: Vec<(u16, u16, u16)> = vec![
+            (698, 525, 362),
+            (295, 438, 931),
+            (459, 650, 435),
+            (448, 820, 437),
+        ];
+        let rgb_pixels: Vec<(f32, f32, f32)> = vec![
+            (115.0 / 255.0, 191.0 / 255.0, 180.0 / 255.0),
+            (238.0 / 255.0, 28.0 / 255.0, 39.0 / 255.0),
+            (84.0 / 255.0, 117.0 / 255.0, 178.0 / 255.0),
+            (82.0 / 255.0, 106.0 / 255.0, 254.0 / 255.0),
+        ];
+        let config = YuvConfig {
+            bit_depth: 10,
+            subsampling_x: 0,
+            subsampling_y: 0,
+            full_range: true,
+            matrix_coefficients: MatrixCoefficients::BT709,
+            transfer_characteristics: TransferCharacteristic::BT1886,
+        };
+        let input = Yuv::new(
+            [
+                yuv_pixels.iter().map(|pix| pix.0).collect(),
+                yuv_pixels.iter().map(|pix| pix.1).collect(),
+                yuv_pixels.iter().map(|pix| pix.2).collect(),
+            ],
+            2,
+            2,
+            config,
+        )
+        .unwrap();
+        let rgb = bt709_full_to_rgb(&input);
+        dbg!(&rgb);
+        dbg!(&rgb_pixels);
+        for (output, expected) in rgb.iter().zip(rgb_pixels.iter()) {
+            assert!(
+                (output[0] - expected.0).abs() < 0.005,
+                "{:.4} != expected {:.4}",
+                output[0],
+                expected.0
+            );
+            assert!(
+                (output[1] - expected.1).abs() < 0.005,
+                "{:.4} != expected {:.4}",
+                output[1],
+                expected.1
+            );
+            assert!(
+                (output[2] - expected.2).abs() < 0.005,
+                "{:.4} != expected {:.4}",
+                output[2],
+                expected.2
+            );
+        }
+        let yuv: Yuv<u16> = rgb_to_bt709_full(&rgb, 2, 2, config).unwrap();
+        for (i, expected) in yuv_pixels.iter().enumerate() {
+            assert_eq!(yuv.data()[0][i], expected.0);
+            assert_eq!(yuv.data()[1][i], expected.1);
+            assert_eq!(yuv.data()[2][i], expected.2);
+        }
+    }
+
+    #[test]
+    fn bt709_limited_to_rgb_10b() {
+        // These values were manually chosen semi-randomly
+        let yuv_pixels: Vec<(u16, u16, u16)> = vec![
+            (662, 523, 380),
+            (316, 447, 879),
+            (457, 632, 444),
+            (447, 782, 446),
+        ];
+        let rgb_pixels: Vec<(f32, f32, f32)> = vec![
+            (115.0 / 255.0, 191.0 / 255.0, 180.0 / 255.0),
+            (238.0 / 255.0, 28.0 / 255.0, 39.0 / 255.0),
+            (84.0 / 255.0, 117.0 / 255.0, 178.0 / 255.0),
+            (82.0 / 255.0, 106.0 / 255.0, 254.0 / 255.0),
+        ];
+        let config = YuvConfig {
+            bit_depth: 10,
+            subsampling_x: 0,
+            subsampling_y: 0,
+            full_range: false,
+            matrix_coefficients: MatrixCoefficients::BT709,
+            transfer_characteristics: TransferCharacteristic::BT1886,
+        };
+        let input = Yuv::new(
+            [
+                yuv_pixels.iter().map(|pix| pix.0).collect(),
+                yuv_pixels.iter().map(|pix| pix.1).collect(),
+                yuv_pixels.iter().map(|pix| pix.2).collect(),
+            ],
+            2,
+            2,
+            config,
+        )
+        .unwrap();
+        let rgb = bt709_limited_to_rgb(&input);
+        dbg!(&rgb);
+        dbg!(&rgb_pixels);
+        for (output, expected) in rgb.iter().zip(rgb_pixels.iter()) {
+            assert!(
+                (output[0] - expected.0).abs() < 0.005,
+                "{:.4} != expected {:.4}",
+                output[0],
+                expected.0
+            );
+            assert!(
+                (output[1] - expected.1).abs() < 0.005,
+                "{:.4} != expected {:.4}",
+                output[1],
+                expected.1
+            );
+            assert!(
+                (output[2] - expected.2).abs() < 0.005,
+                "{:.4} != expected {:.4}",
+                output[2],
+                expected.2
+            );
+        }
+        let yuv: Yuv<u16> = rgb_to_bt709_limited(&rgb, 2, 2, config).unwrap();
+        for (i, expected) in yuv_pixels.iter().enumerate() {
+            assert_eq!(yuv.data()[0][i], expected.0);
+            assert_eq!(yuv.data()[1][i], expected.1);
+            assert_eq!(yuv.data()[2][i], expected.2);
+        }
+    }
+
+    #[test]
+    fn bt2020_full_to_rgb_8b() {
+        // These values were manually chosen semi-randomly
+        let yuv_pixels: Vec<(u8, u8, u8)> = vec![
+            (170, 133, 90),
+            (84, 104, 233),
+            (112, 163, 109),
+            (108, 205, 110),
+        ];
+        let rgb_pixels: Vec<(f32, f32, f32)> = vec![
+            (115.0 / 255.0, 191.0 / 255.0, 180.0 / 255.0),
+            (238.0 / 255.0, 28.0 / 255.0, 39.0 / 255.0),
+            (84.0 / 255.0, 117.0 / 255.0, 178.0 / 255.0),
+            (82.0 / 255.0, 106.0 / 255.0, 254.0 / 255.0),
+        ];
+        let config = YuvConfig {
+            bit_depth: 8,
+            subsampling_x: 0,
+            subsampling_y: 0,
+            full_range: true,
+            matrix_coefficients: MatrixCoefficients::BT2020NonConstantLuminance,
+            transfer_characteristics: TransferCharacteristic::BT2020Ten,
+        };
+        let input = Yuv::new(
+            [
+                yuv_pixels.iter().map(|pix| pix.0).collect(),
+                yuv_pixels.iter().map(|pix| pix.1).collect(),
+                yuv_pixels.iter().map(|pix| pix.2).collect(),
+            ],
+            2,
+            2,
+            config,
+        )
+        .unwrap();
+        let rgb = bt2020_full_to_rgb(&input);
+        dbg!(&rgb);
+        dbg!(&rgb_pixels);
+        for (output, expected) in rgb.iter().zip(rgb_pixels.iter()) {
+            assert!(
+                (output[0] - expected.0).abs() < 0.005,
+                "{:.4} != expected {:.4}",
+                output[0],
+                expected.0
+            );
+            assert!(
+                (output[1] - expected.1).abs() < 0.005,
+                "{:.4} != expected {:.4}",
+                output[1],
+                expected.1
+            );
+            assert!(
+                (output[2] - expected.2).abs() < 0.005,
+                "{:.4} != expected {:.4}",
+                output[2],
+                expected.2
+            );
+        }
+        let yuv: Yuv<u8> = rgb_to_bt2020_full(&rgb, 2, 2, config).unwrap();
+        for (i, expected) in yuv_pixels.iter().enumerate() {
+            assert_eq!(yuv.data()[0][i], expected.0);
+            assert_eq!(yuv.data()[1][i], expected.1);
+            assert_eq!(yuv.data()[2][i], expected.2);
+        }
+    }
+
+    #[test]
+    fn bt2020_limited_to_rgb_8b() {
+        // These values were manually chosen semi-randomly
+        let yuv_pixels: Vec<(u8, u8, u8)> = vec![
+            (162, 132, 95),
+            (88, 107, 220),
+            (112, 159, 111),
+            (109, 196, 112),
+        ];
+        let rgb_pixels: Vec<(f32, f32, f32)> = vec![
+            (115.0 / 255.0, 191.0 / 255.0, 180.0 / 255.0),
+            (238.0 / 255.0, 28.0 / 255.0, 39.0 / 255.0),
+            (84.0 / 255.0, 117.0 / 255.0, 178.0 / 255.0),
+            (82.0 / 255.0, 106.0 / 255.0, 254.0 / 255.0),
+        ];
+        let config = YuvConfig {
+            bit_depth: 8,
+            subsampling_x: 0,
+            subsampling_y: 0,
+            full_range: false,
+            matrix_coefficients: MatrixCoefficients::BT2020NonConstantLuminance,
+            transfer_characteristics: TransferCharacteristic::BT2020Ten,
+        };
+        let input = Yuv::new(
+            [
+                yuv_pixels.iter().map(|pix| pix.0).collect(),
+                yuv_pixels.iter().map(|pix| pix.1).collect(),
+                yuv_pixels.iter().map(|pix| pix.2).collect(),
+            ],
+            2,
+            2,
+            config,
+        )
+        .unwrap();
+        let rgb = bt2020_limited_to_rgb(&input);
+        dbg!(&rgb);
+        dbg!(&rgb_pixels);
+        for (output, expected) in rgb.iter().zip(rgb_pixels.iter()) {
+            assert!(
+                (output[0] - expected.0).abs() < 0.005,
+                "{:.4} != expected {:.4}",
+                output[0],
+                expected.0
+            );
+            assert!(
+                (output[1] - expected.1).abs() < 0.005,
+                "{:.4} != expected {:.4}",
+                output[1],
+                expected.1
+            );
+            assert!(
+                (output[2] - expected.2).abs() < 0.005,
+                "{:.4} != expected {:.4}",
+                output[2],
+                expected.2
+            );
+        }
+        let yuv: Yuv<u8> = rgb_to_bt2020_limited(&rgb, 2, 2, config).unwrap();
+        for (i, expected) in yuv_pixels.iter().enumerate() {
+            assert_eq!(yuv.data()[0][i], expected.0);
+            assert_eq!(yuv.data()[1][i], expected.1);
+            assert_eq!(yuv.data()[2][i], expected.2);
+        }
+    }
+
+    #[test]
+    fn bt2020_full_to_rgb_10b() {
+        // These values were manually chosen semi-randomly
+        let yuv_pixels: Vec<(u16, u16, u16)> = vec![
+            (684, 533, 361),
+            (336, 416, 931),
+            (449, 653, 436),
+            (435, 822, 440),
+        ];
+        let rgb_pixels: Vec<(f32, f32, f32)> = vec![
+            (115.0 / 255.0, 191.0 / 255.0, 180.0 / 255.0),
+            (238.0 / 255.0, 28.0 / 255.0, 39.0 / 255.0),
+            (84.0 / 255.0, 117.0 / 255.0, 178.0 / 255.0),
+            (82.0 / 255.0, 106.0 / 255.0, 254.0 / 255.0),
+        ];
+        let config = YuvConfig {
+            bit_depth: 10,
+            subsampling_x: 0,
+            subsampling_y: 0,
+            full_range: true,
+            matrix_coefficients: MatrixCoefficients::BT2020NonConstantLuminance,
+            transfer_characteristics: TransferCharacteristic::BT2020Ten,
+        };
+        let input = Yuv::new(
+            [
+                yuv_pixels.iter().map(|pix| pix.0).collect(),
+                yuv_pixels.iter().map(|pix| pix.1).collect(),
+                yuv_pixels.iter().map(|pix| pix.2).collect(),
+            ],
+            2,
+            2,
+            config,
+        )
+        .unwrap();
+        let rgb = bt2020_full_to_rgb(&input);
+        dbg!(&rgb);
+        dbg!(&rgb_pixels);
+        for (output, expected) in rgb.iter().zip(rgb_pixels.iter()) {
+            assert!(
+                (output[0] - expected.0).abs() < 0.005,
+                "{:.4} != expected {:.4}",
+                output[0],
+                expected.0
+            );
+            assert!(
+                (output[1] - expected.1).abs() < 0.005,
+                "{:.4} != expected {:.4}",
+                output[1],
+                expected.1
+            );
+            assert!(
+                (output[2] - expected.2).abs() < 0.005,
+                "{:.4} != expected {:.4}",
+                output[2],
+                expected.2
+            );
+        }
+        let yuv: Yuv<u16> = rgb_to_bt2020_full(&rgb, 2, 2, config).unwrap();
+        for (i, expected) in yuv_pixels.iter().enumerate() {
+            assert_eq!(yuv.data()[0][i], expected.0);
+            assert_eq!(yuv.data()[1][i], expected.1);
+            assert_eq!(yuv.data()[2][i], expected.2);
+        }
+    }
+
+    #[test]
+    fn bt2020_limited_to_rgb_10b() {
+        // These values were manually chosen semi-randomly
+        let yuv_pixels: Vec<(u16, u16, u16)> = vec![
+            (649, 530, 380),
+            (352, 428, 879),
+            (449, 635, 445),
+            (437, 784, 449),
+        ];
+        let rgb_pixels: Vec<(f32, f32, f32)> = vec![
+            (115.0 / 255.0, 191.0 / 255.0, 180.0 / 255.0),
+            (238.0 / 255.0, 28.0 / 255.0, 39.0 / 255.0),
+            (84.0 / 255.0, 117.0 / 255.0, 178.0 / 255.0),
+            (82.0 / 255.0, 106.0 / 255.0, 254.0 / 255.0),
+        ];
+        let config = YuvConfig {
+            bit_depth: 10,
+            subsampling_x: 0,
+            subsampling_y: 0,
+            full_range: false,
+            matrix_coefficients: MatrixCoefficients::BT2020NonConstantLuminance,
+            transfer_characteristics: TransferCharacteristic::BT2020Ten,
+        };
+        let input = Yuv::new(
+            [
+                yuv_pixels.iter().map(|pix| pix.0).collect(),
+                yuv_pixels.iter().map(|pix| pix.1).collect(),
+                yuv_pixels.iter().map(|pix| pix.2).collect(),
+            ],
+            2,
+            2,
+            config,
+        )
+        .unwrap();
+        let rgb = bt2020_limited_to_rgb(&input);
+        dbg!(&rgb);
+        dbg!(&rgb_pixels);
+        for (output, expected) in rgb.iter().zip(rgb_pixels.iter()) {
+            assert!(
+                (output[0] - expected.0).abs() < 0.005,
+                "{:.4} != expected {:.4}",
+                output[0],
+                expected.0
+            );
+            assert!(
+                (output[1] - expected.1).abs() < 0.005,
+                "{:.4} != expected {:.4}",
+                output[1],
+                expected.1
+            );
+            assert!(
+                (output[2] - expected.2).abs() < 0.005,
+                "{:.4} != expected {:.4}",
+                output[2],
+                expected.2
+            );
+        }
+        let yuv: Yuv<u16> = rgb_to_bt2020_limited(&rgb, 2, 2, config).unwrap();
+        for (i, expected) in yuv_pixels.iter().enumerate() {
+            assert_eq!(yuv.data()[0][i], expected.0);
+            assert_eq!(yuv.data()[1][i], expected.1);
+            assert_eq!(yuv.data()[2][i], expected.2);
+        }
     }
 }
