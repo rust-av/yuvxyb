@@ -2,11 +2,7 @@ use anyhow::{bail, Result};
 use av_data::pixel::TransferCharacteristic;
 use debug_unreachable::debug_unreachable;
 
-const ST2084_PEAK_LUMINANCE: f32 = 10_000.0;
-const HLG_PEAK_LUMINANCE: f32 = 1_000.0;
-const DEFAULT_PEAK_LUMINANCE: f32 = 1_000.0;
-
-pub(crate) trait TransferFunction {
+pub trait TransferFunction {
     fn to_linear(&self, input: &[[f32; 3]]) -> Result<Vec<[f32; 3]>>;
     fn to_gamma(&self, input: &[[f32; 3]]) -> Result<Vec<[f32; 3]>>;
 }
@@ -109,6 +105,7 @@ impl TransferFunction for TransferCharacteristic {
         })
     }
 
+    #[allow(clippy::too_many_lines)]
     fn to_gamma(&self, input: &[[f32; 3]]) -> Result<Vec<[f32; 3]>> {
         Ok(match *self {
             TransferCharacteristic::Logarithmic100 => input
@@ -219,29 +216,26 @@ impl TransferFunction for TransferCharacteristic {
     }
 }
 
-const REC709_ALPHA: f32 = 1.099_296_826_809_44;
-const REC709_BETA: f32 = 0.018_053_968_510_807;
-
-const SMPTE_240M_ALPHA: f32 = 1.111_572_195_921_731;
-const SMPTE_240M_BETA: f32 = 0.022_821_585_529_445;
+const REC709_ALPHA: f32 = 1.099_296_8;
+const REC709_BETA: f32 = 0.018_053_97;
 
 // Adjusted for continuity of first derivative.
-const SRGB_ALPHA: f32 = 1.055_010_718_947_587;
-const SRGB_BETA: f32 = 0.003_041_282_560_128;
+const SRGB_ALPHA: f32 = 1.055_010_7;
+const SRGB_BETA: f32 = 0.003_041_282_5;
 
-const ST2084_M1: f32 = 0.159_301_757_812_5;
+const ST2084_M1: f32 = 0.159_301_76;
 const ST2084_M2: f32 = 78.84375;
 const ST2084_C1: f32 = 0.835_937_5;
-const ST2084_C2: f32 = 18.851_562_5;
+const ST2084_C2: f32 = 18.851_563;
 const ST2084_C3: f32 = 18.6875;
 
 // Chosen for compatibility with higher precision REC709_ALPHA/REC709_BETA.
 // See: ITU-R BT.2390-2 5.3.1
-const ST2084_OOTF_SCALE: f32 = 59.490_802_387_153_83;
+const ST2084_OOTF_SCALE: f32 = 59.490_803;
 
 const ARIB_B67_A: f32 = 0.178_832_77;
 const ARIB_B67_B: f32 = 0.284_668_92;
-const ARIB_B67_C: f32 = 0.559_910_73;
+const ARIB_B67_C: f32 = 0.559_910_7;
 
 #[inline(always)]
 fn log100_oetf(x: f32) -> f32 {
@@ -263,7 +257,7 @@ fn log100_inverse_oetf(x: f32) -> f32 {
 
 #[inline(always)]
 fn log316_oetf(x: f32) -> f32 {
-    if x <= 0.003_162_277_66 {
+    if x <= 0.003_162_277_6 {
         0.0
     } else {
         1.0 + x.log10() / 2.5
@@ -273,7 +267,7 @@ fn log316_oetf(x: f32) -> f32 {
 #[inline(always)]
 fn log316_inverse_oetf(x: f32) -> f32 {
     if x <= 0.0 {
-        0.003_162_277_66
+        0.003_162_277_6
     } else {
         10.0f32.powf(2.5 * (x - 1.0))
     }
@@ -341,7 +335,8 @@ fn rec_709_oetf(x: f32) -> f32 {
     if x < REC709_BETA {
         x * 4.5
     } else {
-        REC709_ALPHA * x.powf(0.45) - (REC709_ALPHA - 1.0)
+        // REC709_ALPHA * x.powf(0.45) - (REC709_ALPHA - 1.0)
+        REC709_ALPHA.mul_add(x.powf(0.45), -(REC709_ALPHA - 1.0))
     }
 }
 
@@ -358,19 +353,19 @@ fn rec_709_inverse_oetf(x: f32) -> f32 {
 
 #[inline(always)]
 fn xvycc_eotf(x: f32) -> f32 {
-    if x < 0.0 || x > 1.0 {
-        rec_709_inverse_oetf(x.abs()).copysign(x)
-    } else {
+    if (0.0..=1.0).contains(&x) {
         rec_1886_eotf(x.abs()).copysign(x)
+    } else {
+        rec_709_inverse_oetf(x.abs()).copysign(x)
     }
 }
 
 #[inline(always)]
 fn xvycc_inverse_eotf(x: f32) -> f32 {
-    if x < 0.0 || x > 1.0 {
-        rec_709_oetf(x.abs()).copysign(x)
-    } else {
+    if (0.0..=1.0).contains(&x) {
         rec_1886_inverse_eotf(x.abs()).copysign(x)
+    } else {
+        rec_709_oetf(x.abs()).copysign(x)
     }
 }
 
@@ -392,7 +387,8 @@ fn srgb_inverse_eotf(x: f32) -> f32 {
     if x < SRGB_BETA {
         x * 12.92
     } else {
-        SRGB_ALPHA * x.powf(1.0 / 2.4) - (SRGB_ALPHA - 1.0)
+        // SRGB_ALPHA * x.powf(1.0 / 2.4) - (SRGB_ALPHA - 1.0)
+        SRGB_ALPHA.mul_add(x.powf(1.0 / 2.4), -(SRGB_ALPHA - 1.0))
     }
 }
 
@@ -405,8 +401,10 @@ fn st_2084_inverse_eotf(x: f32) -> f32 {
         let xpow = x.powf(ST2084_M1);
 
         // More stable arrangement that avoids some cancellation error.
-        let num = (ST2084_C1 - 1.0) + (ST2084_C2 - ST2084_C3) * xpow;
-        let den = 1.0 + ST2084_C3 * xpow;
+        // (ST2084_C1 - 1.0) + (ST2084_C2 - ST2084_C3) * xpow
+        let num = (ST2084_C2 - ST2084_C3).mul_add(xpow, ST2084_C1 - 1.0);
+        // 1.0 + ST2084_C3 * xpow
+        let den = ST2084_C3.mul_add(xpow, 1.0);
         (1.0 + num / den).powf(ST2084_M2)
     } else {
         0.0
@@ -463,6 +461,7 @@ fn arib_b67_oetf(x: f32) -> f32 {
     if x <= 1.0 / 12.0 {
         (3.0 * x).sqrt()
     } else {
-        ARIB_B67_A * (12.0 * x - ARIB_B67_B).ln() + ARIB_B67_C
+        // ARIB_B67_A * (12.0 * x - ARIB_B67_B).ln() + ARIB_B67_C
+        ARIB_B67_A.mul_add((12.0f32.mul_add(x, -ARIB_B67_B)).ln(), ARIB_B67_C)
     }
 }

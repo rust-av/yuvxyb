@@ -218,7 +218,7 @@ impl YuvConfig {
 }
 
 // Heuristic taken from mpv
-fn guess_matrix_coefficients(width: u32, height: u32) -> MatrixCoefficients {
+const fn guess_matrix_coefficients(width: u32, height: u32) -> MatrixCoefficients {
     if width >= 1280 || height > 576 {
         MatrixCoefficients::BT709
     } else if height == 576 {
@@ -234,9 +234,7 @@ fn guess_color_primaries(matrix: MatrixCoefficients, width: u32, height: u32) ->
         || matrix == MatrixCoefficients::BT2020ConstantLuminance
     {
         ColorPrimaries::BT2020
-    } else if matrix == MatrixCoefficients::BT709 {
-        ColorPrimaries::BT709
-    } else if width >= 1280 || height > 576 {
+    } else if matrix == MatrixCoefficients::BT709 || width >= 1280 || height > 576 {
         ColorPrimaries::BT709
     } else if height == 576 {
         ColorPrimaries::BT470BG
@@ -268,10 +266,8 @@ impl<T: YuvPixel> TryFrom<(Xyb, YuvConfig)> for Yuv<T> {
     fn try_from(other: (Xyb, YuvConfig)) -> Result<Self> {
         let data = other.0;
         let config = other.1.fix_unspecified_data(data.width(), data.height());
-        // dbg!(&other.0.data[0..8]);
-        let lrgb = xyb_to_linear_rgb(&other.0.data);
-        // dbg!(&lrgb[0..8]);
-        linear_rgb_to_yuv(&lrgb, other.0.width(), other.0.height(), other.1)
+        let lrgb = xyb_to_linear_rgb(data.data());
+        linear_rgb_to_yuv(&lrgb, data.width(), data.height(), config)
     }
 }
 
@@ -368,7 +364,7 @@ mod tests {
         };
         let xyb = Xyb::new(data, dims.0 as u32, dims.1 as u32).unwrap();
         let yuv = Yuv::<u8>::try_from((xyb.clone(), config)).unwrap();
-        let xyb2 = Xyb::try_from(yuv.clone()).unwrap();
+        let xyb2 = Xyb::try_from(yuv).unwrap();
         assert_eq!(xyb.data().len(), xyb2.data().len());
         for (pix1, pix2) in xyb.data().iter().zip(xyb2.data().iter()) {
             assert!((pix1[0] - pix2[0]).abs() < f32::EPSILON);
@@ -649,8 +645,7 @@ mod tests {
         };
         let xyb = Xyb::new(data, dims.0 as u32, dims.1 as u32).unwrap();
         let yuv = Yuv::<u16>::try_from((xyb.clone(), config)).unwrap();
-        dbg!(&yuv.data()[0][0..8]);
-        let xyb2 = Xyb::try_from(yuv.clone()).unwrap();
+        let xyb2 = Xyb::try_from(yuv).unwrap();
         assert_eq!(xyb.data().len(), xyb2.data().len());
         // dbg!((&xyb.data()[0..8], &xyb2.data()[0..8]));
         for (pix1, pix2) in xyb.data().iter().zip(xyb2.data().iter()) {
