@@ -3,7 +3,7 @@ use av_data::pixel::{ColorPrimaries, MatrixCoefficients};
 use debug_unreachable::debug_unreachable;
 use nalgebra::{Matrix1x3, Matrix3, Matrix3x1};
 
-use super::{from_yuv444f32, to_yuv444f32};
+use super::{ycbcr_to_ypbpr, ypbpr_to_ycbcr};
 use crate::{Yuv, YuvConfig, YuvPixel};
 
 pub fn get_yuv_to_rgb_matrix(config: YuvConfig) -> Result<Matrix3<f32>> {
@@ -185,15 +185,16 @@ fn xy_to_xyz(x: f32, y: f32) -> [f32; 3] {
 /// in a range of 0.0..=1.0;
 pub fn yuv_to_rgb<T: YuvPixel>(input: &Yuv<T>) -> Result<Vec<[f32; 3]>> {
     let transform = get_yuv_to_rgb_matrix(input.config())?;
-    let data = to_yuv444f32(input);
-    Ok(data
+    let data = ycbcr_to_ypbpr(input);
+    let data = data
         .into_iter()
         .map(|pix| {
             let pix = Matrix3x1::from_column_slice(&pix);
             let res = transform * pix;
             [res[0], res[1], res[2]]
         })
-        .collect::<Vec<_>>())
+        .collect::<Vec<_>>();
+    Ok(data)
 }
 
 /// Converts 32-bit floating point gamma-corrected RGB in a range of 0.0..=1.0
@@ -216,7 +217,7 @@ pub fn rgb_to_yuv<T: YuvPixel>(
             [res[0], res[1], res[2]]
         })
         .collect::<Vec<_>>();
-    Ok(from_yuv444f32(
+    Ok(ypbpr_to_ycbcr(
         &yuv,
         width as usize,
         height as usize,

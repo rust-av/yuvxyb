@@ -647,7 +647,6 @@ mod tests {
         let yuv = Yuv::<u16>::try_from((xyb.clone(), config)).unwrap();
         let xyb2 = Xyb::try_from(yuv).unwrap();
         assert_eq!(xyb.data().len(), xyb2.data().len());
-        // dbg!((&xyb.data()[0..8], &xyb2.data()[0..8]));
         for (pix1, pix2) in xyb.data().iter().zip(xyb2.data().iter()) {
             assert!((pix1[0] - pix2[0]).abs() < f32::EPSILON);
             assert!((pix1[1] - pix2[1]).abs() < f32::EPSILON);
