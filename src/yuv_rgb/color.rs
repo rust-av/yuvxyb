@@ -185,7 +185,7 @@ fn xy_to_xyz(x: f32, y: f32) -> [f32; 3] {
 /// in a range of 0.0..=1.0;
 pub fn yuv_to_rgb<T: YuvPixel>(input: &Yuv<T>) -> Result<Vec<[f32; 3]>> {
     let transform = get_yuv_to_rgb_matrix(input.config())?;
-    let data = ycbcr_to_ypbpr(input);
+    let data = ycbcr_to_ypbpr(input)?;
     let data = data
         .into_iter()
         .map(|pix| {
@@ -217,12 +217,7 @@ pub fn rgb_to_yuv<T: YuvPixel>(
             [res[0], res[1], res[2]]
         })
         .collect::<Vec<_>>();
-    Ok(ypbpr_to_ycbcr(
-        &yuv,
-        width as usize,
-        height as usize,
-        config,
-    ))
+    ypbpr_to_ycbcr(&yuv, width as usize, height as usize, config)
 }
 
 #[cfg(test)]

@@ -10,7 +10,7 @@ mod transfer;
 
 use std::mem::size_of;
 
-use anyhow::Result;
+use anyhow::{bail, Result};
 use num_traits::clamp;
 
 use self::{
@@ -41,14 +41,52 @@ pub fn linear_rgb_to_yuv<T: YuvPixel>(
     rgb_to_yuv(&rgb, width, height, config)
 }
 
-#[must_use]
-fn ycbcr_to_ypbpr<T: YuvPixel>(input: &Yuv<T>) -> Vec<[f32; 3]> {
+fn ycbcr_to_ypbpr<T: YuvPixel>(input: &Yuv<T>) -> Result<Vec<[f32; 3]>> {
     let w = input.width() as usize;
     let h = input.height() as usize;
     let ss_x = input.config().subsampling_x;
     let ss_y = input.config().subsampling_y;
     let bd = input.config().bit_depth;
     let full_range = input.config().full_range;
+
+    let to_luma: &dyn Fn(T) -> f32 = match (bd, full_range) {
+        (8, false) => &to_f32_luma::<T, 8, false>,
+        (10, false) => &to_f32_luma::<T, 10, false>,
+        (12, false) => &to_f32_luma::<T, 12, false>,
+        (8, true) => &to_f32_luma::<T, 8, true>,
+        (9, true) => &to_f32_luma::<T, 9, true>,
+        (10, true) => &to_f32_luma::<T, 10, true>,
+        (11, true) => &to_f32_luma::<T, 11, true>,
+        (12, true) => &to_f32_luma::<T, 12, true>,
+        (13, true) => &to_f32_luma::<T, 13, true>,
+        (14, true) => &to_f32_luma::<T, 14, true>,
+        (15, true) => &to_f32_luma::<T, 15, true>,
+        (16, true) => &to_f32_luma::<T, 16, true>,
+        _ => {
+            bail!(
+                "Bit depths 8, 10, and 12 for limited range or 8-16 for full range are supported"
+            );
+        }
+    };
+    let to_chroma: &dyn Fn(T) -> f32 = match (bd, full_range) {
+        (8, false) => &to_f32_chroma::<T, 8, false>,
+        (10, false) => &to_f32_chroma::<T, 10, false>,
+        (12, false) => &to_f32_chroma::<T, 12, false>,
+        (8, true) => &to_f32_chroma::<T, 8, true>,
+        (9, true) => &to_f32_chroma::<T, 9, true>,
+        (10, true) => &to_f32_chroma::<T, 10, true>,
+        (11, true) => &to_f32_chroma::<T, 11, true>,
+        (12, true) => &to_f32_chroma::<T, 12, true>,
+        (13, true) => &to_f32_chroma::<T, 13, true>,
+        (14, true) => &to_f32_chroma::<T, 14, true>,
+        (15, true) => &to_f32_chroma::<T, 15, true>,
+        (16, true) => &to_f32_chroma::<T, 16, true>,
+        _ => {
+            bail!(
+                "Bit depths 8, 10, and 12 for limited range or 8-16 for full range are supported"
+            );
+        }
+    };
 
     let data = input.data();
     let mut output = vec![[0.0, 0.0, 0.0]; w * h];
@@ -59,14 +97,14 @@ fn ycbcr_to_ypbpr<T: YuvPixel>(input: &Yuv<T>) -> Vec<[f32; 3]> {
             // SAFETY: The bounds of the YUV data are validated when we construct it.
             unsafe {
                 *output.get_unchecked_mut(y_pos) = [
-                    to_f32_luma(*data[0].get_unchecked(y_pos), bd, full_range),
-                    to_f32_chroma(*data[1].get_unchecked(uv_pos), bd, full_range),
-                    to_f32_chroma(*data[2].get_unchecked(uv_pos), bd, full_range),
+                    to_luma(*data[0].get_unchecked(y_pos)),
+                    to_chroma(*data[1].get_unchecked(uv_pos)),
+                    to_chroma(*data[2].get_unchecked(uv_pos)),
                 ];
             }
         }
     }
-    output
+    Ok(output)
 }
 
 fn ypbpr_to_ycbcr<T: YuvPixel>(
@@ -74,12 +112,51 @@ fn ypbpr_to_ycbcr<T: YuvPixel>(
     width: usize,
     height: usize,
     config: YuvConfig,
-) -> Yuv<T> {
+) -> Result<Yuv<T>> {
     let ss_x = config.subsampling_x;
     let ss_y = config.subsampling_y;
     let bd = config.bit_depth;
     let full_range = config.full_range;
     let chroma_size = (width >> ss_x) * (height >> ss_y);
+
+    let from_luma: &dyn Fn(f32) -> T = match (bd, full_range) {
+        (8, false) => &from_f32_luma::<T, 8, false>,
+        (10, false) => &from_f32_luma::<T, 10, false>,
+        (12, false) => &from_f32_luma::<T, 12, false>,
+        (8, true) => &from_f32_luma::<T, 8, true>,
+        (9, true) => &from_f32_luma::<T, 9, true>,
+        (10, true) => &from_f32_luma::<T, 10, true>,
+        (11, true) => &from_f32_luma::<T, 11, true>,
+        (12, true) => &from_f32_luma::<T, 12, true>,
+        (13, true) => &from_f32_luma::<T, 13, true>,
+        (14, true) => &from_f32_luma::<T, 14, true>,
+        (15, true) => &from_f32_luma::<T, 15, true>,
+        (16, true) => &from_f32_luma::<T, 16, true>,
+        _ => {
+            bail!(
+                "Bit depths 8, 10, and 12 for limited range or 8-16 for full range are supported"
+            );
+        }
+    };
+    let from_chroma: &dyn Fn(f32) -> T = match (bd, full_range) {
+        (8, false) => &from_f32_chroma::<T, 8, false>,
+        (10, false) => &from_f32_chroma::<T, 10, false>,
+        (12, false) => &from_f32_chroma::<T, 12, false>,
+        (8, true) => &from_f32_chroma::<T, 8, true>,
+        (9, true) => &from_f32_chroma::<T, 9, true>,
+        (10, true) => &from_f32_chroma::<T, 10, true>,
+        (11, true) => &from_f32_chroma::<T, 11, true>,
+        (12, true) => &from_f32_chroma::<T, 12, true>,
+        (13, true) => &from_f32_chroma::<T, 13, true>,
+        (14, true) => &from_f32_chroma::<T, 14, true>,
+        (15, true) => &from_f32_chroma::<T, 15, true>,
+        (16, true) => &from_f32_chroma::<T, 16, true>,
+        _ => {
+            bail!(
+                "Bit depths 8, 10, and 12 for limited range or 8-16 for full range are supported"
+            );
+        }
+    };
 
     let mut output = [
         vec![T::zero(); width * height],
@@ -94,34 +171,39 @@ fn ypbpr_to_ycbcr<T: YuvPixel>(
             // SAFETY: The bounds of the YUV data are validated when we construct it.
             unsafe {
                 let pix = input.get_unchecked(y_pos);
-                *output[0].get_unchecked_mut(y_pos) = from_f32_luma(pix[0], bd, full_range);
+                *output[0].get_unchecked_mut(y_pos) = from_luma(pix[0]);
                 if uv_pos != last_uv_pos {
                     // Small optimization to avoid doing unnecessary calculations and writes
-                    *output[1].get_unchecked_mut(uv_pos) = from_f32_chroma(pix[1], bd, full_range);
-                    *output[2].get_unchecked_mut(uv_pos) = from_f32_chroma(pix[2], bd, full_range);
+                    *output[1].get_unchecked_mut(uv_pos) = from_chroma(pix[1]);
+                    *output[2].get_unchecked_mut(uv_pos) = from_chroma(pix[2]);
                     last_uv_pos = uv_pos;
                 }
             }
         }
     }
-    Yuv {
+    Ok(Yuv {
         data: output,
         width: width as u32,
         height: height as u32,
         config,
-    }
+    })
 }
 
 #[inline(always)]
-fn to_f32_luma<T: YuvPixel>(val: T, bd: u8, full_range: bool) -> f32 {
+fn to_f32_luma<T: YuvPixel, const BD: u8, const FULL_RANGE: bool>(val: T) -> f32 {
     // Converts to a float value in the range 0.0..=1.0
     let val: f32 = val.as_();
-    let max_val = f32::from(u16::MAX >> (16 - bd));
+    let max_val = f32::from(u16::MAX >> (16 - BD));
     clamp(
-        (if full_range {
+        (if FULL_RANGE {
             val
         } else {
-            255.0 / 219.0 * (val - (16 << (bd - 8)) as f32)
+            (match BD {
+                8 => max_val / 219.0,
+                10 => max_val / (940.0 - 64.0),
+                12 => max_val / (3760.0 - 256.0),
+                _ => unreachable!("Only bit depths 8, 10, and 12 are supported for limited range"),
+            }) * (val - f32::from(16u16 << (BD - 8)))
         }) / max_val,
         0.0,
         1.0,
@@ -129,15 +211,20 @@ fn to_f32_luma<T: YuvPixel>(val: T, bd: u8, full_range: bool) -> f32 {
 }
 
 #[inline(always)]
-fn to_f32_chroma<T: YuvPixel>(val: T, bd: u8, full_range: bool) -> f32 {
+fn to_f32_chroma<T: YuvPixel, const BD: u8, const FULL_RANGE: bool>(val: T) -> f32 {
     // Converts to a float value in the range -0.5..=0.5
     let val: f32 = val.as_();
-    let max_val = f32::from(u16::MAX >> (16 - bd));
+    let max_val = f32::from(u16::MAX >> (16 - BD));
     clamp(
-        (if full_range {
+        (if FULL_RANGE {
             val
         } else {
-            255.0 / 224.0 * (val - (16 << (bd - 8)) as f32)
+            (match BD {
+                8 => max_val / 224.0,
+                10 => max_val / (960.0 - 64.0),
+                12 => max_val / (3840.0 - 256.0),
+                _ => unreachable!("Only bit depths 8, 10, and 12 are supported for limited range"),
+            }) * (val - f32::from(16u16 << (BD - 8)))
         }) / max_val
             - 0.5,
         -0.5,
@@ -146,14 +233,20 @@ fn to_f32_chroma<T: YuvPixel>(val: T, bd: u8, full_range: bool) -> f32 {
 }
 
 #[inline(always)]
-fn from_f32_luma<T: YuvPixel>(val: f32, bd: u8, full_range: bool) -> T {
+fn from_f32_luma<T: YuvPixel, const BD: u8, const FULL_RANGE: bool>(val: f32) -> T {
     // Converts to a float value in the range 0.0..=1.0
-    let max_val = f32::from(u16::MAX >> (16 - bd));
+    let max_val = f32::from(u16::MAX >> (16 - BD));
     let fval = clamp(
-        if full_range {
+        if FULL_RANGE {
             val * max_val
         } else {
-            (219.0f32 / 255.0 * val).mul_add(max_val, (16 << (bd - 8)) as f32)
+            ((match BD {
+                8 => 219.0 / max_val,
+                10 => (940.0 - 64.0) / max_val,
+                12 => (3760.0 - 256.0) / max_val,
+                _ => unreachable!("Only bit depths 8, 10, and 12 are supported for limited range"),
+            }) * val)
+                .mul_add(max_val, f32::from(16u16 << (BD - 8)))
         },
         0.0,
         max_val,
@@ -166,15 +259,21 @@ fn from_f32_luma<T: YuvPixel>(val: f32, bd: u8, full_range: bool) -> T {
 }
 
 #[inline(always)]
-fn from_f32_chroma<T: YuvPixel>(val: f32, bd: u8, full_range: bool) -> T {
+fn from_f32_chroma<T: YuvPixel, const BD: u8, const FULL_RANGE: bool>(val: f32) -> T {
     // Converts from a float value in the range -0.5..=0.5
     let val: f32 = val + 0.5;
-    let max_val = f32::from(u16::MAX >> (16 - bd));
+    let max_val = f32::from(u16::MAX >> (16 - BD));
     let fval = clamp(
-        if full_range {
+        if FULL_RANGE {
             val * max_val
         } else {
-            (224.0f32 / 255.0 * val).mul_add(max_val, (16 << (bd - 8)) as f32)
+            ((match BD {
+                8 => 224.0 / max_val,
+                10 => (960.0 - 64.0) / max_val,
+                12 => (3840.0 - 256.0) / max_val,
+                _ => unreachable!("Only bit depths 8, 10, and 12 are supported for limited range"),
+            }) * val)
+                .mul_add(max_val, f32::from(16u16 << (BD - 8)))
         },
         0.0,
         max_val,
@@ -215,14 +314,14 @@ mod tests {
         ];
 
         for (input, output) in inputs.iter().copied().zip(outputs.iter().copied()) {
-            let result = to_f32_luma(input, 8, true);
+            let result = to_f32_luma::<_, 8, true>(input);
             assert!(
                 (output - result).abs() < 0.0005,
                 "Result {:.6} differed from expected {:.6}",
                 result,
                 output
             );
-            let result: u8 = from_f32_luma(result, 8, true);
+            let result: u8 = from_f32_luma::<_, 8, true>(result);
             assert!(
                 input == result,
                 "Result {} differed from expected {}",
@@ -255,14 +354,14 @@ mod tests {
         ];
 
         for (input, output) in inputs.iter().copied().zip(outputs.iter().copied()) {
-            let result = to_f32_luma(input, 8, false);
+            let result = to_f32_luma::<_, 8, false>(input);
             assert!(
                 (output - result).abs() < 0.0005,
                 "Result {:.6} differed from expected {:.6}",
                 result,
                 output
             );
-            let result: u8 = from_f32_luma(result, 8, false);
+            let result: u8 = from_f32_luma::<_, 8, false>(result);
             let expected = clamp(input, 16, 235);
             assert!(
                 expected == result,
@@ -296,14 +395,14 @@ mod tests {
         ];
 
         for (input, output) in inputs.iter().copied().zip(outputs.iter().copied()) {
-            let result = to_f32_chroma(input, 8, true);
+            let result = to_f32_chroma::<_, 8, true>(input);
             assert!(
                 (output - result).abs() < 0.0005,
                 "Result {:.6} differed from expected {:.6}",
                 result,
                 output
             );
-            let result: u8 = from_f32_chroma(result, 8, true);
+            let result: u8 = from_f32_chroma::<_, 8, true>(result);
             assert!(
                 input == result,
                 "Result {} differed from expected {}",
@@ -336,14 +435,14 @@ mod tests {
         ];
 
         for (input, output) in inputs.iter().copied().zip(outputs.iter().copied()) {
-            let result = to_f32_chroma(input, 8, false);
+            let result = to_f32_chroma::<_, 8, false>(input);
             assert!(
                 (output - result).abs() < 0.0005,
                 "Result {:.6} differed from expected {:.6}",
                 result,
                 output
             );
-            let result: u8 = from_f32_chroma(result, 8, false);
+            let result: u8 = from_f32_chroma::<_, 8, false>(result);
             let expected = clamp(input, 16, 240);
             assert!(
                 expected == result,
@@ -388,14 +487,14 @@ mod tests {
         ];
 
         for (input, output) in inputs.iter().copied().zip(outputs.iter().copied()) {
-            let result = to_f32_luma(input, 10, true);
+            let result = to_f32_luma::<_, 10, true>(input);
             assert!(
                 (output - result).abs() < 0.0005,
                 "Result {:.6} differed from expected {:.6}",
                 result,
                 output
             );
-            let result: u16 = from_f32_luma(result, 10, true);
+            let result: u16 = from_f32_luma::<_, 10, true>(result);
             assert!(
                 input == result,
                 "Result {} differed from expected {}",
@@ -439,14 +538,14 @@ mod tests {
         ];
 
         for (input, output) in inputs.iter().copied().zip(outputs.iter().copied()) {
-            let result = to_f32_luma(input, 10, false);
+            let result = to_f32_luma::<_, 10, false>(input);
             assert!(
                 (output - result).abs() < 0.0005,
                 "Result {:.6} differed from expected {:.6}",
                 result,
                 output
             );
-            let result: u16 = from_f32_luma(result, 10, false);
+            let result: u16 = from_f32_luma::<_, 10, false>(result);
             let expected = clamp(input, 16 << 2, 235 << 2);
             assert!(
                 expected == result,
@@ -491,14 +590,14 @@ mod tests {
         ];
 
         for (input, output) in inputs.iter().copied().zip(outputs.iter().copied()) {
-            let result = to_f32_chroma(input, 10, true);
+            let result = to_f32_chroma::<_, 10, true>(input);
             assert!(
                 (output - result).abs() < 0.0005,
                 "Result {:.6} differed from expected {:.6}",
                 result,
                 output
             );
-            let result: u16 = from_f32_chroma(result, 10, true);
+            let result: u16 = from_f32_chroma::<_, 10, true>(result);
             assert!(
                 input == result,
                 "Result {} differed from expected {}",
@@ -542,14 +641,14 @@ mod tests {
         ];
 
         for (input, output) in inputs.iter().copied().zip(outputs.iter().copied()) {
-            let result = to_f32_chroma(input, 10, false);
+            let result = to_f32_chroma::<_, 10, false>(input);
             assert!(
                 (output - result).abs() < 0.0005,
                 "Result {:.6} differed from expected {:.6}",
                 result,
                 output
             );
-            let result: u16 = from_f32_chroma(result, 10, false);
+            let result: u16 = from_f32_chroma::<_, 10, false>(result);
             let expected = clamp(input, 16 << 2, 240 << 2);
             assert!(
                 expected == result,
