@@ -546,7 +546,7 @@ mod tests {
                 output
             );
             let result: u16 = from_f32_luma::<_, 10, false>(result);
-            let expected = clamp(input, 16 << 2, 235 << 2);
+            let expected = clamp(input, 16 << 2u8, 235 << 2u8);
             assert!(
                 expected == result,
                 "Result {} differed from expected {}",
@@ -649,7 +649,7 @@ mod tests {
                 output
             );
             let result: u16 = from_f32_chroma::<_, 10, false>(result);
-            let expected = clamp(input, 16 << 2, 240 << 2);
+            let expected = clamp(input, 16 << 2u8, 240 << 2u8);
             assert!(
                 expected == result,
                 "Result {} differed from expected {}",
