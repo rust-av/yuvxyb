@@ -266,20 +266,20 @@ mod tests {
         let rgb = yuv_to_rgb(&input).unwrap();
         for (output, expected) in rgb.iter().zip(rgb_pixels.iter()) {
             assert!(
-                (output[0] - expected.0).abs() < 0.005,
-                "{:.4} != expected {:.4}",
+                (output[0] - expected.0).abs() < 0.0005,
+                "Result {:.6} differed from expected {:.6}",
                 output[0],
                 expected.0
             );
             assert!(
-                (output[1] - expected.1).abs() < 0.005,
-                "{:.4} != expected {:.4}",
+                (output[1] - expected.1).abs() < 0.0005,
+                "Result {:.6} differed from expected {:.6}",
                 output[1],
                 expected.1
             );
             assert!(
-                (output[2] - expected.2).abs() < 0.005,
-                "{:.4} != expected {:.4}",
+                (output[2] - expected.2).abs() < 0.0005,
+                "Result {:.6} differed from expected {:.6}",
                 output[2],
                 expected.2
             );
@@ -330,20 +330,20 @@ mod tests {
         let rgb = yuv_to_rgb(&input).unwrap();
         for (output, expected) in rgb.iter().zip(rgb_pixels.iter()) {
             assert!(
-                (output[0] - expected.0).abs() < 0.005,
-                "{:.4} != expected {:.4}",
+                (output[0] - expected.0).abs() < 0.0005,
+                "Result {:.6} differed from expected {:.6}",
                 output[0],
                 expected.0
             );
             assert!(
-                (output[1] - expected.1).abs() < 0.005,
-                "{:.4} != expected {:.4}",
+                (output[1] - expected.1).abs() < 0.0005,
+                "Result {:.6} differed from expected {:.6}",
                 output[1],
                 expected.1
             );
             assert!(
-                (output[2] - expected.2).abs() < 0.005,
-                "{:.4} != expected {:.4}",
+                (output[2] - expected.2).abs() < 0.0005,
+                "Result {:.6} differed from expected {:.6}",
                 output[2],
                 expected.2
             );
@@ -394,20 +394,20 @@ mod tests {
         let rgb = yuv_to_rgb(&input).unwrap();
         for (output, expected) in rgb.iter().zip(rgb_pixels.iter()) {
             assert!(
-                (output[0] - expected.0).abs() < 0.005,
-                "{:.4} != expected {:.4}",
+                (output[0] - expected.0).abs() < 0.0005,
+                "Result {:.6} differed from expected {:.6}",
                 output[0],
                 expected.0
             );
             assert!(
-                (output[1] - expected.1).abs() < 0.005,
-                "{:.4} != expected {:.4}",
+                (output[1] - expected.1).abs() < 0.0005,
+                "Result {:.6} differed from expected {:.6}",
                 output[1],
                 expected.1
             );
             assert!(
-                (output[2] - expected.2).abs() < 0.005,
-                "{:.4} != expected {:.4}",
+                (output[2] - expected.2).abs() < 0.0005,
+                "Result {:.6} differed from expected {:.6}",
                 output[2],
                 expected.2
             );
@@ -458,20 +458,20 @@ mod tests {
         let rgb = yuv_to_rgb(&input).unwrap();
         for (output, expected) in rgb.iter().zip(rgb_pixels.iter()) {
             assert!(
-                (output[0] - expected.0).abs() < 0.005,
-                "{:.4} != expected {:.4}",
+                (output[0] - expected.0).abs() < 0.0005,
+                "Result {:.6} differed from expected {:.6}",
                 output[0],
                 expected.0
             );
             assert!(
-                (output[1] - expected.1).abs() < 0.005,
-                "{:.4} != expected {:.4}",
+                (output[1] - expected.1).abs() < 0.0005,
+                "Result {:.6} differed from expected {:.6}",
                 output[1],
                 expected.1
             );
             assert!(
-                (output[2] - expected.2).abs() < 0.005,
-                "{:.4} != expected {:.4}",
+                (output[2] - expected.2).abs() < 0.0005,
+                "Result {:.6} differed from expected {:.6}",
                 output[2],
                 expected.2
             );
@@ -522,20 +522,20 @@ mod tests {
         let rgb = yuv_to_rgb(&input).unwrap();
         for (output, expected) in rgb.iter().zip(rgb_pixels.iter()) {
             assert!(
-                (output[0] - expected.0).abs() < 0.005,
-                "{:.4} != expected {:.4}",
+                (output[0] - expected.0).abs() < 0.0005,
+                "Result {:.6} differed from expected {:.6}",
                 output[0],
                 expected.0
             );
             assert!(
-                (output[1] - expected.1).abs() < 0.005,
-                "{:.4} != expected {:.4}",
+                (output[1] - expected.1).abs() < 0.0005,
+                "Result {:.6} differed from expected {:.6}",
                 output[1],
                 expected.1
             );
             assert!(
-                (output[2] - expected.2).abs() < 0.005,
-                "{:.4} != expected {:.4}",
+                (output[2] - expected.2).abs() < 0.0005,
+                "Result {:.6} differed from expected {:.6}",
                 output[2],
                 expected.2
             );
@@ -586,20 +586,20 @@ mod tests {
         let rgb = yuv_to_rgb(&input).unwrap();
         for (output, expected) in rgb.iter().zip(rgb_pixels.iter()) {
             assert!(
-                (output[0] - expected.0).abs() < 0.005,
-                "{:.4} != expected {:.4}",
+                (output[0] - expected.0).abs() < 0.0005,
+                "Result {:.6} differed from expected {:.6}",
                 output[0],
                 expected.0
             );
             assert!(
-                (output[1] - expected.1).abs() < 0.005,
-                "{:.4} != expected {:.4}",
+                (output[1] - expected.1).abs() < 0.0005,
+                "Result {:.6} differed from expected {:.6}",
                 output[1],
                 expected.1
             );
             assert!(
-                (output[2] - expected.2).abs() < 0.005,
-                "{:.4} != expected {:.4}",
+                (output[2] - expected.2).abs() < 0.0005,
+                "Result {:.6} differed from expected {:.6}",
                 output[2],
                 expected.2
             );
@@ -650,20 +650,20 @@ mod tests {
         let rgb = yuv_to_rgb(&input).unwrap();
         for (output, expected) in rgb.iter().zip(rgb_pixels.iter()) {
             assert!(
-                (output[0] - expected.0).abs() < 0.005,
-                "{:.4} != expected {:.4}",
+                (output[0] - expected.0).abs() < 0.0005,
+                "Result {:.6} differed from expected {:.6}",
                 output[0],
                 expected.0
             );
             assert!(
-                (output[1] - expected.1).abs() < 0.005,
-                "{:.4} != expected {:.4}",
+                (output[1] - expected.1).abs() < 0.0005,
+                "Result {:.6} differed from expected {:.6}",
                 output[1],
                 expected.1
             );
             assert!(
-                (output[2] - expected.2).abs() < 0.005,
-                "{:.4} != expected {:.4}",
+                (output[2] - expected.2).abs() < 0.0005,
+                "Result {:.6} differed from expected {:.6}",
                 output[2],
                 expected.2
             );
@@ -714,20 +714,20 @@ mod tests {
         let rgb = yuv_to_rgb(&input).unwrap();
         for (output, expected) in rgb.iter().zip(rgb_pixels.iter()) {
             assert!(
-                (output[0] - expected.0).abs() < 0.005,
-                "{:.4} != expected {:.4}",
+                (output[0] - expected.0).abs() < 0.0005,
+                "Result {:.6} differed from expected {:.6}",
                 output[0],
                 expected.0
             );
             assert!(
-                (output[1] - expected.1).abs() < 0.005,
-                "{:.4} != expected {:.4}",
+                (output[1] - expected.1).abs() < 0.0005,
+                "Result {:.6} differed from expected {:.6}",
                 output[1],
                 expected.1
             );
             assert!(
-                (output[2] - expected.2).abs() < 0.005,
-                "{:.4} != expected {:.4}",
+                (output[2] - expected.2).abs() < 0.0005,
+                "Result {:.6} differed from expected {:.6}",
                 output[2],
                 expected.2
             );
@@ -778,20 +778,20 @@ mod tests {
         let rgb = yuv_to_rgb(&input).unwrap();
         for (output, expected) in rgb.iter().zip(rgb_pixels.iter()) {
             assert!(
-                (output[0] - expected.0).abs() < 0.005,
-                "{:.4} != expected {:.4}",
+                (output[0] - expected.0).abs() < 0.0005,
+                "Result {:.6} differed from expected {:.6}",
                 output[0],
                 expected.0
             );
             assert!(
-                (output[1] - expected.1).abs() < 0.005,
-                "{:.4} != expected {:.4}",
+                (output[1] - expected.1).abs() < 0.0005,
+                "Result {:.6} differed from expected {:.6}",
                 output[1],
                 expected.1
             );
             assert!(
-                (output[2] - expected.2).abs() < 0.005,
-                "{:.4} != expected {:.4}",
+                (output[2] - expected.2).abs() < 0.0005,
+                "Result {:.6} differed from expected {:.6}",
                 output[2],
                 expected.2
             );
@@ -842,20 +842,20 @@ mod tests {
         let rgb = yuv_to_rgb(&input).unwrap();
         for (output, expected) in rgb.iter().zip(rgb_pixels.iter()) {
             assert!(
-                (output[0] - expected.0).abs() < 0.005,
-                "{:.4} != expected {:.4}",
+                (output[0] - expected.0).abs() < 0.0005,
+                "Result {:.6} differed from expected {:.6}",
                 output[0],
                 expected.0
             );
             assert!(
-                (output[1] - expected.1).abs() < 0.005,
-                "{:.4} != expected {:.4}",
+                (output[1] - expected.1).abs() < 0.0005,
+                "Result {:.6} differed from expected {:.6}",
                 output[1],
                 expected.1
             );
             assert!(
-                (output[2] - expected.2).abs() < 0.005,
-                "{:.4} != expected {:.4}",
+                (output[2] - expected.2).abs() < 0.0005,
+                "Result {:.6} differed from expected {:.6}",
                 output[2],
                 expected.2
             );
@@ -906,20 +906,20 @@ mod tests {
         let rgb = yuv_to_rgb(&input).unwrap();
         for (output, expected) in rgb.iter().zip(rgb_pixels.iter()) {
             assert!(
-                (output[0] - expected.0).abs() < 0.005,
-                "{:.4} != expected {:.4}",
+                (output[0] - expected.0).abs() < 0.0005,
+                "Result {:.6} differed from expected {:.6}",
                 output[0],
                 expected.0
             );
             assert!(
-                (output[1] - expected.1).abs() < 0.005,
-                "{:.4} != expected {:.4}",
+                (output[1] - expected.1).abs() < 0.0005,
+                "Result {:.6} differed from expected {:.6}",
                 output[1],
                 expected.1
             );
             assert!(
-                (output[2] - expected.2).abs() < 0.005,
-                "{:.4} != expected {:.4}",
+                (output[2] - expected.2).abs() < 0.0005,
+                "Result {:.6} differed from expected {:.6}",
                 output[2],
                 expected.2
             );
@@ -970,20 +970,20 @@ mod tests {
         let rgb = yuv_to_rgb(&input).unwrap();
         for (output, expected) in rgb.iter().zip(rgb_pixels.iter()) {
             assert!(
-                (output[0] - expected.0).abs() < 0.005,
-                "{:.4} != expected {:.4}",
+                (output[0] - expected.0).abs() < 0.0005,
+                "Result {:.6} differed from expected {:.6}",
                 output[0],
                 expected.0
             );
             assert!(
-                (output[1] - expected.1).abs() < 0.005,
-                "{:.4} != expected {:.4}",
+                (output[1] - expected.1).abs() < 0.0005,
+                "Result {:.6} differed from expected {:.6}",
                 output[1],
                 expected.1
             );
             assert!(
-                (output[2] - expected.2).abs() < 0.005,
-                "{:.4} != expected {:.4}",
+                (output[2] - expected.2).abs() < 0.0005,
+                "Result {:.6} differed from expected {:.6}",
                 output[2],
                 expected.2
             );

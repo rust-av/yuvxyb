@@ -367,9 +367,24 @@ mod tests {
         let xyb2 = Xyb::try_from(yuv).unwrap();
         assert_eq!(xyb.data().len(), xyb2.data().len());
         for (pix1, pix2) in xyb.data().iter().zip(xyb2.data().iter()) {
-            assert!((pix1[0] - pix2[0]).abs() < f32::EPSILON);
-            assert!((pix1[1] - pix2[1]).abs() < f32::EPSILON);
-            assert!((pix1[2] - pix2[2]).abs() < f32::EPSILON);
+            assert!(
+                (pix1[0] - pix2[0]).abs() < 0.0005,
+                "Result {:.6} differed from expected {:.6}",
+                pix2[0],
+                pix1[0]
+            );
+            assert!(
+                (pix1[1] - pix2[1]).abs() < 0.0005,
+                "Result {:.6} differed from expected {:.6}",
+                pix2[1],
+                pix1[1]
+            );
+            assert!(
+                (pix1[2] - pix2[2]).abs() < 0.0005,
+                "Result {:.6} differed from expected {:.6}",
+                pix2[2],
+                pix1[2]
+            );
         }
         assert_eq!(xyb.width(), xyb2.width());
         assert_eq!(xyb.height(), xyb2.height());
@@ -648,9 +663,24 @@ mod tests {
         let xyb2 = Xyb::try_from(yuv).unwrap();
         assert_eq!(xyb.data().len(), xyb2.data().len());
         for (pix1, pix2) in xyb.data().iter().zip(xyb2.data().iter()) {
-            assert!((pix1[0] - pix2[0]).abs() < f32::EPSILON);
-            assert!((pix1[1] - pix2[1]).abs() < f32::EPSILON);
-            assert!((pix1[2] - pix2[2]).abs() < f32::EPSILON);
+            assert!(
+                (pix1[0] - pix2[0]).abs() < 0.0005,
+                "Result {:.6} differed from expected {:.6}",
+                pix2[0],
+                pix1[0]
+            );
+            assert!(
+                (pix1[1] - pix2[1]).abs() < 0.0005,
+                "Result {:.6} differed from expected {:.6}",
+                pix2[1],
+                pix1[1]
+            );
+            assert!(
+                (pix1[2] - pix2[2]).abs() < 0.0005,
+                "Result {:.6} differed from expected {:.6}",
+                pix2[2],
+                pix1[2]
+            );
         }
         assert_eq!(xyb.width(), xyb2.width());
         assert_eq!(xyb.height(), xyb2.height());
