@@ -121,7 +121,7 @@ fn to_f32_luma<T: YuvPixel>(val: T, bd: u8, full_range: bool) -> f32 {
         (if full_range {
             val
         } else {
-            255.0 / 219.0 * (val - 16.0)
+            255.0 / 219.0 * (val - (16 << (bd - 8)) as f32)
         }) / max_val,
         0.0,
         1.0,
@@ -137,7 +137,7 @@ fn to_f32_chroma<T: YuvPixel>(val: T, bd: u8, full_range: bool) -> f32 {
         (if full_range {
             val
         } else {
-            255.0 / 224.0 * (val - 16.0)
+            255.0 / 224.0 * (val - (16 << (bd - 8)) as f32)
         }) / max_val
             - 0.5,
         -0.5,
@@ -153,7 +153,7 @@ fn from_f32_luma<T: YuvPixel>(val: f32, bd: u8, full_range: bool) -> T {
         if full_range {
             val * max_val
         } else {
-            (219.0f32 / 255.0 * val).mul_add(max_val, 16.0)
+            (219.0f32 / 255.0 * val).mul_add(max_val, (16 << (bd - 8)) as f32)
         },
         0.0,
         max_val,
@@ -174,7 +174,7 @@ fn from_f32_chroma<T: YuvPixel>(val: f32, bd: u8, full_range: bool) -> T {
         if full_range {
             val * max_val
         } else {
-            (224.0f32 / 255.0 * val).mul_add(max_val, 16.0)
+            (224.0f32 / 255.0 * val).mul_add(max_val, (16 << (bd - 8)) as f32)
         },
         0.0,
         max_val,
@@ -298,11 +298,7 @@ mod tests {
         for (input, output) in inputs.iter().copied().zip(outputs.iter().copied()) {
             let result = to_f32_chroma(input, 8, true);
             assert!(
-                // FIXME: Something is weird where the values coming back from this conversion
-                // are slightly different from the values Vapoursynth is giving.
-                // Temporarily widened the acceptable difference to account for this...
-                //     (output - result).abs() < 0.0005,
-                (output - result).abs() < 0.005,
+                (output - result).abs() < 0.0005,
                 "Result {:.6} differed from expected {:.6}",
                 result,
                 output
@@ -349,6 +345,212 @@ mod tests {
             );
             let result: u8 = from_f32_chroma(result, 8, false);
             let expected = clamp(input, 16, 240);
+            assert!(
+                expected == result,
+                "Result {} differed from expected {}",
+                result,
+                expected
+            );
+        }
+    }
+
+    #[test]
+    fn to_f32_luma_full_10b() {
+        let inputs: &[u16] = &[
+            0 << 2,
+            12 << 2,
+            16 << 2,
+            25 << 2,
+            55 << 2,
+            120 << 2,
+            140 << 2,
+            180 << 2,
+            215 << 2,
+            235 << 2,
+            240 << 2,
+            250 << 2,
+            (256 << 2) - 1,
+        ];
+        let outputs: &[f32] = &[
+            0.0,
+            0.046_920_8,
+            0.062_561_1,
+            0.097_751_7,
+            0.215_054,
+            0.469_208,
+            0.547_41,
+            0.703_812,
+            0.840_665,
+            0.918_866,
+            0.938_416,
+            0.977_517,
+            1.0,
+        ];
+
+        for (input, output) in inputs.iter().copied().zip(outputs.iter().copied()) {
+            let result = to_f32_luma(input, 10, true);
+            assert!(
+                (output - result).abs() < 0.0005,
+                "Result {:.6} differed from expected {:.6}",
+                result,
+                output
+            );
+            let result: u16 = from_f32_luma(result, 10, true);
+            assert!(
+                input == result,
+                "Result {} differed from expected {}",
+                result,
+                input
+            );
+        }
+    }
+
+    #[test]
+    fn to_f32_luma_limited_10b() {
+        let inputs: &[u16] = &[
+            0 << 2,
+            12 << 2,
+            16 << 2,
+            25 << 2,
+            55 << 2,
+            120 << 2,
+            140 << 2,
+            180 << 2,
+            215 << 2,
+            235 << 2,
+            240 << 2,
+            250 << 2,
+            (256 << 2) - 1,
+        ];
+        let outputs: &[f32] = &[
+            0.0,
+            0.0,
+            0.0,
+            0.041_095_9,
+            0.178_082,
+            0.474_886,
+            0.566_21,
+            0.748_858,
+            0.908_676,
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+        ];
+
+        for (input, output) in inputs.iter().copied().zip(outputs.iter().copied()) {
+            let result = to_f32_luma(input, 10, false);
+            assert!(
+                (output - result).abs() < 0.0005,
+                "Result {:.6} differed from expected {:.6}",
+                result,
+                output
+            );
+            let result: u16 = from_f32_luma(result, 10, false);
+            let expected = clamp(input, 16 << 2, 235 << 2);
+            assert!(
+                expected == result,
+                "Result {} differed from expected {}",
+                result,
+                expected
+            );
+        }
+    }
+
+    #[test]
+    fn to_f32_chroma_full_10b() {
+        let inputs: &[u16] = &[
+            0 << 2,
+            12 << 2,
+            16 << 2,
+            25 << 2,
+            55 << 2,
+            120 << 2,
+            140 << 2,
+            180 << 2,
+            215 << 2,
+            235 << 2,
+            240 << 2,
+            250 << 2,
+            (256 << 2) - 1,
+        ];
+        let outputs: &[f32] = &[
+            -0.5,
+            -0.453_568,
+            -0.437_928,
+            -0.402_737,
+            -0.285_435,
+            -0.031_280_5,
+            0.046_920_8,
+            0.203_324,
+            0.340_176,
+            0.418_377,
+            0.437_928,
+            0.477_028,
+            0.499_511,
+        ];
+
+        for (input, output) in inputs.iter().copied().zip(outputs.iter().copied()) {
+            let result = to_f32_chroma(input, 10, true);
+            assert!(
+                (output - result).abs() < 0.0005,
+                "Result {:.6} differed from expected {:.6}",
+                result,
+                output
+            );
+            let result: u16 = from_f32_chroma(result, 10, true);
+            assert!(
+                input == result,
+                "Result {} differed from expected {}",
+                result,
+                input
+            );
+        }
+    }
+
+    #[test]
+    fn to_f32_chroma_limited_10b() {
+        let inputs: &[u16] = &[
+            0 << 2,
+            12 << 2,
+            16 << 2,
+            25 << 2,
+            55 << 2,
+            120 << 2,
+            140 << 2,
+            180 << 2,
+            215 << 2,
+            235 << 2,
+            240 << 2,
+            250 << 2,
+            (256 << 2) - 1,
+        ];
+        let outputs: &[f32] = &[
+            -0.5,
+            -0.5,
+            -0.5,
+            -0.459_821,
+            -0.325_893,
+            -0.035_714_3,
+            0.053_571_4,
+            0.232_143,
+            0.388_393,
+            0.477_679,
+            0.5,
+            0.5,
+            0.5,
+        ];
+
+        for (input, output) in inputs.iter().copied().zip(outputs.iter().copied()) {
+            let result = to_f32_chroma(input, 10, false);
+            assert!(
+                (output - result).abs() < 0.0005,
+                "Result {:.6} differed from expected {:.6}",
+                result,
+                output
+            );
+            let result: u16 = from_f32_chroma(result, 10, false);
+            let expected = clamp(input, 16 << 2, 240 << 2);
             assert!(
                 expected == result,
                 "Result {} differed from expected {}",
