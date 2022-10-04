@@ -41,7 +41,6 @@
 
 // This is pub and doc hidden so it can be run through cargo asm for
 // optimization easier
-mod pixel;
 #[doc(hidden)]
 pub mod rgb_xyz;
 #[doc(hidden)]
@@ -51,21 +50,25 @@ use std::mem::size_of;
 
 use anyhow::{bail, Result};
 pub use av_data::pixel::{ColorPrimaries, MatrixCoefficients, TransferCharacteristic};
-pub use pixel::*;
 use rgb_xyz::{linear_rgb_to_xyb, xyb_to_linear_rgb};
+pub use v_frame::{
+    frame::Frame,
+    plane::Plane,
+    prelude::{CastFromPrimitive, Pixel},
+};
 use yuv_rgb::{linear_rgb_to_yuv, yuv_to_linear_rgb};
 
 #[derive(Debug, Clone)]
 pub struct Xyb {
     data: Vec<[f32; 3]>,
-    width: u32,
-    height: u32,
+    width: usize,
+    height: usize,
 }
 
 impl Xyb {
     /// # Errors
     /// - If data length does not match `width * height`
-    pub fn new(data: Vec<[f32; 3]>, width: u32, height: u32) -> Result<Self> {
+    pub fn new(data: Vec<[f32; 3]>, width: usize, height: usize) -> Result<Self> {
         if data.len() != (width * height) as usize {
             bail!("Data length does not match specified dimensions");
         }
@@ -78,26 +81,33 @@ impl Xyb {
     }
 
     #[must_use]
+    #[inline(always)]
     pub fn data(&self) -> &[[f32; 3]] {
         &self.data
     }
 
     #[must_use]
-    pub const fn width(&self) -> u32 {
+    #[inline(always)]
+    pub fn data_mut(&mut self) -> &mut [[f32; 3]] {
+        &mut self.data
+    }
+
+    #[must_use]
+    #[inline(always)]
+    pub const fn width(&self) -> usize {
         self.width
     }
 
     #[must_use]
-    pub const fn height(&self) -> u32 {
+    #[inline(always)]
+    pub const fn height(&self) -> usize {
         self.height
     }
 }
 
 #[derive(Debug, Clone)]
-pub struct Yuv<T: YuvPixel> {
-    data: [Vec<T>; 3],
-    width: u32,
-    height: u32,
+pub struct Yuv<T: Pixel> {
+    data: Frame<T>,
     config: YuvConfig,
 }
 
@@ -112,16 +122,28 @@ pub struct YuvConfig {
     pub color_primaries: ColorPrimaries,
 }
 
-impl<T: YuvPixel> Yuv<T> {
+impl<T: Pixel> Yuv<T> {
     /// # Errors
     /// - If luma plane length does not match `width * height`
     /// - If chroma plane lengths do not match `(width * height) >>
     ///   (subsampling_x + subsampling_y)`
     /// - If chroma subsampling is enabled and dimensions are not a multiple of
     ///   2
+    /// - If chroma sampling set in `config` does not match subsampling in the
+    ///   frame data
     /// - If `data` contains values which are not valid for the specified bit
     ///   depth (note: out-of-range values for limited range are allowed)
-    pub fn new(data: [Vec<T>; 3], width: u32, height: u32, config: YuvConfig) -> Result<Self> {
+    pub fn new(data: Frame<T>, config: YuvConfig) -> Result<Self> {
+        if config.subsampling_x != data.planes[1].cfg.xdec as u8
+            || config.subsampling_x != data.planes[2].cfg.xdec as u8
+            || config.subsampling_y != data.planes[1].cfg.ydec as u8
+            || config.subsampling_y != data.planes[2].cfg.ydec as u8
+        {
+            bail!("Configured subsampling does not match subsampling of Frame data");
+        }
+
+        let width = data.planes[0].cfg.width;
+        let height = data.planes[0].cfg.height;
         if width % (1 << config.subsampling_x) != 0 {
             bail!(
                 "Width must be a multiple of {} to support this chroma subsampling",
@@ -134,19 +156,9 @@ impl<T: YuvPixel> Yuv<T> {
                 1u32 << config.subsampling_y
             );
         }
-        if data[0].len() != (width * height) as usize {
-            bail!("Luma plane length does not match specified dimensions");
-        }
-        let chroma_len = (width * height) as usize >> (config.subsampling_x + config.subsampling_y);
-        if data[1].len() != chroma_len {
-            bail!("Cb plane length does not match specified dimensions");
-        }
-        if data[2].len() != chroma_len {
-            bail!("Cr plane length does not match specified dimensions");
-        }
         if size_of::<T>() == 2 && config.bit_depth < 16 {
             let max_value = u16::MAX >> (16 - config.bit_depth);
-            if data.iter().any(|plane| {
+            if data.planes.iter().any(|plane| {
                 plane
                     .iter()
                     .any(|pix| pix.to_u16().expect("This is a u16") > max_value)
@@ -160,35 +172,37 @@ impl<T: YuvPixel> Yuv<T> {
 
         Ok(Self {
             data,
-            width,
-            height,
             config: config.fix_unspecified_data(width, height),
         })
     }
 
     #[must_use]
-    pub const fn data(&self) -> &[Vec<T>; 3] {
-        &self.data
+    #[inline(always)]
+    pub const fn data(&self) -> &[Plane<T>] {
+        &self.data.planes
     }
 
     #[must_use]
-    pub const fn width(&self) -> u32 {
-        self.width
+    #[inline(always)]
+    pub const fn width(&self) -> usize {
+        self.data.planes[0].cfg.width
     }
 
     #[must_use]
-    pub const fn height(&self) -> u32 {
-        self.height
+    #[inline(always)]
+    pub const fn height(&self) -> usize {
+        self.data.planes[0].cfg.height
     }
 
     #[must_use]
+    #[inline(always)]
     pub const fn config(&self) -> YuvConfig {
         self.config
     }
 }
 
 impl YuvConfig {
-    pub(crate) fn fix_unspecified_data(mut self, width: u32, height: u32) -> Self {
+    pub(crate) fn fix_unspecified_data(mut self, width: usize, height: usize) -> Self {
         if self.matrix_coefficients == MatrixCoefficients::Unspecified {
             self.matrix_coefficients = guess_matrix_coefficients(width, height);
             log::warn!(
@@ -218,7 +232,7 @@ impl YuvConfig {
 }
 
 // Heuristic taken from mpv
-const fn guess_matrix_coefficients(width: u32, height: u32) -> MatrixCoefficients {
+const fn guess_matrix_coefficients(width: usize, height: usize) -> MatrixCoefficients {
     if width >= 1280 || height > 576 {
         MatrixCoefficients::BT709
     } else if height == 576 {
@@ -229,7 +243,11 @@ const fn guess_matrix_coefficients(width: u32, height: u32) -> MatrixCoefficient
 }
 
 // Heuristic taken from mpv
-fn guess_color_primaries(matrix: MatrixCoefficients, width: u32, height: u32) -> ColorPrimaries {
+fn guess_color_primaries(
+    matrix: MatrixCoefficients,
+    width: usize,
+    height: usize,
+) -> ColorPrimaries {
     if matrix == MatrixCoefficients::BT2020NonConstantLuminance
         || matrix == MatrixCoefficients::BT2020ConstantLuminance
     {
@@ -245,11 +263,29 @@ fn guess_color_primaries(matrix: MatrixCoefficients, width: u32, height: u32) ->
     }
 }
 
-impl<T: YuvPixel> TryFrom<Yuv<T>> for Xyb {
+impl<T: Pixel> TryFrom<Yuv<T>> for Xyb {
     type Error = anyhow::Error;
 
     fn try_from(other: Yuv<T>) -> Result<Self> {
-        let lrgb = yuv_to_linear_rgb(&other)?;
+        Xyb::try_from(&other)
+    }
+}
+
+impl<T: Pixel> TryFrom<(Xyb, YuvConfig)> for Yuv<T> {
+    type Error = anyhow::Error;
+
+    /// # Errors
+    /// - If the `YuvConfig` would produce an invalid image
+    fn try_from(other: (Xyb, YuvConfig)) -> Result<Self> {
+        Yuv::<T>::try_from((&other.0, other.1))
+    }
+}
+
+impl<T: Pixel> TryFrom<&Yuv<T>> for Xyb {
+    type Error = anyhow::Error;
+
+    fn try_from(other: &Yuv<T>) -> Result<Self> {
+        let lrgb = yuv_to_linear_rgb(other)?;
         Ok(Xyb {
             data: linear_rgb_to_xyb(&lrgb),
             width: other.width(),
@@ -258,12 +294,12 @@ impl<T: YuvPixel> TryFrom<Yuv<T>> for Xyb {
     }
 }
 
-impl<T: YuvPixel> TryFrom<(Xyb, YuvConfig)> for Yuv<T> {
+impl<T: Pixel> TryFrom<(&Xyb, YuvConfig)> for Yuv<T> {
     type Error = anyhow::Error;
 
     /// # Errors
     /// - If the `YuvConfig` would produce an invalid image
-    fn try_from(other: (Xyb, YuvConfig)) -> Result<Self> {
+    fn try_from(other: (&Xyb, YuvConfig)) -> Result<Self> {
         let data = other.0;
         let config = other.1.fix_unspecified_data(data.width(), data.height());
         let lrgb = xyb_to_linear_rgb(data.data());
@@ -275,6 +311,7 @@ impl<T: YuvPixel> TryFrom<(Xyb, YuvConfig)> for Yuv<T> {
 mod tests {
     use interpolate_name::interpolate_test;
     use rand::Rng;
+    use v_frame::plane::Plane;
 
     use super::*;
 
@@ -295,14 +332,30 @@ mod tests {
     ) {
         let y_dims = (320usize, 240usize);
         let uv_dims = (y_dims.0 >> ss.0, y_dims.1 >> ss.1);
-        let mut data = [
-            vec![0u8; y_dims.0 * y_dims.1],
-            vec![0u8; uv_dims.0 * uv_dims.1],
-            vec![0u8; uv_dims.0 * uv_dims.1],
-        ];
+        let mut data: Frame<u8> = Frame {
+            planes: [
+                Plane::new(y_dims.0, y_dims.1, 0, 0, 0, 0),
+                Plane::new(
+                    uv_dims.0,
+                    uv_dims.1,
+                    usize::from(ss.0),
+                    usize::from(ss.1),
+                    0,
+                    0,
+                ),
+                Plane::new(
+                    uv_dims.0,
+                    uv_dims.1,
+                    usize::from(ss.0),
+                    usize::from(ss.1),
+                    0,
+                    0,
+                ),
+            ],
+        };
         let mut rng = rand::thread_rng();
-        for (i, plane) in data.iter_mut().enumerate() {
-            for val in plane.iter_mut() {
+        for (i, plane) in data.planes.iter_mut().enumerate() {
+            for val in plane.data_origin_mut().iter_mut() {
                 *val = rng.gen_range(if full_range {
                     0..=255
                 } else if i == 0 {
@@ -312,7 +365,7 @@ mod tests {
                 });
             }
         }
-        let yuv = Yuv::new(data, y_dims.0 as u32, y_dims.1 as u32, YuvConfig {
+        let yuv = Yuv::new(data, YuvConfig {
             bit_depth: 8,
             subsampling_x: ss.0,
             subsampling_y: ss.1,
@@ -439,14 +492,30 @@ mod tests {
     ) {
         let y_dims = (320usize, 240usize);
         let uv_dims = (y_dims.0 >> ss.0, y_dims.1 >> ss.1);
-        let mut data = [
-            vec![0u16; y_dims.0 * y_dims.1],
-            vec![0u16; uv_dims.0 * uv_dims.1],
-            vec![0u16; uv_dims.0 * uv_dims.1],
-        ];
+        let mut data: Frame<u16> = Frame {
+            planes: [
+                Plane::new(y_dims.0, y_dims.1, 0, 0, 0, 0),
+                Plane::new(
+                    uv_dims.0,
+                    uv_dims.1,
+                    usize::from(ss.0),
+                    usize::from(ss.1),
+                    0,
+                    0,
+                ),
+                Plane::new(
+                    uv_dims.0,
+                    uv_dims.1,
+                    usize::from(ss.0),
+                    usize::from(ss.1),
+                    0,
+                    0,
+                ),
+            ],
+        };
         let mut rng = rand::thread_rng();
-        for (i, plane) in data.iter_mut().enumerate() {
-            for val in plane.iter_mut() {
+        for (i, plane) in data.planes.iter_mut().enumerate() {
+            for val in plane.data_origin_mut().iter_mut() {
                 *val = rng.gen_range(if full_range {
                     0..=1023
                 } else if i == 0 {
@@ -456,7 +525,7 @@ mod tests {
                 });
             }
         }
-        let yuv = Yuv::new(data, y_dims.0 as u32, y_dims.1 as u32, YuvConfig {
+        let yuv = Yuv::new(data, YuvConfig {
             bit_depth: 10,
             subsampling_x: ss.0,
             subsampling_y: ss.1,

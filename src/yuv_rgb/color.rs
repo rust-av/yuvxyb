@@ -4,7 +4,7 @@ use debug_unreachable::debug_unreachable;
 use nalgebra::{Matrix1x3, Matrix3, Matrix3x1};
 
 use super::{ycbcr_to_ypbpr, ypbpr_to_ycbcr};
-use crate::{Yuv, YuvConfig, YuvPixel};
+use crate::{Pixel, Yuv, YuvConfig};
 
 pub fn get_yuv_to_rgb_matrix(config: YuvConfig) -> Result<Matrix3<f32>> {
     Ok(get_rgb_to_yuv_matrix(config)?
@@ -183,7 +183,7 @@ fn xy_to_xyz(x: f32, y: f32) -> [f32; 3] {
 
 /// Converts 8..=16-bit YUV data to 32-bit floating point gamma-corrected RGB
 /// in a range of 0.0..=1.0;
-pub fn yuv_to_rgb<T: YuvPixel>(input: &Yuv<T>) -> Result<Vec<[f32; 3]>> {
+pub fn yuv_to_rgb<T: Pixel>(input: &Yuv<T>) -> Result<Vec<[f32; 3]>> {
     let transform = get_yuv_to_rgb_matrix(input.config())?;
     let data = ycbcr_to_ypbpr(input)?;
     let data = data
@@ -202,10 +202,10 @@ pub fn yuv_to_rgb<T: YuvPixel>(input: &Yuv<T>) -> Result<Vec<[f32; 3]>> {
 ///
 /// # Errors
 /// - If the `YuvConfig` would produce an invalid image
-pub fn rgb_to_yuv<T: YuvPixel>(
+pub fn rgb_to_yuv<T: Pixel>(
     input: &[[f32; 3]],
-    width: u32,
-    height: u32,
+    width: usize,
+    height: usize,
     config: YuvConfig,
 ) -> Result<Yuv<T>> {
     let transform = get_rgb_to_yuv_matrix(config)?;
@@ -223,6 +223,7 @@ pub fn rgb_to_yuv<T: YuvPixel>(
 #[cfg(test)]
 mod tests {
     use av_data::pixel::{ColorPrimaries, MatrixCoefficients, TransferCharacteristic};
+    use v_frame::{frame::Frame, plane::Plane};
 
     use super::*;
     use crate::Yuv;
@@ -248,13 +249,13 @@ mod tests {
             color_primaries: ColorPrimaries::ST170M,
         };
         let input = Yuv::new(
-            [
-                yuv_pixels.iter().map(|pix| pix.0).collect(),
-                yuv_pixels.iter().map(|pix| pix.1).collect(),
-                yuv_pixels.iter().map(|pix| pix.2).collect(),
-            ],
-            2,
-            2,
+            Frame {
+                planes: [
+                    Plane::from_slice(&yuv_pixels.iter().map(|pix| pix.0).collect::<Vec<_>>(), 2),
+                    Plane::from_slice(&yuv_pixels.iter().map(|pix| pix.1).collect::<Vec<_>>(), 2),
+                    Plane::from_slice(&yuv_pixels.iter().map(|pix| pix.2).collect::<Vec<_>>(), 2),
+                ],
+            },
             config,
         )
         .unwrap();
@@ -281,9 +282,9 @@ mod tests {
         }
         let yuv: Yuv<u8> = rgb_to_yuv(&rgb, 2, 2, config).unwrap();
         for (i, expected) in yuv_pixels.iter().enumerate() {
-            assert_eq!(yuv.data()[0][i], expected.0);
-            assert_eq!(yuv.data()[1][i], expected.1);
-            assert_eq!(yuv.data()[2][i], expected.2);
+            assert_eq!(yuv.data()[0].data_origin()[i], expected.0);
+            assert_eq!(yuv.data()[1].data_origin()[i], expected.1);
+            assert_eq!(yuv.data()[2].data_origin()[i], expected.2);
         }
     }
 
@@ -312,13 +313,13 @@ mod tests {
             color_primaries: ColorPrimaries::ST170M,
         };
         let input = Yuv::new(
-            [
-                yuv_pixels.iter().map(|pix| pix.0).collect(),
-                yuv_pixels.iter().map(|pix| pix.1).collect(),
-                yuv_pixels.iter().map(|pix| pix.2).collect(),
-            ],
-            2,
-            2,
+            Frame {
+                planes: [
+                    Plane::from_slice(&yuv_pixels.iter().map(|pix| pix.0).collect::<Vec<_>>(), 2),
+                    Plane::from_slice(&yuv_pixels.iter().map(|pix| pix.1).collect::<Vec<_>>(), 2),
+                    Plane::from_slice(&yuv_pixels.iter().map(|pix| pix.2).collect::<Vec<_>>(), 2),
+                ],
+            },
             config,
         )
         .unwrap();
@@ -345,9 +346,9 @@ mod tests {
         }
         let yuv: Yuv<u8> = rgb_to_yuv(&rgb, 2, 2, config).unwrap();
         for (i, expected) in yuv_pixels.iter().enumerate() {
-            assert_eq!(yuv.data()[0][i], expected.0);
-            assert_eq!(yuv.data()[1][i], expected.1);
-            assert_eq!(yuv.data()[2][i], expected.2);
+            assert_eq!(yuv.data()[0].data_origin()[i], expected.0);
+            assert_eq!(yuv.data()[1].data_origin()[i], expected.1);
+            assert_eq!(yuv.data()[2].data_origin()[i], expected.2);
         }
     }
 
@@ -376,13 +377,13 @@ mod tests {
             color_primaries: ColorPrimaries::ST170M,
         };
         let input = Yuv::new(
-            [
-                yuv_pixels.iter().map(|pix| pix.0).collect(),
-                yuv_pixels.iter().map(|pix| pix.1).collect(),
-                yuv_pixels.iter().map(|pix| pix.2).collect(),
-            ],
-            2,
-            2,
+            Frame {
+                planes: [
+                    Plane::from_slice(&yuv_pixels.iter().map(|pix| pix.0).collect::<Vec<_>>(), 2),
+                    Plane::from_slice(&yuv_pixels.iter().map(|pix| pix.1).collect::<Vec<_>>(), 2),
+                    Plane::from_slice(&yuv_pixels.iter().map(|pix| pix.2).collect::<Vec<_>>(), 2),
+                ],
+            },
             config,
         )
         .unwrap();
@@ -409,9 +410,9 @@ mod tests {
         }
         let yuv: Yuv<u16> = rgb_to_yuv(&rgb, 2, 2, config).unwrap();
         for (i, expected) in yuv_pixels.iter().enumerate() {
-            assert_eq!(yuv.data()[0][i], expected.0);
-            assert_eq!(yuv.data()[1][i], expected.1);
-            assert_eq!(yuv.data()[2][i], expected.2);
+            assert_eq!(yuv.data()[0].data_origin()[i], expected.0);
+            assert_eq!(yuv.data()[1].data_origin()[i], expected.1);
+            assert_eq!(yuv.data()[2].data_origin()[i], expected.2);
         }
     }
 
@@ -440,13 +441,13 @@ mod tests {
             color_primaries: ColorPrimaries::ST170M,
         };
         let input = Yuv::new(
-            [
-                yuv_pixels.iter().map(|pix| pix.0).collect(),
-                yuv_pixels.iter().map(|pix| pix.1).collect(),
-                yuv_pixels.iter().map(|pix| pix.2).collect(),
-            ],
-            2,
-            2,
+            Frame {
+                planes: [
+                    Plane::from_slice(&yuv_pixels.iter().map(|pix| pix.0).collect::<Vec<_>>(), 2),
+                    Plane::from_slice(&yuv_pixels.iter().map(|pix| pix.1).collect::<Vec<_>>(), 2),
+                    Plane::from_slice(&yuv_pixels.iter().map(|pix| pix.2).collect::<Vec<_>>(), 2),
+                ],
+            },
             config,
         )
         .unwrap();
@@ -473,9 +474,9 @@ mod tests {
         }
         let yuv: Yuv<u16> = rgb_to_yuv(&rgb, 2, 2, config).unwrap();
         for (i, expected) in yuv_pixels.iter().enumerate() {
-            assert_eq!(yuv.data()[0][i], expected.0);
-            assert_eq!(yuv.data()[1][i], expected.1);
-            assert_eq!(yuv.data()[2][i], expected.2);
+            assert_eq!(yuv.data()[0].data_origin()[i], expected.0);
+            assert_eq!(yuv.data()[1].data_origin()[i], expected.1);
+            assert_eq!(yuv.data()[2].data_origin()[i], expected.2);
         }
     }
 
@@ -504,13 +505,13 @@ mod tests {
             color_primaries: ColorPrimaries::BT709,
         };
         let input = Yuv::new(
-            [
-                yuv_pixels.iter().map(|pix| pix.0).collect(),
-                yuv_pixels.iter().map(|pix| pix.1).collect(),
-                yuv_pixels.iter().map(|pix| pix.2).collect(),
-            ],
-            2,
-            2,
+            Frame {
+                planes: [
+                    Plane::from_slice(&yuv_pixels.iter().map(|pix| pix.0).collect::<Vec<_>>(), 2),
+                    Plane::from_slice(&yuv_pixels.iter().map(|pix| pix.1).collect::<Vec<_>>(), 2),
+                    Plane::from_slice(&yuv_pixels.iter().map(|pix| pix.2).collect::<Vec<_>>(), 2),
+                ],
+            },
             config,
         )
         .unwrap();
@@ -537,9 +538,9 @@ mod tests {
         }
         let yuv: Yuv<u8> = rgb_to_yuv(&rgb, 2, 2, config).unwrap();
         for (i, expected) in yuv_pixels.iter().enumerate() {
-            assert_eq!(yuv.data()[0][i], expected.0);
-            assert_eq!(yuv.data()[1][i], expected.1);
-            assert_eq!(yuv.data()[2][i], expected.2);
+            assert_eq!(yuv.data()[0].data_origin()[i], expected.0);
+            assert_eq!(yuv.data()[1].data_origin()[i], expected.1);
+            assert_eq!(yuv.data()[2].data_origin()[i], expected.2);
         }
     }
 
@@ -568,13 +569,13 @@ mod tests {
             color_primaries: ColorPrimaries::BT709,
         };
         let input = Yuv::new(
-            [
-                yuv_pixels.iter().map(|pix| pix.0).collect(),
-                yuv_pixels.iter().map(|pix| pix.1).collect(),
-                yuv_pixels.iter().map(|pix| pix.2).collect(),
-            ],
-            2,
-            2,
+            Frame {
+                planes: [
+                    Plane::from_slice(&yuv_pixels.iter().map(|pix| pix.0).collect::<Vec<_>>(), 2),
+                    Plane::from_slice(&yuv_pixels.iter().map(|pix| pix.1).collect::<Vec<_>>(), 2),
+                    Plane::from_slice(&yuv_pixels.iter().map(|pix| pix.2).collect::<Vec<_>>(), 2),
+                ],
+            },
             config,
         )
         .unwrap();
@@ -601,9 +602,9 @@ mod tests {
         }
         let yuv: Yuv<u8> = rgb_to_yuv(&rgb, 2, 2, config).unwrap();
         for (i, expected) in yuv_pixels.iter().enumerate() {
-            assert_eq!(yuv.data()[0][i], expected.0);
-            assert_eq!(yuv.data()[1][i], expected.1);
-            assert_eq!(yuv.data()[2][i], expected.2);
+            assert_eq!(yuv.data()[0].data_origin()[i], expected.0);
+            assert_eq!(yuv.data()[1].data_origin()[i], expected.1);
+            assert_eq!(yuv.data()[2].data_origin()[i], expected.2);
         }
     }
 
@@ -632,13 +633,13 @@ mod tests {
             color_primaries: ColorPrimaries::BT709,
         };
         let input = Yuv::new(
-            [
-                yuv_pixels.iter().map(|pix| pix.0).collect(),
-                yuv_pixels.iter().map(|pix| pix.1).collect(),
-                yuv_pixels.iter().map(|pix| pix.2).collect(),
-            ],
-            2,
-            2,
+            Frame {
+                planes: [
+                    Plane::from_slice(&yuv_pixels.iter().map(|pix| pix.0).collect::<Vec<_>>(), 2),
+                    Plane::from_slice(&yuv_pixels.iter().map(|pix| pix.1).collect::<Vec<_>>(), 2),
+                    Plane::from_slice(&yuv_pixels.iter().map(|pix| pix.2).collect::<Vec<_>>(), 2),
+                ],
+            },
             config,
         )
         .unwrap();
@@ -665,9 +666,9 @@ mod tests {
         }
         let yuv: Yuv<u16> = rgb_to_yuv(&rgb, 2, 2, config).unwrap();
         for (i, expected) in yuv_pixels.iter().enumerate() {
-            assert_eq!(yuv.data()[0][i], expected.0);
-            assert_eq!(yuv.data()[1][i], expected.1);
-            assert_eq!(yuv.data()[2][i], expected.2);
+            assert_eq!(yuv.data()[0].data_origin()[i], expected.0);
+            assert_eq!(yuv.data()[1].data_origin()[i], expected.1);
+            assert_eq!(yuv.data()[2].data_origin()[i], expected.2);
         }
     }
 
@@ -696,13 +697,13 @@ mod tests {
             color_primaries: ColorPrimaries::BT709,
         };
         let input = Yuv::new(
-            [
-                yuv_pixels.iter().map(|pix| pix.0).collect(),
-                yuv_pixels.iter().map(|pix| pix.1).collect(),
-                yuv_pixels.iter().map(|pix| pix.2).collect(),
-            ],
-            2,
-            2,
+            Frame {
+                planes: [
+                    Plane::from_slice(&yuv_pixels.iter().map(|pix| pix.0).collect::<Vec<_>>(), 2),
+                    Plane::from_slice(&yuv_pixels.iter().map(|pix| pix.1).collect::<Vec<_>>(), 2),
+                    Plane::from_slice(&yuv_pixels.iter().map(|pix| pix.2).collect::<Vec<_>>(), 2),
+                ],
+            },
             config,
         )
         .unwrap();
@@ -729,9 +730,9 @@ mod tests {
         }
         let yuv: Yuv<u16> = rgb_to_yuv(&rgb, 2, 2, config).unwrap();
         for (i, expected) in yuv_pixels.iter().enumerate() {
-            assert_eq!(yuv.data()[0][i], expected.0);
-            assert_eq!(yuv.data()[1][i], expected.1);
-            assert_eq!(yuv.data()[2][i], expected.2);
+            assert_eq!(yuv.data()[0].data_origin()[i], expected.0);
+            assert_eq!(yuv.data()[1].data_origin()[i], expected.1);
+            assert_eq!(yuv.data()[2].data_origin()[i], expected.2);
         }
     }
 
@@ -760,13 +761,13 @@ mod tests {
             color_primaries: ColorPrimaries::BT2020,
         };
         let input = Yuv::new(
-            [
-                yuv_pixels.iter().map(|pix| pix.0).collect(),
-                yuv_pixels.iter().map(|pix| pix.1).collect(),
-                yuv_pixels.iter().map(|pix| pix.2).collect(),
-            ],
-            2,
-            2,
+            Frame {
+                planes: [
+                    Plane::from_slice(&yuv_pixels.iter().map(|pix| pix.0).collect::<Vec<_>>(), 2),
+                    Plane::from_slice(&yuv_pixels.iter().map(|pix| pix.1).collect::<Vec<_>>(), 2),
+                    Plane::from_slice(&yuv_pixels.iter().map(|pix| pix.2).collect::<Vec<_>>(), 2),
+                ],
+            },
             config,
         )
         .unwrap();
@@ -793,9 +794,9 @@ mod tests {
         }
         let yuv: Yuv<u8> = rgb_to_yuv(&rgb, 2, 2, config).unwrap();
         for (i, expected) in yuv_pixels.iter().enumerate() {
-            assert_eq!(yuv.data()[0][i], expected.0);
-            assert_eq!(yuv.data()[1][i], expected.1);
-            assert_eq!(yuv.data()[2][i], expected.2);
+            assert_eq!(yuv.data()[0].data_origin()[i], expected.0);
+            assert_eq!(yuv.data()[1].data_origin()[i], expected.1);
+            assert_eq!(yuv.data()[2].data_origin()[i], expected.2);
         }
     }
 
@@ -824,13 +825,13 @@ mod tests {
             color_primaries: ColorPrimaries::BT2020,
         };
         let input = Yuv::new(
-            [
-                yuv_pixels.iter().map(|pix| pix.0).collect(),
-                yuv_pixels.iter().map(|pix| pix.1).collect(),
-                yuv_pixels.iter().map(|pix| pix.2).collect(),
-            ],
-            2,
-            2,
+            Frame {
+                planes: [
+                    Plane::from_slice(&yuv_pixels.iter().map(|pix| pix.0).collect::<Vec<_>>(), 2),
+                    Plane::from_slice(&yuv_pixels.iter().map(|pix| pix.1).collect::<Vec<_>>(), 2),
+                    Plane::from_slice(&yuv_pixels.iter().map(|pix| pix.2).collect::<Vec<_>>(), 2),
+                ],
+            },
             config,
         )
         .unwrap();
@@ -857,9 +858,9 @@ mod tests {
         }
         let yuv: Yuv<u8> = rgb_to_yuv(&rgb, 2, 2, config).unwrap();
         for (i, expected) in yuv_pixels.iter().enumerate() {
-            assert_eq!(yuv.data()[0][i], expected.0);
-            assert_eq!(yuv.data()[1][i], expected.1);
-            assert_eq!(yuv.data()[2][i], expected.2);
+            assert_eq!(yuv.data()[0].data_origin()[i], expected.0);
+            assert_eq!(yuv.data()[1].data_origin()[i], expected.1);
+            assert_eq!(yuv.data()[2].data_origin()[i], expected.2);
         }
     }
 
@@ -888,13 +889,13 @@ mod tests {
             color_primaries: ColorPrimaries::BT2020,
         };
         let input = Yuv::new(
-            [
-                yuv_pixels.iter().map(|pix| pix.0).collect(),
-                yuv_pixels.iter().map(|pix| pix.1).collect(),
-                yuv_pixels.iter().map(|pix| pix.2).collect(),
-            ],
-            2,
-            2,
+            Frame {
+                planes: [
+                    Plane::from_slice(&yuv_pixels.iter().map(|pix| pix.0).collect::<Vec<_>>(), 2),
+                    Plane::from_slice(&yuv_pixels.iter().map(|pix| pix.1).collect::<Vec<_>>(), 2),
+                    Plane::from_slice(&yuv_pixels.iter().map(|pix| pix.2).collect::<Vec<_>>(), 2),
+                ],
+            },
             config,
         )
         .unwrap();
@@ -921,9 +922,9 @@ mod tests {
         }
         let yuv: Yuv<u16> = rgb_to_yuv(&rgb, 2, 2, config).unwrap();
         for (i, expected) in yuv_pixels.iter().enumerate() {
-            assert_eq!(yuv.data()[0][i], expected.0);
-            assert_eq!(yuv.data()[1][i], expected.1);
-            assert_eq!(yuv.data()[2][i], expected.2);
+            assert_eq!(yuv.data()[0].data_origin()[i], expected.0);
+            assert_eq!(yuv.data()[1].data_origin()[i], expected.1);
+            assert_eq!(yuv.data()[2].data_origin()[i], expected.2);
         }
     }
 
@@ -952,13 +953,13 @@ mod tests {
             color_primaries: ColorPrimaries::BT2020,
         };
         let input = Yuv::new(
-            [
-                yuv_pixels.iter().map(|pix| pix.0).collect(),
-                yuv_pixels.iter().map(|pix| pix.1).collect(),
-                yuv_pixels.iter().map(|pix| pix.2).collect(),
-            ],
-            2,
-            2,
+            Frame {
+                planes: [
+                    Plane::from_slice(&yuv_pixels.iter().map(|pix| pix.0).collect::<Vec<_>>(), 2),
+                    Plane::from_slice(&yuv_pixels.iter().map(|pix| pix.1).collect::<Vec<_>>(), 2),
+                    Plane::from_slice(&yuv_pixels.iter().map(|pix| pix.2).collect::<Vec<_>>(), 2),
+                ],
+            },
             config,
         )
         .unwrap();
@@ -985,9 +986,9 @@ mod tests {
         }
         let yuv: Yuv<u16> = rgb_to_yuv(&rgb, 2, 2, config).unwrap();
         for (i, expected) in yuv_pixels.iter().enumerate() {
-            assert_eq!(yuv.data()[0][i], expected.0);
-            assert_eq!(yuv.data()[1][i], expected.1);
-            assert_eq!(yuv.data()[2][i], expected.2);
+            assert_eq!(yuv.data()[0].data_origin()[i], expected.0);
+            assert_eq!(yuv.data()[1].data_origin()[i], expected.1);
+            assert_eq!(yuv.data()[2].data_origin()[i], expected.2);
         }
     }
 }

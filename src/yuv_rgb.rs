@@ -8,20 +8,19 @@
 mod color;
 mod transfer;
 
-use std::mem::size_of;
-
 use anyhow::{bail, Result};
 use num_traits::clamp;
+use v_frame::{frame::Frame, plane::Plane};
 
 use self::{
     color::{rgb_to_yuv, yuv_to_rgb},
     transfer::TransferFunction,
 };
-use crate::{Yuv, YuvConfig, YuvPixel};
+use crate::{CastFromPrimitive, Pixel, Yuv, YuvConfig};
 
 /// Converts 8..=16-bit YUV data to 32-bit floating point Linear RGB
 /// in a range of 0.0..=1.0;
-pub fn yuv_to_linear_rgb<T: YuvPixel>(input: &Yuv<T>) -> Result<Vec<[f32; 3]>> {
+pub fn yuv_to_linear_rgb<T: Pixel>(input: &Yuv<T>) -> Result<Vec<[f32; 3]>> {
     let rgb = yuv_to_rgb(input)?;
     input.config().transfer_characteristics.to_linear(&rgb)
 }
@@ -31,17 +30,17 @@ pub fn yuv_to_linear_rgb<T: YuvPixel>(input: &Yuv<T>) -> Result<Vec<[f32; 3]>> {
 ///
 /// # Errors
 /// - If the `YuvConfig` would produce an invalid image
-pub fn linear_rgb_to_yuv<T: YuvPixel>(
+pub fn linear_rgb_to_yuv<T: Pixel>(
     input: &[[f32; 3]],
-    width: u32,
-    height: u32,
+    width: usize,
+    height: usize,
     config: YuvConfig,
 ) -> Result<Yuv<T>> {
     let rgb = config.transfer_characteristics.to_gamma(input)?;
     rgb_to_yuv(&rgb, width, height, config)
 }
 
-fn ycbcr_to_ypbpr<T: YuvPixel>(input: &Yuv<T>) -> Result<Vec<[f32; 3]>> {
+fn ycbcr_to_ypbpr<T: Pixel>(input: &Yuv<T>) -> Result<Vec<[f32; 3]>> {
     let w = input.width() as usize;
     let h = input.height() as usize;
     let ss_x = input.config().subsampling_x;
@@ -89,6 +88,9 @@ fn ycbcr_to_ypbpr<T: YuvPixel>(input: &Yuv<T>) -> Result<Vec<[f32; 3]>> {
     };
 
     let data = input.data();
+    let y_origin = data[0].data_origin();
+    let u_origin = data[1].data_origin();
+    let v_origin = data[2].data_origin();
     let mut output = vec![[0.0, 0.0, 0.0]; w * h];
     for y in 0..h {
         for x in 0..w {
@@ -97,9 +99,9 @@ fn ycbcr_to_ypbpr<T: YuvPixel>(input: &Yuv<T>) -> Result<Vec<[f32; 3]>> {
             // SAFETY: The bounds of the YUV data are validated when we construct it.
             unsafe {
                 *output.get_unchecked_mut(y_pos) = [
-                    to_luma(*data[0].get_unchecked(y_pos)),
-                    to_chroma(*data[1].get_unchecked(uv_pos)),
-                    to_chroma(*data[2].get_unchecked(uv_pos)),
+                    to_luma(*y_origin.get_unchecked(y_pos)),
+                    to_chroma(*u_origin.get_unchecked(uv_pos)),
+                    to_chroma(*v_origin.get_unchecked(uv_pos)),
                 ];
             }
         }
@@ -107,7 +109,7 @@ fn ycbcr_to_ypbpr<T: YuvPixel>(input: &Yuv<T>) -> Result<Vec<[f32; 3]>> {
     Ok(output)
 }
 
-fn ypbpr_to_ycbcr<T: YuvPixel>(
+fn ypbpr_to_ycbcr<T: Pixel>(
     input: &[[f32; 3]],
     width: usize,
     height: usize,
@@ -117,7 +119,8 @@ fn ypbpr_to_ycbcr<T: YuvPixel>(
     let ss_y = config.subsampling_y;
     let bd = config.bit_depth;
     let full_range = config.full_range;
-    let chroma_size = (width >> ss_x) * (height >> ss_y);
+    let chroma_width = width >> ss_x;
+    let chroma_height = height >> ss_y;
 
     let from_luma: &dyn Fn(f32) -> T = match (bd, full_range) {
         (8, false) => &from_f32_luma::<T, 8, false>,
@@ -158,41 +161,71 @@ fn ypbpr_to_ycbcr<T: YuvPixel>(
         }
     };
 
-    let mut output = [
-        vec![T::zero(); width * height],
-        vec![T::zero(); chroma_size],
-        vec![T::zero(); chroma_size],
-    ];
+    let mut output: Frame<T> = Frame {
+        planes: [
+            Plane::new(width, height, 0, 0, 0, 0),
+            Plane::new(
+                chroma_width,
+                chroma_height,
+                usize::from(ss_x),
+                usize::from(ss_y),
+                0,
+                0,
+            ),
+            Plane::new(
+                chroma_width,
+                chroma_height,
+                usize::from(ss_x),
+                usize::from(ss_y),
+                0,
+                0,
+            ),
+        ],
+    };
+
+    // We setup the plane origins as mutable slices outside the loop
+    // because `data_origin_mut` is _not_ just a simple array index,
+    // so it would optimize poorly if called during each loop iteration.
+    let (y_plane, rest) = output.planes.split_first_mut().expect("has 3 planes");
+    let (u_plane, rest) = rest.split_first_mut().expect("has 3 planes");
+    let (v_plane, _) = rest.split_first_mut().expect("has 3 planes");
+    let y_stride = y_plane.cfg.stride;
+    let u_stride = u_plane.cfg.stride;
+    let v_stride = v_plane.cfg.stride;
+    let y_origin = y_plane.data_origin_mut();
+    let u_origin = u_plane.data_origin_mut();
+    let v_origin = v_plane.data_origin_mut();
     let mut last_uv_pos = usize::MAX;
     for y in 0..height {
         for x in 0..width {
-            let y_pos = y * width + x;
-            let uv_pos = (y >> ss_y) * (width >> ss_x) + (x >> ss_x);
+            let y_pos = y * y_stride + x;
+            let u_pos = (y >> ss_y) * u_stride + (x >> ss_x);
+            let v_pos = (y >> ss_y) * v_stride + (x >> ss_x);
             // SAFETY: The bounds of the YUV data are validated when we construct it.
             unsafe {
                 let pix = input.get_unchecked(y_pos);
-                *output[0].get_unchecked_mut(y_pos) = from_luma(pix[0]);
-                if uv_pos != last_uv_pos {
+                *y_origin.get_unchecked_mut(y_pos) = from_luma(pix[0]);
+                if u_pos != last_uv_pos {
                     // Small optimization to avoid doing unnecessary calculations and writes
-                    *output[1].get_unchecked_mut(uv_pos) = from_chroma(pix[1]);
-                    *output[2].get_unchecked_mut(uv_pos) = from_chroma(pix[2]);
-                    last_uv_pos = uv_pos;
+                    // We can track this from just `u_pos`. We have `v_pos` separate for indexing
+                    // on the off chance that the two planes have different strides.
+                    *u_origin.get_unchecked_mut(u_pos) = from_chroma(pix[1]);
+                    *v_origin.get_unchecked_mut(v_pos) = from_chroma(pix[2]);
+                    last_uv_pos = u_pos;
                 }
             }
         }
     }
     Ok(Yuv {
         data: output,
-        width: width as u32,
-        height: height as u32,
         config,
     })
 }
 
 #[inline(always)]
-fn to_f32_luma<T: YuvPixel, const BD: u8, const FULL_RANGE: bool>(val: T) -> f32 {
+fn to_f32_luma<T: Pixel, const BD: u8, const FULL_RANGE: bool>(val: T) -> f32 {
     // Converts to a float value in the range 0.0..=1.0
-    let val: f32 = val.as_();
+    let val = f32::from(u16::cast_from(val));
     let max_val = f32::from(u16::MAX >> (16 - BD));
     clamp(
         (if FULL_RANGE {
@@ -211,9 +244,9 @@ fn to_f32_luma<T: YuvPixel, const BD: u8, const FULL_RANGE: bool>(val: T) -> f32
 }
 
 #[inline(always)]
-fn to_f32_chroma<T: YuvPixel, const BD: u8, const FULL_RANGE: bool>(val: T) -> f32 {
+fn to_f32_chroma<T: Pixel, const BD: u8, const FULL_RANGE: bool>(val: T) -> f32 {
     // Converts to a float value in the range -0.5..=0.5
-    let val: f32 = val.as_();
+    let val = f32::from(u16::cast_from(val));
     let max_val = f32::from(u16::MAX >> (16 - BD));
     clamp(
         (if FULL_RANGE {
@@ -233,7 +266,7 @@ fn to_f32_chroma<T: YuvPixel, const BD: u8, const FULL_RANGE: bool>(val: T) -> f
 }
 
 #[inline(always)]
-fn from_f32_luma<T: YuvPixel, const BD: u8, const FULL_RANGE: bool>(val: f32) -> T {
+fn from_f32_luma<T: Pixel, const BD: u8, const FULL_RANGE: bool>(val: f32) -> T {
     // Converts to a float value in the range 0.0..=1.0
     let max_val = f32::from(u16::MAX >> (16 - BD));
     let fval = clamp(
@@ -251,15 +284,11 @@ fn from_f32_luma<T: YuvPixel, const BD: u8, const FULL_RANGE: bool>(val: f32) ->
         0.0,
         max_val,
     );
-    if size_of::<T>() == 1 {
-        T::from_u8(fval.round() as u8).expect("This is a u8")
-    } else {
-        T::from_u16(fval.round() as u16).expect("This is a u16")
-    }
+    T::cast_from(fval.round() as u16)
 }
 
 #[inline(always)]
-fn from_f32_chroma<T: YuvPixel, const BD: u8, const FULL_RANGE: bool>(val: f32) -> T {
+fn from_f32_chroma<T: Pixel, const BD: u8, const FULL_RANGE: bool>(val: f32) -> T {
     // Converts from a float value in the range -0.5..=0.5
     let val: f32 = val + 0.5;
     let max_val = f32::from(u16::MAX >> (16 - BD));
@@ -278,11 +307,7 @@ fn from_f32_chroma<T: YuvPixel, const BD: u8, const FULL_RANGE: bool>(val: f32) 
         0.0,
         max_val,
     );
-    if size_of::<T>() == 1 {
-        T::from_u8(fval.round() as u8).expect("This is a u8")
-    } else {
-        T::from_u16(fval.round() as u16).expect("This is a u16")
-    }
+    T::cast_from(fval.round() as u16)
 }
 
 #[cfg(test)]

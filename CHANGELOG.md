@@ -1,3 +1,10 @@
+## Version 0.0.4
+
+- Use the `v_frame` crate instead of rolling our own
+- Add `data_mut` method for `Xyb`, useful for some metrics and
+  does not violate invariants of frame size
+- Minor optimizations
+
 ## Version 0.0.3
 
 - Add tests
