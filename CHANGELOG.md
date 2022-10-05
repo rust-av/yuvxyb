@@ -1,3 +1,7 @@
+## Version 0.0.5
+
+- Bump `v_frame` crate
+
 ## Version 0.0.4
 
 - Use the `v_frame` crate instead of rolling our own
