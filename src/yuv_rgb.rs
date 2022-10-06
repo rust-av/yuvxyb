@@ -226,88 +226,97 @@ fn ypbpr_to_ycbcr<T: Pixel>(
 fn to_f32_luma<T: Pixel, const BD: u8, const FULL_RANGE: bool>(val: T) -> f32 {
     // Converts to a float value in the range 0.0..=1.0
     let val = f32::from(u16::cast_from(val));
-    let max_val = f32::from(u16::MAX >> (16 - BD));
-    clamp(
-        (if FULL_RANGE {
-            val
-        } else {
-            (match BD {
-                8 => max_val / 219.0,
-                10 => max_val / (940.0 - 64.0),
-                12 => max_val / (3760.0 - 256.0),
-                _ => unreachable!("Only bit depths 8, 10, and 12 are supported for limited range"),
-            }) * (val - f32::from(16u16 << (BD - 8)))
-        }) / max_val,
-        0.0,
-        1.0,
-    )
+    let (scale, offset) = get_scale_offset::<true>(BD, FULL_RANGE, false);
+    clamp(val.mul_add(scale, offset), 0.0, 1.0)
 }
 
 #[inline(always)]
 fn to_f32_chroma<T: Pixel, const BD: u8, const FULL_RANGE: bool>(val: T) -> f32 {
     // Converts to a float value in the range -0.5..=0.5
     let val = f32::from(u16::cast_from(val));
-    let max_val = f32::from(u16::MAX >> (16 - BD));
-    clamp(
-        (if FULL_RANGE {
-            val
-        } else {
-            (match BD {
-                8 => max_val / 224.0,
-                10 => max_val / (960.0 - 64.0),
-                12 => max_val / (3840.0 - 256.0),
-                _ => unreachable!("Only bit depths 8, 10, and 12 are supported for limited range"),
-            }) * (val - f32::from(16u16 << (BD - 8)))
-        }) / max_val
-            - 0.5,
-        -0.5,
-        0.5,
-    )
+    let (scale, offset) = get_scale_offset::<true>(BD, FULL_RANGE, true);
+    clamp(val.mul_add(scale, offset), -0.5, 0.5)
 }
 
 #[inline(always)]
 fn from_f32_luma<T: Pixel, const BD: u8, const FULL_RANGE: bool>(val: f32) -> T {
     // Converts to a float value in the range 0.0..=1.0
-    let max_val = f32::from(u16::MAX >> (16 - BD));
-    let fval = clamp(
-        if FULL_RANGE {
-            val * max_val
-        } else {
-            ((match BD {
-                8 => 219.0 / max_val,
-                10 => (940.0 - 64.0) / max_val,
-                12 => (3760.0 - 256.0) / max_val,
-                _ => unreachable!("Only bit depths 8, 10, and 12 are supported for limited range"),
-            }) * val)
-                .mul_add(max_val, f32::from(16u16 << (BD - 8)))
-        },
-        0.0,
-        max_val,
-    );
-    T::cast_from(fval.round() as u16)
+    let (scale, offset) = get_scale_offset::<false>(BD, FULL_RANGE, false);
+    T::cast_from(clamp(
+        val.mul_add(scale, offset).round() as u16,
+        0,
+        ((1u32 << BD) - 1) as u16,
+    ))
 }
 
 #[inline(always)]
 fn from_f32_chroma<T: Pixel, const BD: u8, const FULL_RANGE: bool>(val: f32) -> T {
+    // Accounts for rounding issues
+    if FULL_RANGE && (val + 0.5).abs() < f32::EPSILON {
+        return T::cast_from(0u16);
+    }
+
     // Converts from a float value in the range -0.5..=0.5
-    let val: f32 = val + 0.5;
-    let max_val = f32::from(u16::MAX >> (16 - BD));
-    let fval = clamp(
-        if FULL_RANGE {
-            val * max_val
-        } else {
-            ((match BD {
-                8 => 224.0 / max_val,
-                10 => (960.0 - 64.0) / max_val,
-                12 => (3840.0 - 256.0) / max_val,
-                _ => unreachable!("Only bit depths 8, 10, and 12 are supported for limited range"),
-            }) * val)
-                .mul_add(max_val, f32::from(16u16 << (BD - 8)))
-        },
-        0.0,
-        max_val,
-    );
-    T::cast_from(fval.round() as u16)
+    let (scale, offset) = get_scale_offset::<false>(BD, FULL_RANGE, true);
+    T::cast_from(clamp(
+        val.mul_add(scale, offset).round() as u16,
+        0,
+        ((1u32 << BD) - 1) as u16,
+    ))
+}
+
+#[allow(clippy::useless_let_if_seq)]
+fn get_scale_offset<const TO_FLOAT: bool>(
+    bit_depth: u8,
+    full_range: bool,
+    chroma: bool,
+) -> (f32, f32) {
+    let range_in;
+    let offset_in;
+    let range_out;
+    let offset_out;
+    if TO_FLOAT {
+        range_in = pixel_range(bit_depth, full_range, chroma);
+        offset_in = pixel_offset(bit_depth, full_range, chroma);
+        range_out = pixel_range(32, true, false);
+        offset_out = pixel_offset(32, true, false);
+    } else {
+        range_in = pixel_range(32, true, false);
+        offset_in = pixel_offset(32, true, false);
+        range_out = pixel_range(bit_depth, full_range, chroma);
+        offset_out = pixel_offset(bit_depth, full_range, chroma);
+    }
+
+    let scale = (range_out / range_in) as f32;
+    let offset = (-offset_in * range_out / range_in + offset_out) as f32;
+
+    (scale, offset)
+}
+
+fn pixel_range(bit_depth: u8, full_range: bool, chroma: bool) -> f64 {
+    if bit_depth == 32 {
+        // floating point
+        1.0f64
+    } else if full_range {
+        f64::from((1u32 << bit_depth) - 1)
+    } else if chroma {
+        f64::from(224u16 << (bit_depth - 8))
+    } else {
+        f64::from(219u16 << (bit_depth - 8))
+    }
+}
+
+fn pixel_offset(bit_depth: u8, full_range: bool, chroma: bool) -> f64 {
+    if bit_depth == 32 {
+        // floating point
+        0.0f64
+    } else if chroma {
+        f64::from(1u32 << (bit_depth - 1))
+    } else if full_range {
+        0.0f64
+    } else {
+        f64::from(16u16 << (bit_depth - 8))
+    }
 }
 
 #[cfg(test)]
