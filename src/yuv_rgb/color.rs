@@ -220,6 +220,92 @@ pub fn rgb_to_yuv<T: Pixel>(
     ypbpr_to_ycbcr(&yuv, width as usize, height as usize, config)
 }
 
+pub fn transform_primaries(
+    input: &[[f32; 3]],
+    in_primaries: ColorPrimaries,
+    out_primaries: ColorPrimaries,
+) -> Result<Vec<[f32; 3]>> {
+    let transform = gamut_xyz_to_rgb_matrix(out_primaries)?
+        * white_point_adaptation_matrix(in_primaries, out_primaries)
+        * gamut_rgb_to_xyz_matrix(in_primaries)?;
+    let transformed = input
+        .iter()
+        .map(|pix| {
+            let pix = Matrix3x1::from_column_slice(pix);
+            let res = transform * pix;
+            [res[0], res[1], res[2]]
+        })
+        .collect::<Vec<_>>();
+    Ok(transformed)
+}
+
+fn gamut_rgb_to_xyz_matrix(primaries: ColorPrimaries) -> Result<Matrix3<f32>> {
+    if primaries == ColorPrimaries::ST428 {
+        return Ok(Matrix3::identity());
+    }
+
+    let xyz_matrix = get_primaries_xyz(primaries)?;
+    let white_xyz = Matrix3x1::from_column_slice(&get_white_point(primaries));
+
+    let s = xyz_matrix.try_inverse().expect("has an inverse") * white_xyz;
+    let mut m = [0f32; 9];
+    m[0..3].copy_from_slice((xyz_matrix.row(0) * s).as_slice());
+    m[3..6].copy_from_slice((xyz_matrix.row(1) * s).as_slice());
+    m[6..9].copy_from_slice((xyz_matrix.row(2) * s).as_slice());
+
+    Ok(Matrix3::from_row_slice(&m))
+}
+
+fn gamut_xyz_to_rgb_matrix(primaries: ColorPrimaries) -> Result<Matrix3<f32>> {
+    if primaries == ColorPrimaries::ST428 {
+        return Ok(Matrix3::identity());
+    }
+
+    Ok(gamut_rgb_to_xyz_matrix(primaries)?
+        .try_inverse()
+        .expect("has an inverse"))
+}
+
+fn get_primaries_xyz(primaries: ColorPrimaries) -> Result<Matrix3<f32>> {
+    // Columns: R G B
+    // Rows: X Y Z
+    let primaries_xy = get_primaries_xy(primaries)?;
+
+    let mut ret = [0f32; 9];
+    ret[0..3].copy_from_slice(&xy_to_xyz(primaries_xy[0][0], primaries_xy[0][1]));
+    ret[3..6].copy_from_slice(&xy_to_xyz(primaries_xy[1][0], primaries_xy[1][1]));
+    ret[6..9].copy_from_slice(&xy_to_xyz(primaries_xy[2][0], primaries_xy[2][1]));
+
+    Ok(Matrix3::from_row_slice(&ret).transpose())
+}
+
+fn white_point_adaptation_matrix(
+    in_primaries: ColorPrimaries,
+    out_primaries: ColorPrimaries,
+) -> Matrix3<f32> {
+    let bradford = Matrix3::from_row_slice(&[
+        0.8951f32, 0.2664f32, -0.1614f32, -0.7502f32, 1.7135f32, 0.0367f32, 0.0389f32, -0.0685f32,
+        1.0296f32,
+    ]);
+
+    let white_in = Matrix3x1::from_column_slice(&get_white_point(in_primaries));
+    let white_out = Matrix3x1::from_column_slice(&get_white_point(out_primaries));
+
+    if white_in == white_out {
+        return Matrix3::identity();
+    }
+
+    let rgb_in = bradford * white_in;
+    let rgb_out = bradford * white_out;
+
+    let mut m: Matrix3<f32> = Matrix3::zeros();
+    m[0] = rgb_out[0] / rgb_in[0];
+    m[4] = rgb_out[1] / rgb_in[1];
+    m[8] = rgb_out[2] / rgb_in[2];
+
+    bradford.try_inverse().expect("has an inverse") * m * bradford
+}
+
 #[cfg(test)]
 mod tests {
     use av_data::pixel::{ColorPrimaries, MatrixCoefficients, TransferCharacteristic};
@@ -234,10 +320,10 @@ mod tests {
         let yuv_pixels: Vec<(u8, u8, u8)> =
             vec![(168, 152, 92), (71, 57, 230), (122, 122, 79), (133, 96, 39)];
         let rgb_pixels: Vec<(f32, f32, f32)> = vec![
-            (115.0 / 255.0, 191.0 / 255.0, 180.0 / 255.0),
-            (238.0 / 255.0, 28.0 / 255.0, 39.0 / 255.0),
-            (84.0 / 255.0, 117.0 / 255.0, 178.0 / 255.0),
-            (82.0 / 255.0, 106.0 / 255.0, 254.0 / 255.0),
+            (0.176_271, 0.462_868, 0.632_797),
+            (0.617_078, 0.014_544_7, -0.001_077_79),
+            (0.039_517_2, 0.313_771, 0.136_314),
+            (0.031_437_4, 0.590_267, 0.052_908_4),
         ];
         let config = YuvConfig {
             bit_depth: 8,
@@ -291,17 +377,13 @@ mod tests {
     #[test]
     fn bt601_limited_to_rgb_8b() {
         // These values were manually chosen semi-randomly
-        let yuv_pixels: Vec<(u8, u8, u8)> = vec![
-            (160, 149, 97),
-            (77, 67, 215),
-            (121, 123, 86),
-            (130, 101, 52),
-        ];
+        let yuv_pixels: Vec<(u8, u8, u8)> =
+            vec![(168, 152, 92), (71, 57, 230), (122, 122, 79), (133, 96, 39)];
         let rgb_pixels: Vec<(f32, f32, f32)> = vec![
-            (115.0 / 255.0, 191.0 / 255.0, 180.0 / 255.0),
-            (238.0 / 255.0, 28.0 / 255.0, 39.0 / 255.0),
-            (84.0 / 255.0, 117.0 / 255.0, 178.0 / 255.0),
-            (82.0 / 255.0, 106.0 / 255.0, 254.0 / 255.0),
+            (0.187_073, 0.534_06, 0.745_515),
+            (0.709_485, 0.013_730_4, -0.001_225_91),
+            (0.034_007_4, 0.345_284, 0.136_045),
+            (0.036_132, 0.686_773, 0.044_742_8),
         ];
         let config = YuvConfig {
             bit_depth: 8,
@@ -356,16 +438,16 @@ mod tests {
     fn bt601_full_to_rgb_10b() {
         // These values were manually chosen semi-randomly
         let yuv_pixels: Vec<(u16, u16, u16)> = vec![
-            (674, 609, 367),
-            (286, 226, 920),
-            (491, 487, 315),
-            (532, 385, 155),
+            (649, 530, 380),
+            (352, 428, 879),
+            (449, 635, 445),
+            (437, 784, 449),
         ];
         let rgb_pixels: Vec<(f32, f32, f32)> = vec![
-            (115.0 / 255.0, 191.0 / 255.0, 180.0 / 255.0),
-            (238.0 / 255.0, 28.0 / 255.0, 39.0 / 255.0),
-            (84.0 / 255.0, 117.0 / 255.0, 178.0 / 255.0),
-            (82.0 / 255.0, 106.0 / 255.0, 254.0 / 255.0),
+            (0.167_542, 0.448_585, 0.376_461),
+            (0.631_3, 0.017_788, 0.019_665_5),
+            (0.084_962_2, 0.145_111, 0.359_581),
+            (0.083_808_2, 0.108_535, 0.777_17),
         ];
         let config = YuvConfig {
             bit_depth: 10,
@@ -420,16 +502,16 @@ mod tests {
     fn bt601_limited_to_rgb_10b() {
         // These values were manually chosen semi-randomly
         let yuv_pixels: Vec<(u16, u16, u16)> = vec![
-            (641, 595, 388),
-            (309, 267, 861),
-            (484, 490, 344),
-            (520, 403, 206),
+            (649, 530, 380),
+            (352, 428, 879),
+            (449, 635, 445),
+            (437, 784, 449),
         ];
         let rgb_pixels: Vec<(f32, f32, f32)> = vec![
-            (115.0 / 255.0, 191.0 / 255.0, 180.0 / 255.0),
-            (238.0 / 255.0, 28.0 / 255.0, 39.0 / 255.0),
-            (84.0 / 255.0, 117.0 / 255.0, 178.0 / 255.0),
-            (82.0 / 255.0, 106.0 / 255.0, 254.0 / 255.0),
+            (0.177_588, 0.519_389, 0.429_835),
+            (0.735_715, 0.015_674_2, 0.011_590_1),
+            (0.079_238_1, 0.146_685, 0.401_792),
+            (0.078_409, 0.105_985, 0.920_082),
         ];
         let config = YuvConfig {
             bit_depth: 10,
@@ -483,17 +565,13 @@ mod tests {
     #[test]
     fn bt709_full_to_rgb_8b() {
         // These values were manually chosen semi-randomly
-        let yuv_pixels: Vec<(u8, u8, u8)> = vec![
-            (174, 131, 91),
-            (73, 109, 232),
-            (114, 162, 109),
-            (112, 205, 109),
-        ];
+        let yuv_pixels: Vec<(u8, u8, u8)> =
+            vec![(168, 152, 92), (71, 57, 230), (122, 122, 79), (133, 96, 39)];
         let rgb_pixels: Vec<(f32, f32, f32)> = vec![
-            (115.0 / 255.0, 191.0 / 255.0, 180.0 / 255.0),
-            (238.0 / 255.0, 28.0 / 255.0, 39.0 / 255.0),
-            (84.0 / 255.0, 117.0 / 255.0, 178.0 / 255.0),
-            (82.0 / 255.0, 106.0 / 255.0, 254.0 / 255.0),
+            (0.136_756, 0.435_524, 0.645_848),
+            (0.793_989, 0.009_446_9, 0.0),
+            (0.015_421_1, 0.262_53, 0.135_474),
+            (0.0, 0.437_285, 0.050_705_9),
         ];
         let config = YuvConfig {
             bit_depth: 8,
@@ -547,17 +625,13 @@ mod tests {
     #[test]
     fn bt709_limited_to_rgb_8b() {
         // These values were manually chosen semi-randomly
-        let yuv_pixels: Vec<(u8, u8, u8)> = vec![
-            (165, 131, 95),
-            (79, 112, 220),
-            (114, 158, 111),
-            (112, 195, 111),
-        ];
+        let yuv_pixels: Vec<(u8, u8, u8)> =
+            vec![(168, 152, 92), (71, 57, 230), (122, 122, 79), (133, 96, 39)];
         let rgb_pixels: Vec<(f32, f32, f32)> = vec![
-            (115.0 / 255.0, 191.0 / 255.0, 180.0 / 255.0),
-            (238.0 / 255.0, 28.0 / 255.0, 39.0 / 255.0),
-            (84.0 / 255.0, 117.0 / 255.0, 178.0 / 255.0),
-            (82.0 / 255.0, 106.0 / 255.0, 254.0 / 255.0),
+            (0.140_153, 0.500_134, 0.761_916),
+            (0.925_443, 0.003_726_5, 0.0),
+            (0.008_854_72, 0.283_511, 0.135_132),
+            (0.0, 0.496_572, 0.042_859_3),
         ];
         let config = YuvConfig {
             bit_depth: 8,
@@ -612,16 +686,16 @@ mod tests {
     fn bt709_full_to_rgb_10b() {
         // These values were manually chosen semi-randomly
         let yuv_pixels: Vec<(u16, u16, u16)> = vec![
-            (698, 525, 362),
-            (295, 438, 931),
-            (459, 650, 435),
-            (448, 820, 437),
+            (649, 530, 380),
+            (352, 428, 879),
+            (449, 635, 445),
+            (437, 784, 449),
         ];
         let rgb_pixels: Vec<(f32, f32, f32)> = vec![
-            (115.0 / 255.0, 191.0 / 255.0, 180.0 / 255.0),
-            (238.0 / 255.0, 28.0 / 255.0, 39.0 / 255.0),
-            (84.0 / 255.0, 117.0 / 255.0, 178.0 / 255.0),
-            (82.0 / 255.0, 106.0 / 255.0, 254.0 / 255.0),
+            (0.132_819, 0.412_614, 0.378_43),
+            (0.795_462, 0.018_939_1, 0.018_982_6),
+            (0.072_853_8, 0.144_83, 0.371_61),
+            (0.069_994_8, 0.115_066, 0.819_838),
         ];
         let config = YuvConfig {
             bit_depth: 10,
@@ -676,16 +750,16 @@ mod tests {
     fn bt709_limited_to_rgb_10b() {
         // These values were manually chosen semi-randomly
         let yuv_pixels: Vec<(u16, u16, u16)> = vec![
-            (662, 523, 380),
-            (316, 447, 879),
-            (457, 632, 444),
-            (447, 782, 446),
+            (649, 530, 380),
+            (352, 428, 879),
+            (449, 635, 445),
+            (437, 784, 449),
         ];
         let rgb_pixels: Vec<(f32, f32, f32)> = vec![
-            (115.0 / 255.0, 191.0 / 255.0, 180.0 / 255.0),
-            (238.0 / 255.0, 28.0 / 255.0, 39.0 / 255.0),
-            (84.0 / 255.0, 117.0 / 255.0, 178.0 / 255.0),
-            (82.0 / 255.0, 106.0 / 255.0, 254.0 / 255.0),
+            (0.136_251, 0.474_517, 0.432_284),
+            (0.938_306, 0.011_321_7, 0.011_364_6),
+            (0.065_771, 0.146_186, 0.416_47),
+            (0.062_539_6, 0.112_142, 0.974_052),
         ];
         let config = YuvConfig {
             bit_depth: 10,
@@ -737,147 +811,19 @@ mod tests {
     }
 
     #[test]
-    fn bt2020_full_to_rgb_8b() {
-        // These values were manually chosen semi-randomly
-        let yuv_pixels: Vec<(u8, u8, u8)> = vec![
-            (170, 133, 90),
-            (84, 104, 233),
-            (112, 163, 109),
-            (108, 205, 110),
-        ];
-        let rgb_pixels: Vec<(f32, f32, f32)> = vec![
-            (115.0 / 255.0, 191.0 / 255.0, 180.0 / 255.0),
-            (238.0 / 255.0, 28.0 / 255.0, 39.0 / 255.0),
-            (84.0 / 255.0, 117.0 / 255.0, 178.0 / 255.0),
-            (82.0 / 255.0, 106.0 / 255.0, 254.0 / 255.0),
-        ];
-        let config = YuvConfig {
-            bit_depth: 8,
-            subsampling_x: 0,
-            subsampling_y: 0,
-            full_range: true,
-            matrix_coefficients: MatrixCoefficients::BT2020NonConstantLuminance,
-            transfer_characteristics: TransferCharacteristic::BT2020Ten,
-            color_primaries: ColorPrimaries::BT2020,
-        };
-        let input = Yuv::new(
-            Frame {
-                planes: [
-                    Plane::from_slice(&yuv_pixels.iter().map(|pix| pix.0).collect::<Vec<_>>(), 2),
-                    Plane::from_slice(&yuv_pixels.iter().map(|pix| pix.1).collect::<Vec<_>>(), 2),
-                    Plane::from_slice(&yuv_pixels.iter().map(|pix| pix.2).collect::<Vec<_>>(), 2),
-                ],
-            },
-            config,
-        )
-        .unwrap();
-        let rgb = yuv_to_rgb(&input).unwrap();
-        for (output, expected) in rgb.iter().zip(rgb_pixels.iter()) {
-            assert!(
-                (output[0] - expected.0).abs() < 0.0005,
-                "Result {:.6} differed from expected {:.6}",
-                output[0],
-                expected.0
-            );
-            assert!(
-                (output[1] - expected.1).abs() < 0.0005,
-                "Result {:.6} differed from expected {:.6}",
-                output[1],
-                expected.1
-            );
-            assert!(
-                (output[2] - expected.2).abs() < 0.0005,
-                "Result {:.6} differed from expected {:.6}",
-                output[2],
-                expected.2
-            );
-        }
-        let yuv: Yuv<u8> = rgb_to_yuv(&rgb, 2, 2, config).unwrap();
-        for (i, expected) in yuv_pixels.iter().enumerate() {
-            assert_eq!(yuv.data()[0].data_origin()[i], expected.0);
-            assert_eq!(yuv.data()[1].data_origin()[i], expected.1);
-            assert_eq!(yuv.data()[2].data_origin()[i], expected.2);
-        }
-    }
-
-    #[test]
-    fn bt2020_limited_to_rgb_8b() {
-        // These values were manually chosen semi-randomly
-        let yuv_pixels: Vec<(u8, u8, u8)> = vec![
-            (162, 132, 95),
-            (88, 107, 220),
-            (112, 159, 111),
-            (109, 196, 112),
-        ];
-        let rgb_pixels: Vec<(f32, f32, f32)> = vec![
-            (115.0 / 255.0, 191.0 / 255.0, 180.0 / 255.0),
-            (238.0 / 255.0, 28.0 / 255.0, 39.0 / 255.0),
-            (84.0 / 255.0, 117.0 / 255.0, 178.0 / 255.0),
-            (82.0 / 255.0, 106.0 / 255.0, 254.0 / 255.0),
-        ];
-        let config = YuvConfig {
-            bit_depth: 8,
-            subsampling_x: 0,
-            subsampling_y: 0,
-            full_range: false,
-            matrix_coefficients: MatrixCoefficients::BT2020NonConstantLuminance,
-            transfer_characteristics: TransferCharacteristic::BT2020Ten,
-            color_primaries: ColorPrimaries::BT2020,
-        };
-        let input = Yuv::new(
-            Frame {
-                planes: [
-                    Plane::from_slice(&yuv_pixels.iter().map(|pix| pix.0).collect::<Vec<_>>(), 2),
-                    Plane::from_slice(&yuv_pixels.iter().map(|pix| pix.1).collect::<Vec<_>>(), 2),
-                    Plane::from_slice(&yuv_pixels.iter().map(|pix| pix.2).collect::<Vec<_>>(), 2),
-                ],
-            },
-            config,
-        )
-        .unwrap();
-        let rgb = yuv_to_rgb(&input).unwrap();
-        for (output, expected) in rgb.iter().zip(rgb_pixels.iter()) {
-            assert!(
-                (output[0] - expected.0).abs() < 0.0005,
-                "Result {:.6} differed from expected {:.6}",
-                output[0],
-                expected.0
-            );
-            assert!(
-                (output[1] - expected.1).abs() < 0.0005,
-                "Result {:.6} differed from expected {:.6}",
-                output[1],
-                expected.1
-            );
-            assert!(
-                (output[2] - expected.2).abs() < 0.0005,
-                "Result {:.6} differed from expected {:.6}",
-                output[2],
-                expected.2
-            );
-        }
-        let yuv: Yuv<u8> = rgb_to_yuv(&rgb, 2, 2, config).unwrap();
-        for (i, expected) in yuv_pixels.iter().enumerate() {
-            assert_eq!(yuv.data()[0].data_origin()[i], expected.0);
-            assert_eq!(yuv.data()[1].data_origin()[i], expected.1);
-            assert_eq!(yuv.data()[2].data_origin()[i], expected.2);
-        }
-    }
-
-    #[test]
     fn bt2020_full_to_rgb_10b() {
         // These values were manually chosen semi-randomly
         let yuv_pixels: Vec<(u16, u16, u16)> = vec![
-            (684, 533, 361),
-            (336, 416, 931),
-            (449, 653, 436),
-            (435, 822, 440),
+            (649, 530, 380),
+            (352, 428, 879),
+            (449, 635, 445),
+            (437, 784, 449),
         ];
         let rgb_pixels: Vec<(f32, f32, f32)> = vec![
-            (115.0 / 255.0, 191.0 / 255.0, 180.0 / 255.0),
-            (238.0 / 255.0, 28.0 / 255.0, 39.0 / 255.0),
-            (84.0 / 255.0, 117.0 / 255.0, 178.0 / 255.0),
-            (82.0 / 255.0, 106.0 / 255.0, 254.0 / 255.0),
+            (-0.045_010_6, 0.469_065, 0.377_969),
+            (1.191_15, -0.077_644_3, 0.006_470_73),
+            (0.009_840_05, 0.159_92, 0.403_686),
+            (-0.011_980_1, 0.124_049, 0.919_839),
         ];
         let config = YuvConfig {
             bit_depth: 10,
@@ -938,10 +884,10 @@ mod tests {
             (437, 784, 449),
         ];
         let rgb_pixels: Vec<(f32, f32, f32)> = vec![
-            (115.0 / 255.0, 191.0 / 255.0, 180.0 / 255.0),
-            (238.0 / 255.0, 28.0 / 255.0, 39.0 / 255.0),
-            (84.0 / 255.0, 117.0 / 255.0, 178.0 / 255.0),
-            (82.0 / 255.0, 106.0 / 255.0, 254.0 / 255.0),
+            (-0.079_884_5, 0.543_609, 0.431_571),
+            (1.401_31, -0.099_792_3, -0.003_625_77),
+            (-0.006_279_73, 0.163_196, 0.454_858),
+            (-0.034_417, 0.121_553, 1.097_1),
         ];
         let config = YuvConfig {
             bit_depth: 10,

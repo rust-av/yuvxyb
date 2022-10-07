@@ -9,11 +9,12 @@ mod color;
 mod transfer;
 
 use anyhow::{bail, Result};
+use av_data::pixel::ColorPrimaries;
 use num_traits::clamp;
 use v_frame::{frame::Frame, plane::Plane};
 
 use self::{
-    color::{rgb_to_yuv, yuv_to_rgb},
+    color::{rgb_to_yuv, transform_primaries, yuv_to_rgb},
     transfer::TransferFunction,
 };
 use crate::{CastFromPrimitive, Pixel, Yuv, YuvConfig};
@@ -22,7 +23,8 @@ use crate::{CastFromPrimitive, Pixel, Yuv, YuvConfig};
 /// in a range of 0.0..=1.0;
 pub fn yuv_to_linear_rgb<T: Pixel>(input: &Yuv<T>) -> Result<Vec<[f32; 3]>> {
     let rgb = yuv_to_rgb(input)?;
-    input.config().transfer_characteristics.to_linear(&rgb)
+    let linear = input.config().transfer_characteristics.to_linear(&rgb)?;
+    transform_primaries(&linear, input.config.color_primaries, ColorPrimaries::BT709)
 }
 
 /// Converts 32-bit floating point Linear RGB in a range of 0.0..=1.0
@@ -36,7 +38,8 @@ pub fn linear_rgb_to_yuv<T: Pixel>(
     height: usize,
     config: YuvConfig,
 ) -> Result<Yuv<T>> {
-    let rgb = config.transfer_characteristics.to_gamma(input)?;
+    let rgb = transform_primaries(input, ColorPrimaries::BT709, config.color_primaries)?;
+    let rgb = config.transfer_characteristics.to_gamma(&rgb)?;
     rgb_to_yuv(&rgb, width, height, config)
 }
 
