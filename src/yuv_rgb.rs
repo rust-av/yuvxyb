@@ -53,8 +53,14 @@ fn ycbcr_to_ypbpr<T: Pixel>(input: &Yuv<T>) -> Result<Vec<[f32; 3]>> {
 
     let to_luma: &dyn Fn(T) -> f32 = match (bd, full_range) {
         (8, false) => &to_f32_luma::<T, 8, false>,
+        (9, false) => &to_f32_luma::<T, 9, false>,
         (10, false) => &to_f32_luma::<T, 10, false>,
+        (11, false) => &to_f32_luma::<T, 11, false>,
         (12, false) => &to_f32_luma::<T, 12, false>,
+        (13, false) => &to_f32_luma::<T, 13, false>,
+        (14, false) => &to_f32_luma::<T, 14, false>,
+        (15, false) => &to_f32_luma::<T, 15, false>,
+        (16, false) => &to_f32_luma::<T, 16, false>,
         (8, true) => &to_f32_luma::<T, 8, true>,
         (9, true) => &to_f32_luma::<T, 9, true>,
         (10, true) => &to_f32_luma::<T, 10, true>,
@@ -65,15 +71,19 @@ fn ycbcr_to_ypbpr<T: Pixel>(input: &Yuv<T>) -> Result<Vec<[f32; 3]>> {
         (15, true) => &to_f32_luma::<T, 15, true>,
         (16, true) => &to_f32_luma::<T, 16, true>,
         _ => {
-            bail!(
-                "Bit depths 8, 10, and 12 for limited range or 8-16 for full range are supported"
-            );
+            bail!("Bit depths 8-16 are supported");
         }
     };
     let to_chroma: &dyn Fn(T) -> f32 = match (bd, full_range) {
         (8, false) => &to_f32_chroma::<T, 8, false>,
+        (9, false) => &to_f32_chroma::<T, 9, false>,
         (10, false) => &to_f32_chroma::<T, 10, false>,
+        (11, false) => &to_f32_chroma::<T, 11, false>,
         (12, false) => &to_f32_chroma::<T, 12, false>,
+        (13, false) => &to_f32_chroma::<T, 13, false>,
+        (14, false) => &to_f32_chroma::<T, 14, false>,
+        (15, false) => &to_f32_chroma::<T, 15, false>,
+        (16, false) => &to_f32_chroma::<T, 16, false>,
         (8, true) => &to_f32_chroma::<T, 8, true>,
         (9, true) => &to_f32_chroma::<T, 9, true>,
         (10, true) => &to_f32_chroma::<T, 10, true>,
@@ -84,9 +94,7 @@ fn ycbcr_to_ypbpr<T: Pixel>(input: &Yuv<T>) -> Result<Vec<[f32; 3]>> {
         (15, true) => &to_f32_chroma::<T, 15, true>,
         (16, true) => &to_f32_chroma::<T, 16, true>,
         _ => {
-            bail!(
-                "Bit depths 8, 10, and 12 for limited range or 8-16 for full range are supported"
-            );
+            bail!("Bit depths 8-16 are supported");
         }
     };
 
@@ -117,6 +125,7 @@ fn ycbcr_to_ypbpr<T: Pixel>(input: &Yuv<T>) -> Result<Vec<[f32; 3]>> {
     Ok(output)
 }
 
+#[allow(clippy::too_many_lines)]
 fn ypbpr_to_ycbcr<T: Pixel>(
     input: &[[f32; 3]],
     width: usize,
@@ -132,8 +141,14 @@ fn ypbpr_to_ycbcr<T: Pixel>(
 
     let from_luma: &dyn Fn(f32) -> T = match (bd, full_range) {
         (8, false) => &from_f32_luma::<T, 8, false>,
+        (9, false) => &from_f32_luma::<T, 9, false>,
         (10, false) => &from_f32_luma::<T, 10, false>,
+        (11, false) => &from_f32_luma::<T, 11, false>,
         (12, false) => &from_f32_luma::<T, 12, false>,
+        (13, false) => &from_f32_luma::<T, 13, false>,
+        (14, false) => &from_f32_luma::<T, 14, false>,
+        (15, false) => &from_f32_luma::<T, 15, false>,
+        (16, false) => &from_f32_luma::<T, 16, false>,
         (8, true) => &from_f32_luma::<T, 8, true>,
         (9, true) => &from_f32_luma::<T, 9, true>,
         (10, true) => &from_f32_luma::<T, 10, true>,
@@ -144,15 +159,19 @@ fn ypbpr_to_ycbcr<T: Pixel>(
         (15, true) => &from_f32_luma::<T, 15, true>,
         (16, true) => &from_f32_luma::<T, 16, true>,
         _ => {
-            bail!(
-                "Bit depths 8, 10, and 12 for limited range or 8-16 for full range are supported"
-            );
+            bail!("Bit depths 8-16 are supported");
         }
     };
     let from_chroma: &dyn Fn(f32) -> T = match (bd, full_range) {
         (8, false) => &from_f32_chroma::<T, 8, false>,
+        (9, false) => &from_f32_chroma::<T, 9, false>,
         (10, false) => &from_f32_chroma::<T, 10, false>,
+        (11, false) => &from_f32_chroma::<T, 11, false>,
         (12, false) => &from_f32_chroma::<T, 12, false>,
+        (13, false) => &from_f32_chroma::<T, 13, false>,
+        (14, false) => &from_f32_chroma::<T, 14, false>,
+        (15, false) => &from_f32_chroma::<T, 15, false>,
+        (16, false) => &from_f32_chroma::<T, 16, false>,
         (8, true) => &from_f32_chroma::<T, 8, true>,
         (9, true) => &from_f32_chroma::<T, 9, true>,
         (10, true) => &from_f32_chroma::<T, 10, true>,
@@ -163,9 +182,7 @@ fn ypbpr_to_ycbcr<T: Pixel>(
         (15, true) => &from_f32_chroma::<T, 15, true>,
         (16, true) => &from_f32_chroma::<T, 16, true>,
         _ => {
-            bail!(
-                "Bit depths 8, 10, and 12 for limited range or 8-16 for full range are supported"
-            );
+            bail!("Bit depths 8-16 are supported");
         }
     };
 
