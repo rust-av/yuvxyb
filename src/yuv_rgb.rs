@@ -91,20 +91,25 @@ fn ycbcr_to_ypbpr<T: Pixel>(input: &Yuv<T>) -> Result<Vec<[f32; 3]>> {
     };
 
     let data = input.data();
+    let y_stride = data[0].cfg.stride;
+    let u_stride = data[1].cfg.stride;
+    let v_stride = data[2].cfg.stride;
     let y_origin = data[0].data_origin();
     let u_origin = data[1].data_origin();
     let v_origin = data[2].data_origin();
     let mut output = vec![[0.0, 0.0, 0.0]; w * h];
     for y in 0..h {
         for x in 0..w {
-            let y_pos = y * w + x;
-            let uv_pos = (y >> ss_y) * (w >> ss_x) + (x >> ss_x);
+            let output_pos = y * w + x;
+            let y_pos = y * y_stride + x;
+            let u_pos = (y >> ss_y) * u_stride + (x >> ss_x);
+            let v_pos = (y >> ss_y) * v_stride + (x >> ss_x);
             // SAFETY: The bounds of the YUV data are validated when we construct it.
             unsafe {
-                *output.get_unchecked_mut(y_pos) = [
+                *output.get_unchecked_mut(output_pos) = [
                     to_luma(*y_origin.get_unchecked(y_pos)),
-                    to_chroma(*u_origin.get_unchecked(uv_pos)),
-                    to_chroma(*v_origin.get_unchecked(uv_pos)),
+                    to_chroma(*u_origin.get_unchecked(u_pos)),
+                    to_chroma(*v_origin.get_unchecked(v_pos)),
                 ];
             }
         }
@@ -201,12 +206,13 @@ fn ypbpr_to_ycbcr<T: Pixel>(
     let mut last_uv_pos = usize::MAX;
     for y in 0..height {
         for x in 0..width {
+            let input_pos = y * width + x;
             let y_pos = y * y_stride + x;
             let u_pos = (y >> ss_y) * u_stride + (x >> ss_x);
             let v_pos = (y >> ss_y) * v_stride + (x >> ss_x);
             // SAFETY: The bounds of the YUV data are validated when we construct it.
             unsafe {
-                let pix = input.get_unchecked(y_pos);
+                let pix = input.get_unchecked(input_pos);
                 *y_origin.get_unchecked_mut(y_pos) = from_luma(pix[0]);
                 if u_pos != last_uv_pos {
                     // Small optimization to avoid doing unnecessary calculations and writes
@@ -752,10 +758,16 @@ mod tests {
             );
         }
         let yuv: Yuv<u8> = linear_rgb_to_yuv(&rgb, 2, 2, config).unwrap();
-        for (i, expected) in yuv_pixels.iter().enumerate() {
-            assert_eq!(yuv.data()[0].data_origin()[i], expected.0);
-            assert_eq!(yuv.data()[1].data_origin()[i], expected.1);
-            assert_eq!(yuv.data()[2].data_origin()[i], expected.2);
+        for y in 0..2 {
+            for x in 0..2 {
+                let expected = yuv_pixels[y * 2 + x];
+                let dy = yuv.data()[0].p(x, y);
+                let du = yuv.data()[1].p(x, y);
+                let dv = yuv.data()[2].p(x, y);
+                assert_eq!(dy, expected.0);
+                assert_eq!(du, expected.1);
+                assert_eq!(dv, expected.2);
+            }
         }
     }
 
@@ -812,10 +824,16 @@ mod tests {
             );
         }
         let yuv: Yuv<u8> = linear_rgb_to_yuv(&rgb, 2, 2, config).unwrap();
-        for (i, expected) in yuv_pixels.iter().enumerate() {
-            assert_eq!(yuv.data()[0].data_origin()[i], expected.0);
-            assert_eq!(yuv.data()[1].data_origin()[i], expected.1);
-            assert_eq!(yuv.data()[2].data_origin()[i], expected.2);
+        for y in 0..2 {
+            for x in 0..2 {
+                let expected = yuv_pixels[y * 2 + x];
+                let dy = yuv.data()[0].p(x, y);
+                let du = yuv.data()[1].p(x, y);
+                let dv = yuv.data()[2].p(x, y);
+                assert_eq!(dy, expected.0);
+                assert_eq!(du, expected.1);
+                assert_eq!(dv, expected.2);
+            }
         }
     }
 
@@ -876,10 +894,16 @@ mod tests {
             );
         }
         let yuv: Yuv<u16> = linear_rgb_to_yuv(&rgb, 2, 2, config).unwrap();
-        for (i, expected) in yuv_pixels.iter().enumerate() {
-            assert_eq!(yuv.data()[0].data_origin()[i], expected.0);
-            assert_eq!(yuv.data()[1].data_origin()[i], expected.1);
-            assert_eq!(yuv.data()[2].data_origin()[i], expected.2);
+        for y in 0..2 {
+            for x in 0..2 {
+                let expected = yuv_pixels[y * 2 + x];
+                let dy = yuv.data()[0].p(x, y);
+                let du = yuv.data()[1].p(x, y);
+                let dv = yuv.data()[2].p(x, y);
+                assert_eq!(dy, expected.0);
+                assert_eq!(du, expected.1);
+                assert_eq!(dv, expected.2);
+            }
         }
     }
 
@@ -940,10 +964,16 @@ mod tests {
             );
         }
         let yuv: Yuv<u16> = linear_rgb_to_yuv(&rgb, 2, 2, config).unwrap();
-        for (i, expected) in yuv_pixels.iter().enumerate() {
-            assert_eq!(yuv.data()[0].data_origin()[i], expected.0);
-            assert_eq!(yuv.data()[1].data_origin()[i], expected.1);
-            assert_eq!(yuv.data()[2].data_origin()[i], expected.2);
+        for y in 0..2 {
+            for x in 0..2 {
+                let expected = yuv_pixels[y * 2 + x];
+                let dy = yuv.data()[0].p(x, y);
+                let du = yuv.data()[1].p(x, y);
+                let dv = yuv.data()[2].p(x, y);
+                assert_eq!(dy, expected.0);
+                assert_eq!(du, expected.1);
+                assert_eq!(dv, expected.2);
+            }
         }
     }
 
@@ -1000,10 +1030,16 @@ mod tests {
             );
         }
         let yuv: Yuv<u8> = linear_rgb_to_yuv(&rgb, 2, 2, config).unwrap();
-        for (i, expected) in yuv_pixels.iter().enumerate() {
-            assert_eq!(yuv.data()[0].data_origin()[i], expected.0);
-            assert_eq!(yuv.data()[1].data_origin()[i], expected.1);
-            assert_eq!(yuv.data()[2].data_origin()[i], expected.2);
+        for y in 0..2 {
+            for x in 0..2 {
+                let expected = yuv_pixels[y * 2 + x];
+                let dy = yuv.data()[0].p(x, y);
+                let du = yuv.data()[1].p(x, y);
+                let dv = yuv.data()[2].p(x, y);
+                assert_eq!(dy, expected.0);
+                assert_eq!(du, expected.1);
+                assert_eq!(dv, expected.2);
+            }
         }
     }
 
@@ -1060,10 +1096,16 @@ mod tests {
             );
         }
         let yuv: Yuv<u8> = linear_rgb_to_yuv(&rgb, 2, 2, config).unwrap();
-        for (i, expected) in yuv_pixels.iter().enumerate() {
-            assert_eq!(yuv.data()[0].data_origin()[i], expected.0);
-            assert_eq!(yuv.data()[1].data_origin()[i], expected.1);
-            assert_eq!(yuv.data()[2].data_origin()[i], expected.2);
+        for y in 0..2 {
+            for x in 0..2 {
+                let expected = yuv_pixels[y * 2 + x];
+                let dy = yuv.data()[0].p(x, y);
+                let du = yuv.data()[1].p(x, y);
+                let dv = yuv.data()[2].p(x, y);
+                assert_eq!(dy, expected.0);
+                assert_eq!(du, expected.1);
+                assert_eq!(dv, expected.2);
+            }
         }
     }
 
@@ -1124,10 +1166,16 @@ mod tests {
             );
         }
         let yuv: Yuv<u16> = linear_rgb_to_yuv(&rgb, 2, 2, config).unwrap();
-        for (i, expected) in yuv_pixels.iter().enumerate() {
-            assert_eq!(yuv.data()[0].data_origin()[i], expected.0);
-            assert_eq!(yuv.data()[1].data_origin()[i], expected.1);
-            assert_eq!(yuv.data()[2].data_origin()[i], expected.2);
+        for y in 0..2 {
+            for x in 0..2 {
+                let expected = yuv_pixels[y * 2 + x];
+                let dy = yuv.data()[0].p(x, y);
+                let du = yuv.data()[1].p(x, y);
+                let dv = yuv.data()[2].p(x, y);
+                assert_eq!(dy, expected.0);
+                assert_eq!(du, expected.1);
+                assert_eq!(dv, expected.2);
+            }
         }
     }
 
@@ -1188,10 +1236,16 @@ mod tests {
             );
         }
         let yuv: Yuv<u16> = linear_rgb_to_yuv(&rgb, 2, 2, config).unwrap();
-        for (i, expected) in yuv_pixels.iter().enumerate() {
-            assert_eq!(yuv.data()[0].data_origin()[i], expected.0);
-            assert_eq!(yuv.data()[1].data_origin()[i], expected.1);
-            assert_eq!(yuv.data()[2].data_origin()[i], expected.2);
+        for y in 0..2 {
+            for x in 0..2 {
+                let expected = yuv_pixels[y * 2 + x];
+                let dy = yuv.data()[0].p(x, y);
+                let du = yuv.data()[1].p(x, y);
+                let dv = yuv.data()[2].p(x, y);
+                assert_eq!(dy, expected.0);
+                assert_eq!(du, expected.1);
+                assert_eq!(dv, expected.2);
+            }
         }
     }
 
@@ -1252,10 +1306,16 @@ mod tests {
             );
         }
         let yuv: Yuv<u16> = linear_rgb_to_yuv(&rgb, 2, 2, config).unwrap();
-        for (i, expected) in yuv_pixels.iter().enumerate() {
-            assert_eq!(yuv.data()[0].data_origin()[i], expected.0);
-            assert_eq!(yuv.data()[1].data_origin()[i], expected.1);
-            assert_eq!(yuv.data()[2].data_origin()[i], expected.2);
+        for y in 0..2 {
+            for x in 0..2 {
+                let expected = yuv_pixels[y * 2 + x];
+                let dy = yuv.data()[0].p(x, y);
+                let du = yuv.data()[1].p(x, y);
+                let dv = yuv.data()[2].p(x, y);
+                assert_eq!(dy, expected.0);
+                assert_eq!(du, expected.1);
+                assert_eq!(dv, expected.2);
+            }
         }
     }
 
@@ -1316,10 +1376,16 @@ mod tests {
             );
         }
         let yuv: Yuv<u16> = linear_rgb_to_yuv(&rgb, 2, 2, config).unwrap();
-        for (i, expected) in yuv_pixels.iter().enumerate() {
-            assert_eq!(yuv.data()[0].data_origin()[i], expected.0);
-            assert_eq!(yuv.data()[1].data_origin()[i], expected.1);
-            assert_eq!(yuv.data()[2].data_origin()[i], expected.2);
+        for y in 0..2 {
+            for x in 0..2 {
+                let expected = yuv_pixels[y * 2 + x];
+                let dy = yuv.data()[0].p(x, y);
+                let du = yuv.data()[1].p(x, y);
+                let dv = yuv.data()[2].p(x, y);
+                assert_eq!(dy, expected.0);
+                assert_eq!(du, expected.1);
+                assert_eq!(dv, expected.2);
+            }
         }
     }
 }
