@@ -247,11 +247,11 @@ fn gamut_rgb_to_xyz_matrix(primaries: ColorPrimaries) -> Result<Matrix3<f32>> {
     let xyz_matrix = get_primaries_xyz(primaries)?;
     let white_xyz = Matrix3x1::from_column_slice(&get_white_point(primaries));
 
-    let s = xyz_matrix.try_inverse().expect("has an inverse") * white_xyz;
+    let s = (xyz_matrix.try_inverse().expect("has an inverse") * white_xyz).transpose();
     let mut m = [0f32; 9];
-    m[0..3].copy_from_slice((xyz_matrix.row(0) * s).as_slice());
-    m[3..6].copy_from_slice((xyz_matrix.row(1) * s).as_slice());
-    m[6..9].copy_from_slice((xyz_matrix.row(2) * s).as_slice());
+    m[0..3].copy_from_slice((xyz_matrix.row(0).component_mul(&s)).as_slice());
+    m[3..6].copy_from_slice((xyz_matrix.row(1).component_mul(&s)).as_slice());
+    m[6..9].copy_from_slice((xyz_matrix.row(2).component_mul(&s)).as_slice());
 
     Ok(Matrix3::from_row_slice(&m))
 }
