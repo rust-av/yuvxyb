@@ -8,7 +8,7 @@
 mod color;
 mod transfer;
 
-use anyhow::{bail, Result};
+use anyhow::Result;
 use av_data::pixel::ColorPrimaries;
 use num_traits::clamp;
 use v_frame::{frame::Frame, plane::Plane};
@@ -43,7 +43,7 @@ pub fn linear_rgb_to_yuv<T: Pixel>(
     rgb_to_yuv(&rgb, width, height, config)
 }
 
-fn ycbcr_to_ypbpr<T: Pixel>(input: &Yuv<T>) -> Result<Vec<[f32; 3]>> {
+fn ycbcr_to_ypbpr<T: Pixel>(input: &Yuv<T>) -> Vec<[f32; 3]> {
     let w = input.width() as usize;
     let h = input.height() as usize;
     let ss_x = input.config().subsampling_x;
@@ -51,52 +51,8 @@ fn ycbcr_to_ypbpr<T: Pixel>(input: &Yuv<T>) -> Result<Vec<[f32; 3]>> {
     let bd = input.config().bit_depth;
     let full_range = input.config().full_range;
 
-    let to_luma: &dyn Fn(T) -> f32 = match (bd, full_range) {
-        (8, false) => &to_f32_luma::<T, 8, false>,
-        (9, false) => &to_f32_luma::<T, 9, false>,
-        (10, false) => &to_f32_luma::<T, 10, false>,
-        (11, false) => &to_f32_luma::<T, 11, false>,
-        (12, false) => &to_f32_luma::<T, 12, false>,
-        (13, false) => &to_f32_luma::<T, 13, false>,
-        (14, false) => &to_f32_luma::<T, 14, false>,
-        (15, false) => &to_f32_luma::<T, 15, false>,
-        (16, false) => &to_f32_luma::<T, 16, false>,
-        (8, true) => &to_f32_luma::<T, 8, true>,
-        (9, true) => &to_f32_luma::<T, 9, true>,
-        (10, true) => &to_f32_luma::<T, 10, true>,
-        (11, true) => &to_f32_luma::<T, 11, true>,
-        (12, true) => &to_f32_luma::<T, 12, true>,
-        (13, true) => &to_f32_luma::<T, 13, true>,
-        (14, true) => &to_f32_luma::<T, 14, true>,
-        (15, true) => &to_f32_luma::<T, 15, true>,
-        (16, true) => &to_f32_luma::<T, 16, true>,
-        _ => {
-            bail!("Bit depths 8-16 are supported");
-        }
-    };
-    let to_chroma: &dyn Fn(T) -> f32 = match (bd, full_range) {
-        (8, false) => &to_f32_chroma::<T, 8, false>,
-        (9, false) => &to_f32_chroma::<T, 9, false>,
-        (10, false) => &to_f32_chroma::<T, 10, false>,
-        (11, false) => &to_f32_chroma::<T, 11, false>,
-        (12, false) => &to_f32_chroma::<T, 12, false>,
-        (13, false) => &to_f32_chroma::<T, 13, false>,
-        (14, false) => &to_f32_chroma::<T, 14, false>,
-        (15, false) => &to_f32_chroma::<T, 15, false>,
-        (16, false) => &to_f32_chroma::<T, 16, false>,
-        (8, true) => &to_f32_chroma::<T, 8, true>,
-        (9, true) => &to_f32_chroma::<T, 9, true>,
-        (10, true) => &to_f32_chroma::<T, 10, true>,
-        (11, true) => &to_f32_chroma::<T, 11, true>,
-        (12, true) => &to_f32_chroma::<T, 12, true>,
-        (13, true) => &to_f32_chroma::<T, 13, true>,
-        (14, true) => &to_f32_chroma::<T, 14, true>,
-        (15, true) => &to_f32_chroma::<T, 15, true>,
-        (16, true) => &to_f32_chroma::<T, 16, true>,
-        _ => {
-            bail!("Bit depths 8-16 are supported");
-        }
-    };
+    let (luma_scale, luma_offset) = get_scale_offset::<true>(bd, full_range, false);
+    let (chroma_scale, chroma_offset) = get_scale_offset::<true>(bd, full_range, true);
 
     let data = input.data();
     let y_stride = data[0].cfg.stride;
@@ -115,14 +71,14 @@ fn ycbcr_to_ypbpr<T: Pixel>(input: &Yuv<T>) -> Result<Vec<[f32; 3]>> {
             // SAFETY: The bounds of the YUV data are validated when we construct it.
             unsafe {
                 *output.get_unchecked_mut(output_pos) = [
-                    to_luma(*y_origin.get_unchecked(y_pos)),
-                    to_chroma(*u_origin.get_unchecked(u_pos)),
-                    to_chroma(*v_origin.get_unchecked(v_pos)),
+                    to_f32_luma(*y_origin.get_unchecked(y_pos), luma_scale, luma_offset),
+                    to_f32_chroma(*u_origin.get_unchecked(u_pos), chroma_scale, chroma_offset),
+                    to_f32_chroma(*v_origin.get_unchecked(v_pos), chroma_scale, chroma_offset),
                 ];
             }
         }
     }
-    Ok(output)
+    output
 }
 
 #[allow(clippy::too_many_lines)]
@@ -131,7 +87,7 @@ fn ypbpr_to_ycbcr<T: Pixel>(
     width: usize,
     height: usize,
     config: YuvConfig,
-) -> Result<Yuv<T>> {
+) -> Yuv<T> {
     let ss_x = config.subsampling_x;
     let ss_y = config.subsampling_y;
     let bd = config.bit_depth;
@@ -139,52 +95,8 @@ fn ypbpr_to_ycbcr<T: Pixel>(
     let chroma_width = width >> ss_x;
     let chroma_height = height >> ss_y;
 
-    let from_luma: &dyn Fn(f32) -> T = match (bd, full_range) {
-        (8, false) => &from_f32_luma::<T, 8, false>,
-        (9, false) => &from_f32_luma::<T, 9, false>,
-        (10, false) => &from_f32_luma::<T, 10, false>,
-        (11, false) => &from_f32_luma::<T, 11, false>,
-        (12, false) => &from_f32_luma::<T, 12, false>,
-        (13, false) => &from_f32_luma::<T, 13, false>,
-        (14, false) => &from_f32_luma::<T, 14, false>,
-        (15, false) => &from_f32_luma::<T, 15, false>,
-        (16, false) => &from_f32_luma::<T, 16, false>,
-        (8, true) => &from_f32_luma::<T, 8, true>,
-        (9, true) => &from_f32_luma::<T, 9, true>,
-        (10, true) => &from_f32_luma::<T, 10, true>,
-        (11, true) => &from_f32_luma::<T, 11, true>,
-        (12, true) => &from_f32_luma::<T, 12, true>,
-        (13, true) => &from_f32_luma::<T, 13, true>,
-        (14, true) => &from_f32_luma::<T, 14, true>,
-        (15, true) => &from_f32_luma::<T, 15, true>,
-        (16, true) => &from_f32_luma::<T, 16, true>,
-        _ => {
-            bail!("Bit depths 8-16 are supported");
-        }
-    };
-    let from_chroma: &dyn Fn(f32) -> T = match (bd, full_range) {
-        (8, false) => &from_f32_chroma::<T, 8, false>,
-        (9, false) => &from_f32_chroma::<T, 9, false>,
-        (10, false) => &from_f32_chroma::<T, 10, false>,
-        (11, false) => &from_f32_chroma::<T, 11, false>,
-        (12, false) => &from_f32_chroma::<T, 12, false>,
-        (13, false) => &from_f32_chroma::<T, 13, false>,
-        (14, false) => &from_f32_chroma::<T, 14, false>,
-        (15, false) => &from_f32_chroma::<T, 15, false>,
-        (16, false) => &from_f32_chroma::<T, 16, false>,
-        (8, true) => &from_f32_chroma::<T, 8, true>,
-        (9, true) => &from_f32_chroma::<T, 9, true>,
-        (10, true) => &from_f32_chroma::<T, 10, true>,
-        (11, true) => &from_f32_chroma::<T, 11, true>,
-        (12, true) => &from_f32_chroma::<T, 12, true>,
-        (13, true) => &from_f32_chroma::<T, 13, true>,
-        (14, true) => &from_f32_chroma::<T, 14, true>,
-        (15, true) => &from_f32_chroma::<T, 15, true>,
-        (16, true) => &from_f32_chroma::<T, 16, true>,
-        _ => {
-            bail!("Bit depths 8-16 are supported");
-        }
-    };
+    let (luma_scale, luma_offset) = get_scale_offset::<false>(bd, full_range, false);
+    let (chroma_scale, chroma_offset) = get_scale_offset::<false>(bd, full_range, true);
 
     let mut output: Frame<T> = Frame {
         planes: [
@@ -230,64 +142,63 @@ fn ypbpr_to_ycbcr<T: Pixel>(
             // SAFETY: The bounds of the YUV data are validated when we construct it.
             unsafe {
                 let pix = input.get_unchecked(input_pos);
-                *y_origin.get_unchecked_mut(y_pos) = from_luma(pix[0]);
+                *y_origin.get_unchecked_mut(y_pos) =
+                    from_f32_luma(pix[0], luma_scale, luma_offset, bd);
                 if u_pos != last_uv_pos {
                     // Small optimization to avoid doing unnecessary calculations and writes
                     // We can track this from just `u_pos`. We have `v_pos` separate for indexing
                     // on the off chance that the two planes have different strides.
-                    *u_origin.get_unchecked_mut(u_pos) = from_chroma(pix[1]);
-                    *v_origin.get_unchecked_mut(v_pos) = from_chroma(pix[2]);
+                    *u_origin.get_unchecked_mut(u_pos) =
+                        from_f32_chroma(pix[1], chroma_scale, chroma_offset, bd, full_range);
+                    *v_origin.get_unchecked_mut(v_pos) =
+                        from_f32_chroma(pix[2], chroma_scale, chroma_offset, bd, full_range);
                     last_uv_pos = u_pos;
                 }
             }
         }
     }
-    Ok(Yuv {
+    Yuv {
         data: output,
         config,
-    })
+    }
 }
 
 #[inline(always)]
-fn to_f32_luma<T: Pixel, const BD: u8, const FULL_RANGE: bool>(val: T) -> f32 {
+fn to_f32_luma<T: Pixel>(val: T, scale: f32, offset: f32) -> f32 {
     // Converts to a float value in the range 0.0..=1.0
     let val = f32::from(u16::cast_from(val));
-    let (scale, offset) = get_scale_offset::<true>(BD, FULL_RANGE, false);
     clamp(val.mul_add(scale, offset), 0.0, 1.0)
 }
 
 #[inline(always)]
-fn to_f32_chroma<T: Pixel, const BD: u8, const FULL_RANGE: bool>(val: T) -> f32 {
+fn to_f32_chroma<T: Pixel>(val: T, scale: f32, offset: f32) -> f32 {
     // Converts to a float value in the range -0.5..=0.5
     let val = f32::from(u16::cast_from(val));
-    let (scale, offset) = get_scale_offset::<true>(BD, FULL_RANGE, true);
     clamp(val.mul_add(scale, offset), -0.5, 0.5)
 }
 
 #[inline(always)]
-fn from_f32_luma<T: Pixel, const BD: u8, const FULL_RANGE: bool>(val: f32) -> T {
+fn from_f32_luma<T: Pixel>(val: f32, scale: f32, offset: f32, bd: u8) -> T {
     // Converts to a float value in the range 0.0..=1.0
-    let (scale, offset) = get_scale_offset::<false>(BD, FULL_RANGE, false);
     T::cast_from(clamp(
         val.mul_add(scale, offset).round() as u16,
         0,
-        ((1u32 << BD) - 1) as u16,
+        ((1u32 << bd) - 1) as u16,
     ))
 }
 
 #[inline(always)]
-fn from_f32_chroma<T: Pixel, const BD: u8, const FULL_RANGE: bool>(val: f32) -> T {
+fn from_f32_chroma<T: Pixel>(val: f32, scale: f32, offset: f32, bd: u8, full_range: bool) -> T {
     // Accounts for rounding issues
-    if FULL_RANGE && (val + 0.5).abs() < f32::EPSILON {
+    if full_range && (val + 0.5).abs() < f32::EPSILON {
         return T::cast_from(0u16);
     }
 
     // Converts from a float value in the range -0.5..=0.5
-    let (scale, offset) = get_scale_offset::<false>(BD, FULL_RANGE, true);
     T::cast_from(clamp(
         val.mul_add(scale, offset).round() as u16,
         0,
-        ((1u32 << BD) - 1) as u16,
+        ((1u32 << bd) - 1) as u16,
     ))
 }
 
@@ -377,14 +288,18 @@ mod tests {
         ];
 
         for (input, output) in inputs.iter().copied().zip(outputs.iter().copied()) {
-            let result = to_f32_luma::<_, 8, true>(input);
+            let bd = 8;
+            let full_range = true;
+            let (scale, offset) = get_scale_offset::<true>(bd, full_range, false);
+            let result = to_f32_luma(input, scale, offset);
             assert!(
                 (output - result).abs() < 0.0005,
                 "Result {:.6} differed from expected {:.6}",
                 result,
                 output
             );
-            let result: u8 = from_f32_luma::<_, 8, true>(result);
+            let (scale, offset) = get_scale_offset::<false>(bd, full_range, false);
+            let result: u8 = from_f32_luma(result, scale, offset, bd);
             assert!(
                 input == result,
                 "Result {} differed from expected {}",
@@ -417,20 +332,24 @@ mod tests {
         ];
 
         for (input, output) in inputs.iter().copied().zip(outputs.iter().copied()) {
-            let result = to_f32_luma::<_, 8, false>(input);
+            let bd = 8;
+            let full_range = false;
+            let (scale, offset) = get_scale_offset::<true>(bd, full_range, false);
+            let result = to_f32_luma(input, scale, offset);
             assert!(
                 (output - result).abs() < 0.0005,
                 "Result {:.6} differed from expected {:.6}",
                 result,
                 output
             );
-            let result: u8 = from_f32_luma::<_, 8, false>(result);
+            let (scale, offset) = get_scale_offset::<false>(bd, full_range, false);
+            let result: u8 = from_f32_luma(result, scale, offset, bd);
             let expected = clamp(input, 16, 235);
             assert!(
                 expected == result,
                 "Result {} differed from expected {}",
                 result,
-                expected
+                input
             );
         }
     }
@@ -458,14 +377,18 @@ mod tests {
         ];
 
         for (input, output) in inputs.iter().copied().zip(outputs.iter().copied()) {
-            let result = to_f32_chroma::<_, 8, true>(input);
+            let bd = 8;
+            let full_range = true;
+            let (scale, offset) = get_scale_offset::<true>(bd, full_range, true);
+            let result = to_f32_chroma(input, scale, offset);
             assert!(
                 (output - result).abs() < 0.0005,
                 "Result {:.6} differed from expected {:.6}",
                 result,
                 output
             );
-            let result: u8 = from_f32_chroma::<_, 8, true>(result);
+            let (scale, offset) = get_scale_offset::<false>(bd, full_range, true);
+            let result: u8 = from_f32_chroma(result, scale, offset, bd, full_range);
             assert!(
                 input == result,
                 "Result {} differed from expected {}",
@@ -498,20 +421,24 @@ mod tests {
         ];
 
         for (input, output) in inputs.iter().copied().zip(outputs.iter().copied()) {
-            let result = to_f32_chroma::<_, 8, false>(input);
+            let bd = 8;
+            let full_range = false;
+            let (scale, offset) = get_scale_offset::<true>(bd, full_range, true);
+            let result = to_f32_chroma(input, scale, offset);
             assert!(
                 (output - result).abs() < 0.0005,
                 "Result {:.6} differed from expected {:.6}",
                 result,
                 output
             );
-            let result: u8 = from_f32_chroma::<_, 8, false>(result);
+            let (scale, offset) = get_scale_offset::<false>(bd, full_range, true);
+            let result: u8 = from_f32_chroma(result, scale, offset, bd, full_range);
             let expected = clamp(input, 16, 240);
             assert!(
                 expected == result,
                 "Result {} differed from expected {}",
                 result,
-                expected
+                input
             );
         }
     }
@@ -550,14 +477,18 @@ mod tests {
         ];
 
         for (input, output) in inputs.iter().copied().zip(outputs.iter().copied()) {
-            let result = to_f32_luma::<_, 10, true>(input);
+            let bd = 10;
+            let full_range = true;
+            let (scale, offset) = get_scale_offset::<true>(bd, full_range, false);
+            let result = to_f32_luma(input, scale, offset);
             assert!(
                 (output - result).abs() < 0.0005,
                 "Result {:.6} differed from expected {:.6}",
                 result,
                 output
             );
-            let result: u16 = from_f32_luma::<_, 10, true>(result);
+            let (scale, offset) = get_scale_offset::<false>(bd, full_range, false);
+            let result: u16 = from_f32_luma(result, scale, offset, bd);
             assert!(
                 input == result,
                 "Result {} differed from expected {}",
@@ -601,20 +532,24 @@ mod tests {
         ];
 
         for (input, output) in inputs.iter().copied().zip(outputs.iter().copied()) {
-            let result = to_f32_luma::<_, 10, false>(input);
+            let bd = 10;
+            let full_range = false;
+            let (scale, offset) = get_scale_offset::<true>(bd, full_range, false);
+            let result = to_f32_luma(input, scale, offset);
             assert!(
                 (output - result).abs() < 0.0005,
                 "Result {:.6} differed from expected {:.6}",
                 result,
                 output
             );
-            let result: u16 = from_f32_luma::<_, 10, false>(result);
+            let (scale, offset) = get_scale_offset::<false>(bd, full_range, false);
+            let result: u16 = from_f32_luma(result, scale, offset, bd);
             let expected = clamp(input, 16 << 2u8, 235 << 2u8);
             assert!(
                 expected == result,
                 "Result {} differed from expected {}",
                 result,
-                expected
+                input
             );
         }
     }
@@ -653,14 +588,18 @@ mod tests {
         ];
 
         for (input, output) in inputs.iter().copied().zip(outputs.iter().copied()) {
-            let result = to_f32_chroma::<_, 10, true>(input);
+            let bd = 10;
+            let full_range = true;
+            let (scale, offset) = get_scale_offset::<true>(bd, full_range, true);
+            let result = to_f32_chroma(input, scale, offset);
             assert!(
                 (output - result).abs() < 0.0005,
                 "Result {:.6} differed from expected {:.6}",
                 result,
                 output
             );
-            let result: u16 = from_f32_chroma::<_, 10, true>(result);
+            let (scale, offset) = get_scale_offset::<false>(bd, full_range, true);
+            let result: u16 = from_f32_chroma(result, scale, offset, bd, full_range);
             assert!(
                 input == result,
                 "Result {} differed from expected {}",
@@ -704,20 +643,24 @@ mod tests {
         ];
 
         for (input, output) in inputs.iter().copied().zip(outputs.iter().copied()) {
-            let result = to_f32_chroma::<_, 10, false>(input);
+            let bd = 10;
+            let full_range = false;
+            let (scale, offset) = get_scale_offset::<true>(bd, full_range, true);
+            let result = to_f32_chroma(input, scale, offset);
             assert!(
                 (output - result).abs() < 0.0005,
                 "Result {:.6} differed from expected {:.6}",
                 result,
                 output
             );
-            let result: u16 = from_f32_chroma::<_, 10, false>(result);
+            let (scale, offset) = get_scale_offset::<false>(bd, full_range, true);
+            let result: u16 = from_f32_chroma(result, scale, offset, bd, full_range);
             let expected = clamp(input, 16 << 2u8, 240 << 2u8);
             assert!(
                 expected == result,
                 "Result {} differed from expected {}",
                 result,
-                expected
+                input
             );
         }
     }
