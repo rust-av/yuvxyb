@@ -1,3 +1,8 @@
+## Version 0.1.0
+
+- Make things faster
+- Unofficially declare that the interface is not going to change much after this
+
 ## Version 0.0.6
 
 - Fix more conversion bugs
