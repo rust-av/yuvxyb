@@ -1,7 +1,5 @@
 //! Conversion from YUV to XYB requires a few steps. The most direct path is
-//! YUV -> sRGB -> Linear RGB -> XYZ -> LMS -> XYB. We can fuse the matrices for
-//! XYZ, LMS, and XYB to decrease the number of steps to just YUV -> sRGB ->
-//! Linear RGB -> XYB.
+//! YUV -> sRGB -> Linear RGB -> XYZ -> LMS -> XYB.
 
 #![allow(clippy::many_single_char_names)]
 
@@ -75,4 +73,117 @@ pub fn xyb_to_linear_rgb(input: &[[f32; 3]]) -> Vec<[f32; 3]> {
             [res[0], res[1], res[2]]
         })
         .collect()
+}
+
+fn transform_linear_rgb_to_xyb_pixel(pix: &[f32; 3]) -> [f32; 3] {
+    let rgb = Matrix3x1::from_column_slice(pix);
+    let xyz = linear_srgb_to_xyz_matrix() * rgb;
+    let lms = xyz_to_lms_matrix() * xyz;
+    let xyb = lms_to_xyb_matrix() * lms;
+    [xyb[0], xyb[1], xyb[2]]
+}
+
+fn transform_xyb_to_linear_rgb_pixel(pix: &[f32; 3]) -> [f32; 3] {
+    let xyb = Matrix3x1::from_column_slice(pix);
+    let lms = xyb_to_lms_matrix() * xyb;
+    let xyz = lms_to_xyz_matrix() * lms;
+    let rgb = xyz_to_linear_srgb_matrix() * xyz;
+    [rgb[0], rgb[1], rgb[2]]
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{fs::File, path::PathBuf};
+
+    use pxm::PFM;
+
+    use super::*;
+
+    #[test]
+    fn linear_rgb_to_xyb_correct() {
+        let source_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("test_data")
+            .join("tank_linear_rgb.pfm");
+        let expected_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("test_data")
+            .join("tank_xyb.pfm");
+        let source = PFM::read_from(&mut File::open(source_path).unwrap()).unwrap();
+        let expected = PFM::read_from(&mut File::open(expected_path).unwrap()).unwrap();
+        let source = source
+            .data
+            .chunks_exact(3)
+            .map(|chunk| [chunk[0], chunk[1], chunk[2]])
+            .collect::<Vec<_>>();
+        let expected = expected
+            .data
+            .chunks_exact(3)
+            .map(|chunk| [chunk[0], chunk[1], chunk[2]])
+            .collect::<Vec<_>>();
+
+        let result = linear_rgb_to_xyb(&source);
+        for (exp, res) in expected.into_iter().zip(result.into_iter()) {
+            assert!(
+                (exp[0] - res[0]).abs() < 0.0005,
+                "Difference in X channel: Expected {:.4}, got {:.4}",
+                exp[0],
+                res[0]
+            );
+            assert!(
+                (exp[1] - res[1]).abs() < 0.0005,
+                "Difference in Y channel: Expected {:.4}, got {:.4}",
+                exp[1],
+                res[1]
+            );
+            assert!(
+                (exp[2] - res[2]).abs() < 0.0005,
+                "Difference in B channel: Expected {:.4}, got {:.4}",
+                exp[2],
+                res[2]
+            );
+        }
+    }
+
+    #[test]
+    fn xyb_to_linear_rgb_correct() {
+        let source_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("test_data")
+            .join("tank_xyb.pfm");
+        let expected_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("test_data")
+            .join("tank_linear_rgb.pfm");
+        let source = PFM::read_from(&mut File::open(source_path).unwrap()).unwrap();
+        let expected = PFM::read_from(&mut File::open(expected_path).unwrap()).unwrap();
+        let source = source
+            .data
+            .chunks_exact(3)
+            .map(|chunk| [chunk[0], chunk[1], chunk[2]])
+            .collect::<Vec<_>>();
+        let expected = expected
+            .data
+            .chunks_exact(3)
+            .map(|chunk| [chunk[0], chunk[1], chunk[2]])
+            .collect::<Vec<_>>();
+
+        let result = xyb_to_linear_rgb(&source);
+        for (exp, res) in expected.into_iter().zip(result.into_iter()) {
+            assert!(
+                (exp[0] - res[0]).abs() < 0.0005,
+                "Difference in R channel: Expected {:.4}, got {:.4}",
+                exp[0],
+                res[0]
+            );
+            assert!(
+                (exp[1] - res[1]).abs() < 0.0005,
+                "Difference in G channel: Expected {:.4}, got {:.4}",
+                exp[1],
+                res[1]
+            );
+            assert!(
+                (exp[2] - res[2]).abs() < 0.0005,
+                "Difference in B channel: Expected {:.4}, got {:.4}",
+                exp[2],
+                res[2]
+            );
+        }
+    }
 }
