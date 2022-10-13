@@ -14,6 +14,9 @@ repository = "https://github.com/rust-av/yuvxyb"
 anyhow = "1.0.65"
 av-data = "0.4.1"
 debug_unreachable = { package = "new_debug_unreachable", version = "1.0.4" }
+image = { version = "0.24.4", default-features = false, features = [
+    "png",
+], optional = true }
 log = "0.4.17"
 nalgebra = "0.31.1"
 num-traits = "0.2.15"
@@ -30,3 +33,7 @@ rand = "0.8.5"
 [[bench]]
 name = "benches"
 harness = false
+
+[features]
+# Intended for debugging, will output grayscale images of each plane
+dump = ["image"]

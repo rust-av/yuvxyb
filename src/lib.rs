@@ -286,8 +286,12 @@ impl<T: Pixel> TryFrom<&Yuv<T>> for Xyb {
 
     fn try_from(other: &Yuv<T>) -> Result<Self> {
         let lrgb = yuv_to_linear_rgb(other)?;
+        #[cfg(feature = "dump")]
+        let data = linear_rgb_to_xyb(&lrgb, (other.width() as u32, other.height() as u32));
+        #[cfg(not(feature = "dump"))]
+        let data = linear_rgb_to_xyb(&lrgb);
         Ok(Xyb {
-            data: linear_rgb_to_xyb(&lrgb),
+            data,
             width: other.width(),
             height: other.height(),
         })
@@ -302,7 +306,10 @@ impl<T: Pixel> TryFrom<(&Xyb, YuvConfig)> for Yuv<T> {
     fn try_from(other: (&Xyb, YuvConfig)) -> Result<Self> {
         let data = other.0;
         let config = other.1.fix_unspecified_data(data.width(), data.height());
-        let lrgb = xyb_to_linear_rgb(data.data());
+        #[cfg(feature = "dump")]
+        let lrgb = xyb_to_linear_rgb(data.data(), (data.width() as u32, data.height() as u32));
+        #[cfg(not(feature = "dump"))]
+        let lrgb = xyb_to_linear_rgb(&data.data());
         linear_rgb_to_yuv(&lrgb, data.width(), data.height(), config)
     }
 }

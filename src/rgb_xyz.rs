@@ -4,91 +4,193 @@
 #![allow(clippy::many_single_char_names)]
 
 use nalgebra::{Matrix3, Matrix3x1};
-use once_cell::sync::OnceCell;
+use num_traits::clamp;
 
 // These are each provided in row-major order
-const LINEAR_SRGB_TO_XYZ_MATRIX: [f32; 9] = [
-    0.4124, 0.3576, 0.1805, 0.2126, 0.7152, 0.0722, 0.0193, 0.1192, 0.9505,
+const XYZ_TO_LINEAR_SRGB_MATRIX: [f32; 9] = [
+    0.7328, 0.4296, -0.1624, -0.7036, 1.6975, 0.0061, 0.0030, 0.0136, 0.9834,
 ];
 const XYZ_TO_LMS_MATRIX: [f32; 9] = [
-    0.240_576,
-    0.855_098,
-    -0.039_698_3,
-    -0.417_076,
-    1.177_26,
-    0.0786_283,
-    0.0,
-    0.0,
-    0.516_835,
+    0.4002, 0.7076, -0.0808, -0.2263, 1.1653, 0.0457, 0.0, 0.0, 0.9182,
 ];
 const LMS_TO_XYB_MATRIX: [f32; 9] = [1.0, -1.0, 0.0, 1.0, 1.0, 0.0, 0.0, 0.0, 1.0];
 
-static LINEAR_SRGB_TO_XYB_MATRIX: OnceCell<Matrix3<f32>> = OnceCell::new();
-static XYB_TO_LINEAR_SRGB_MATRIX: OnceCell<Matrix3<f32>> = OnceCell::new();
-
-fn linear_srgb_to_xyb_matrix() -> &'static Matrix3<f32> {
-    LINEAR_SRGB_TO_XYB_MATRIX.get_or_init(|| {
-        let srgb_to_xyz = Matrix3::from_row_slice(&LINEAR_SRGB_TO_XYZ_MATRIX);
-        let xyz_to_lms = Matrix3::from_row_slice(&XYZ_TO_LMS_MATRIX);
-        let lms_to_xyb = Matrix3::from_row_slice(&LMS_TO_XYB_MATRIX);
-
-        srgb_to_xyz * xyz_to_lms * lms_to_xyb
-    })
+fn linear_srgb_to_xyz_matrix() -> Matrix3<f32> {
+    xyz_to_linear_srgb_matrix()
+        .try_inverse()
+        .expect("has inverse")
 }
 
-fn xyb_to_linear_srgb_matrix() -> &'static Matrix3<f32> {
-    XYB_TO_LINEAR_SRGB_MATRIX.get_or_init(|| {
-        linear_srgb_to_xyb_matrix()
-            .try_inverse()
-            .expect("This matrix has an inverse")
-    })
+fn xyz_to_lms_matrix() -> Matrix3<f32> {
+    Matrix3::from_row_slice(&XYZ_TO_LMS_MATRIX)
 }
+
+fn lms_to_xyb_matrix() -> Matrix3<f32> {
+    Matrix3::from_row_slice(&LMS_TO_XYB_MATRIX)
+}
+
+fn xyb_to_lms_matrix() -> Matrix3<f32> {
+    lms_to_xyb_matrix().try_inverse().expect("has inverse")
+}
+
+fn lms_to_xyz_matrix() -> Matrix3<f32> {
+    xyz_to_lms_matrix().try_inverse().expect("has inverse")
+}
+
+fn xyz_to_linear_srgb_matrix() -> Matrix3<f32> {
+    Matrix3::from_row_slice(&XYZ_TO_LINEAR_SRGB_MATRIX)
+}
+
+const PLANE_X_MIN: f32 = -0.0979;
+const PLANE_X_MAX: f32 = 0.1799;
+const PLANE_Y_MIN: f32 = 0.0;
+const PLANE_Y_MAX: f32 = 6.1848;
+const PLANE_B_MIN: f32 = 0.0;
+const PLANE_B_MAX: f32 = 6.1808;
 
 /// Converts 32-bit floating point linear RGB to XYB. This function does assume
 /// that the input is Linear RGB. If you pass it gamma-encoded RGB, the results
 /// will be incorrect.
 #[must_use]
-pub fn linear_rgb_to_xyb(input: &[[f32; 3]]) -> Vec<[f32; 3]> {
-    let transform = linear_srgb_to_xyb_matrix();
-    input
+pub fn linear_rgb_to_xyb(
+    input: &[[f32; 3]],
+    #[cfg(feature = "dump")] dims: (u32, u32),
+) -> Vec<[f32; 3]> {
+    let rgb_to_xyz = linear_srgb_to_xyz_matrix();
+    let xyz_to_lms = xyz_to_lms_matrix();
+    let lms_to_xyb = lms_to_xyb_matrix();
+    let result: Vec<[f32; 3]> = input
         .iter()
         .map(|pix| {
-            let pix = Matrix3x1::from_column_slice(pix);
-            let res = transform * pix;
-            [res[0], res[1], res[2]]
+            let rgb = Matrix3x1::from_column_slice(pix);
+            let xyz = rgb_to_xyz * rgb;
+            let lms = xyz_to_lms * xyz;
+            let xyb = lms_to_xyb * lms;
+            [
+                clamp(xyb[0], PLANE_X_MIN, PLANE_X_MAX),
+                clamp(xyb[1], PLANE_Y_MIN, PLANE_Y_MAX),
+                clamp(xyb[2], PLANE_B_MIN, PLANE_B_MAX),
+            ]
         })
-        .collect()
+        .collect();
+
+    #[cfg(feature = "dump")]
+    {
+        use std::{fs::create_dir_all, path::Path};
+
+        use image::GrayImage;
+
+        let dir = Path::new("yuvxyb-dump");
+        if !dir.exists() {
+            create_dir_all(dir).unwrap();
+        }
+
+        // Output Linear RGB planes
+        for i in 0usize..3 {
+            let mut img = GrayImage::new(dims.0, dims.1);
+            for (source, output) in input.iter().zip(img.iter_mut()) {
+                let min = 0.0f32;
+                let max = 1.0f32;
+                let value = (source[i] - min) * 255.0f32 / (max - min);
+                *output = clamp(value, 0.0f32, 255.0f32) as u8;
+            }
+            img.save(dir.join(format!("linrgb_p{}.png", i))).unwrap();
+        }
+
+        // Output XYB planes
+        for i in 0usize..3 {
+            let mut img = GrayImage::new(dims.0, dims.1);
+            for (source, output) in result.iter().zip(img.iter_mut()) {
+                let min = match i {
+                    0 => PLANE_X_MIN,
+                    1 => PLANE_Y_MIN,
+                    2 => PLANE_B_MIN,
+                    _ => unreachable!(),
+                };
+                let max = match i {
+                    0 => PLANE_X_MAX,
+                    1 => PLANE_Y_MAX,
+                    2 => PLANE_B_MAX,
+                    _ => unreachable!(),
+                };
+                let value = (source[i] - min) * 255.0f32 / (max - min);
+                *output = clamp(value, 0.0f32, 255.0f32) as u8;
+            }
+            img.save(dir.join(format!("xyb_p{}.png", i))).unwrap();
+        }
+    }
+
+    result
 }
 
 /// Converts 32-bit floating point XYB to Linear RGB. This does not perform
 /// gamma encoding on the resulting RGB.
 #[must_use]
-pub fn xyb_to_linear_rgb(input: &[[f32; 3]]) -> Vec<[f32; 3]> {
-    let transform = xyb_to_linear_srgb_matrix();
-    input
+pub fn xyb_to_linear_rgb(
+    input: &[[f32; 3]],
+    #[cfg(feature = "dump")] dims: (u32, u32),
+) -> Vec<[f32; 3]> {
+    let xyb_to_lms = xyb_to_lms_matrix();
+    let lms_to_xyz = lms_to_xyz_matrix();
+    let xyz_to_rgb = xyz_to_linear_srgb_matrix();
+    let result: Vec<[f32; 3]> = input
         .iter()
-        .map(|pix| {
-            let pix = Matrix3x1::from_column_slice(pix);
-            let res = transform * pix;
-            [res[0], res[1], res[2]]
+        .map(|xyb| {
+            let xyb = Matrix3x1::from_column_slice(xyb);
+            let lms = xyb_to_lms * xyb;
+            let xyz = lms_to_xyz * lms;
+            let rgb = xyz_to_rgb * xyz;
+            [rgb[0], rgb[1], rgb[2]]
         })
-        .collect()
-}
+        .collect();
 
-fn transform_linear_rgb_to_xyb_pixel(pix: &[f32; 3]) -> [f32; 3] {
-    let rgb = Matrix3x1::from_column_slice(pix);
-    let xyz = linear_srgb_to_xyz_matrix() * rgb;
-    let lms = xyz_to_lms_matrix() * xyz;
-    let xyb = lms_to_xyb_matrix() * lms;
-    [xyb[0], xyb[1], xyb[2]]
-}
+    #[cfg(feature = "dump")]
+    {
+        use std::{fs::create_dir_all, path::Path};
 
-fn transform_xyb_to_linear_rgb_pixel(pix: &[f32; 3]) -> [f32; 3] {
-    let xyb = Matrix3x1::from_column_slice(pix);
-    let lms = xyb_to_lms_matrix() * xyb;
-    let xyz = lms_to_xyz_matrix() * lms;
-    let rgb = xyz_to_linear_srgb_matrix() * xyz;
-    [rgb[0], rgb[1], rgb[2]]
+        use image::GrayImage;
+        use num_traits::clamp;
+
+        let dir = Path::new("yuvxyb-dump");
+        if !dir.exists() {
+            create_dir_all(dir).unwrap();
+        }
+
+        // Output Linear RGB planes
+        for i in 0usize..3 {
+            let mut img = GrayImage::new(dims.0, dims.1);
+            for (source, output) in result.iter().zip(img.iter_mut()) {
+                let min = 0.0f32;
+                let max = 1.0f32;
+                let value = (source[i] - min) * 255.0f32 / (max - min);
+                *output = clamp(value, 0.0f32, 255.0f32) as u8;
+            }
+            img.save(dir.join(format!("linrgb_p{}.png", i))).unwrap();
+        }
+
+        // Output XYB planes
+        for i in 0usize..3 {
+            let mut img = GrayImage::new(dims.0, dims.1);
+            for (source, output) in input.iter().zip(img.iter_mut()) {
+                let min = match i {
+                    0 => -0.0979,
+                    1..=2 => 0.0,
+                    _ => unreachable!(),
+                };
+                let max = match i {
+                    0 => 0.1799,
+                    1 => 6.1848,
+                    2 => 6.1808,
+                    _ => unreachable!(),
+                };
+                let value = (source[i] - min) * 255.0f32 / (max - min);
+                *output = clamp(value, 0.0f32, 255.0f32) as u8;
+            }
+            img.save(dir.join(format!("xyb_p{}.png", i))).unwrap();
+        }
+    }
+
+    result
 }
 
 #[cfg(test)]
@@ -109,19 +211,22 @@ mod tests {
             .join("tank_xyb.pfm");
         let source = PFM::read_from(&mut File::open(source_path).unwrap()).unwrap();
         let expected = PFM::read_from(&mut File::open(expected_path).unwrap()).unwrap();
-        let source = source
+        let source_data = source
             .data
             .chunks_exact(3)
             .map(|chunk| [chunk[0], chunk[1], chunk[2]])
             .collect::<Vec<_>>();
-        let expected = expected
+        let expected_data = expected
             .data
             .chunks_exact(3)
             .map(|chunk| [chunk[0], chunk[1], chunk[2]])
             .collect::<Vec<_>>();
 
-        let result = linear_rgb_to_xyb(&source);
-        for (exp, res) in expected.into_iter().zip(result.into_iter()) {
+        #[cfg(feature = "dump")]
+        let result = linear_rgb_to_xyb(&source_data, (source.width as u32, source.height as u32));
+        #[cfg(not(feature = "dump"))]
+        let result = linear_rgb_to_xyb(&source_data);
+        for (exp, res) in expected_data.into_iter().zip(result.into_iter()) {
             assert!(
                 (exp[0] - res[0]).abs() < 0.0005,
                 "Difference in X channel: Expected {:.4}, got {:.4}",
@@ -153,19 +258,22 @@ mod tests {
             .join("tank_linear_rgb.pfm");
         let source = PFM::read_from(&mut File::open(source_path).unwrap()).unwrap();
         let expected = PFM::read_from(&mut File::open(expected_path).unwrap()).unwrap();
-        let source = source
+        let source_data = source
             .data
             .chunks_exact(3)
             .map(|chunk| [chunk[0], chunk[1], chunk[2]])
             .collect::<Vec<_>>();
-        let expected = expected
+        let expected_data = expected
             .data
             .chunks_exact(3)
             .map(|chunk| [chunk[0], chunk[1], chunk[2]])
             .collect::<Vec<_>>();
 
-        let result = xyb_to_linear_rgb(&source);
-        for (exp, res) in expected.into_iter().zip(result.into_iter()) {
+        #[cfg(feature = "dump")]
+        let result = xyb_to_linear_rgb(&source_data, (source.width as u32, source.height as u32));
+        #[cfg(not(feature = "dump"))]
+        let result = xyb_to_linear_rgb(&source_data);
+        for (exp, res) in expected_data.into_iter().zip(result.into_iter()) {
             assert!(
                 (exp[0] - res[0]).abs() < 0.0005,
                 "Difference in R channel: Expected {:.4}, got {:.4}",
