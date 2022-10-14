@@ -149,7 +149,6 @@ pub fn xyb_to_linear_rgb(
         use std::{fs::create_dir_all, path::Path};
 
         use image::GrayImage;
-        use num_traits::clamp;
 
         let dir = Path::new("yuvxyb-dump");
         if !dir.exists() {

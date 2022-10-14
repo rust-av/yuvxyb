@@ -1,3 +1,7 @@
+## Version 0.1.1
+
+- Improvements to XYB conversion accuracy
+
 ## Version 0.1.0
 
 - Make things faster

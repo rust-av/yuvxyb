@@ -309,7 +309,7 @@ impl<T: Pixel> TryFrom<(&Xyb, YuvConfig)> for Yuv<T> {
         #[cfg(feature = "dump")]
         let lrgb = xyb_to_linear_rgb(data.data(), (data.width() as u32, data.height() as u32));
         #[cfg(not(feature = "dump"))]
-        let lrgb = xyb_to_linear_rgb(&data.data());
+        let lrgb = xyb_to_linear_rgb(data.data());
         linear_rgb_to_yuv(&lrgb, data.width(), data.height(), config)
     }
 }
