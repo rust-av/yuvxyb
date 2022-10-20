@@ -44,15 +44,18 @@ fn make_yuv_8b(
             });
         }
     }
-    Yuv::new(data, YuvConfig {
-        bit_depth: 8,
-        subsampling_x: ss.0,
-        subsampling_y: ss.1,
-        full_range,
-        matrix_coefficients: mc,
-        transfer_characteristics: tc,
-        color_primaries: cp,
-    })
+    Yuv::new(
+        data,
+        YuvConfig {
+            bit_depth: 8,
+            subsampling_x: ss.0,
+            subsampling_y: ss.1,
+            full_range,
+            matrix_coefficients: mc,
+            transfer_characteristics: tc,
+            color_primaries: cp,
+        },
+    )
     .unwrap()
 }
 
@@ -98,15 +101,18 @@ fn make_yuv_10b(
             });
         }
     }
-    Yuv::new(data, YuvConfig {
-        bit_depth: 10,
-        subsampling_x: ss.0,
-        subsampling_y: ss.1,
-        full_range,
-        matrix_coefficients: mc,
-        transfer_characteristics: tc,
-        color_primaries: cp,
-    })
+    Yuv::new(
+        data,
+        YuvConfig {
+            bit_depth: 10,
+            subsampling_x: ss.0,
+            subsampling_y: ss.1,
+            full_range,
+            matrix_coefficients: mc,
+            transfer_characteristics: tc,
+            color_primaries: cp,
+        },
+    )
     .unwrap()
 }
 

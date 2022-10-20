@@ -44,8 +44,8 @@ pub fn linear_rgb_to_yuv<T: Pixel>(
 }
 
 fn ycbcr_to_ypbpr<T: Pixel>(input: &Yuv<T>) -> Vec<[f32; 3]> {
-    let w = input.width() as usize;
-    let h = input.height() as usize;
+    let w = input.width();
+    let h = input.height();
     let ss_x = input.config().subsampling_x;
     let ss_y = input.config().subsampling_y;
     let bd = input.config().bit_depth;

@@ -52,10 +52,7 @@ const PLANE_B_MAX: f32 = 6.1808;
 /// that the input is Linear RGB. If you pass it gamma-encoded RGB, the results
 /// will be incorrect.
 #[must_use]
-pub fn linear_rgb_to_xyb(
-    input: &[[f32; 3]],
-    #[cfg(feature = "dump")] dims: (u32, u32),
-) -> Vec<[f32; 3]> {
+pub fn linear_rgb_to_xyb(input: &[[f32; 3]]) -> Vec<[f32; 3]> {
     let rgb_to_xyz = linear_srgb_to_xyz_matrix();
     let xyz_to_lms = xyz_to_lms_matrix();
     let lms_to_xyb = lms_to_xyb_matrix();
@@ -74,62 +71,13 @@ pub fn linear_rgb_to_xyb(
         })
         .collect();
 
-    #[cfg(feature = "dump")]
-    {
-        use std::{fs::create_dir_all, path::Path};
-
-        use image::GrayImage;
-
-        let dir = Path::new("yuvxyb-dump");
-        if !dir.exists() {
-            create_dir_all(dir).unwrap();
-        }
-
-        // Output Linear RGB planes
-        for i in 0usize..3 {
-            let mut img = GrayImage::new(dims.0, dims.1);
-            for (source, output) in input.iter().zip(img.iter_mut()) {
-                let min = 0.0f32;
-                let max = 1.0f32;
-                let value = (source[i] - min) * 255.0f32 / (max - min);
-                *output = clamp(value, 0.0f32, 255.0f32) as u8;
-            }
-            img.save(dir.join(format!("linrgb_p{}.png", i))).unwrap();
-        }
-
-        // Output XYB planes
-        for i in 0usize..3 {
-            let mut img = GrayImage::new(dims.0, dims.1);
-            for (source, output) in result.iter().zip(img.iter_mut()) {
-                let min = match i {
-                    0 => PLANE_X_MIN,
-                    1 => PLANE_Y_MIN,
-                    2 => PLANE_B_MIN,
-                    _ => unreachable!(),
-                };
-                let max = match i {
-                    0 => PLANE_X_MAX,
-                    1 => PLANE_Y_MAX,
-                    2 => PLANE_B_MAX,
-                    _ => unreachable!(),
-                };
-                let value = (source[i] - min) * 255.0f32 / (max - min);
-                *output = clamp(value, 0.0f32, 255.0f32) as u8;
-            }
-            img.save(dir.join(format!("xyb_p{}.png", i))).unwrap();
-        }
-    }
-
     result
 }
 
 /// Converts 32-bit floating point XYB to Linear RGB. This does not perform
 /// gamma encoding on the resulting RGB.
 #[must_use]
-pub fn xyb_to_linear_rgb(
-    input: &[[f32; 3]],
-    #[cfg(feature = "dump")] dims: (u32, u32),
-) -> Vec<[f32; 3]> {
+pub fn xyb_to_linear_rgb(input: &[[f32; 3]]) -> Vec<[f32; 3]> {
     let xyb_to_lms = xyb_to_lms_matrix();
     let lms_to_xyz = lms_to_xyz_matrix();
     let xyz_to_rgb = xyz_to_linear_srgb_matrix();
@@ -143,51 +91,6 @@ pub fn xyb_to_linear_rgb(
             [rgb[0], rgb[1], rgb[2]]
         })
         .collect();
-
-    #[cfg(feature = "dump")]
-    {
-        use std::{fs::create_dir_all, path::Path};
-
-        use image::GrayImage;
-
-        let dir = Path::new("yuvxyb-dump");
-        if !dir.exists() {
-            create_dir_all(dir).unwrap();
-        }
-
-        // Output Linear RGB planes
-        for i in 0usize..3 {
-            let mut img = GrayImage::new(dims.0, dims.1);
-            for (source, output) in result.iter().zip(img.iter_mut()) {
-                let min = 0.0f32;
-                let max = 1.0f32;
-                let value = (source[i] - min) * 255.0f32 / (max - min);
-                *output = clamp(value, 0.0f32, 255.0f32) as u8;
-            }
-            img.save(dir.join(format!("linrgb_p{}.png", i))).unwrap();
-        }
-
-        // Output XYB planes
-        for i in 0usize..3 {
-            let mut img = GrayImage::new(dims.0, dims.1);
-            for (source, output) in input.iter().zip(img.iter_mut()) {
-                let min = match i {
-                    0 => -0.0979,
-                    1..=2 => 0.0,
-                    _ => unreachable!(),
-                };
-                let max = match i {
-                    0 => 0.1799,
-                    1 => 6.1848,
-                    2 => 6.1808,
-                    _ => unreachable!(),
-                };
-                let value = (source[i] - min) * 255.0f32 / (max - min);
-                *output = clamp(value, 0.0f32, 255.0f32) as u8;
-            }
-            img.save(dir.join(format!("xyb_p{}.png", i))).unwrap();
-        }
-    }
 
     result
 }
@@ -221,9 +124,6 @@ mod tests {
             .map(|chunk| [chunk[0], chunk[1], chunk[2]])
             .collect::<Vec<_>>();
 
-        #[cfg(feature = "dump")]
-        let result = linear_rgb_to_xyb(&source_data, (source.width as u32, source.height as u32));
-        #[cfg(not(feature = "dump"))]
         let result = linear_rgb_to_xyb(&source_data);
         for (exp, res) in expected_data.into_iter().zip(result.into_iter()) {
             assert!(
@@ -268,9 +168,6 @@ mod tests {
             .map(|chunk| [chunk[0], chunk[1], chunk[2]])
             .collect::<Vec<_>>();
 
-        #[cfg(feature = "dump")]
-        let result = xyb_to_linear_rgb(&source_data, (source.width as u32, source.height as u32));
-        #[cfg(not(feature = "dump"))]
         let result = xyb_to_linear_rgb(&source_data);
         for (exp, res) in expected_data.into_iter().zip(result.into_iter()) {
             assert!(

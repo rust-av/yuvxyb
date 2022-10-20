@@ -69,7 +69,54 @@ impl Xyb {
     /// # Errors
     /// - If data length does not match `width * height`
     pub fn new(data: Vec<[f32; 3]>, width: usize, height: usize) -> Result<Self> {
-        if data.len() != (width * height) as usize {
+        if data.len() != width * height {
+            bail!("Data length does not match specified dimensions");
+        }
+
+        Ok(Self {
+            data,
+            width,
+            height,
+        })
+    }
+
+    #[must_use]
+    #[inline(always)]
+    pub fn data(&self) -> &[[f32; 3]] {
+        &self.data
+    }
+
+    #[must_use]
+    #[inline(always)]
+    pub fn data_mut(&mut self) -> &mut [[f32; 3]] {
+        &mut self.data
+    }
+
+    #[must_use]
+    #[inline(always)]
+    pub const fn width(&self) -> usize {
+        self.width
+    }
+
+    #[must_use]
+    #[inline(always)]
+    pub const fn height(&self) -> usize {
+        self.height
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct LinearRgb {
+    data: Vec<[f32; 3]>,
+    width: usize,
+    height: usize,
+}
+
+impl LinearRgb {
+    /// # Errors
+    /// - If data length does not match `width * height`
+    pub fn new(data: Vec<[f32; 3]>, width: usize, height: usize) -> Result<Self> {
+        if data.len() != width * height {
             bail!("Data length does not match specified dimensions");
         }
 
@@ -271,6 +318,14 @@ impl<T: Pixel> TryFrom<Yuv<T>> for Xyb {
     }
 }
 
+impl<T: Pixel> TryFrom<Yuv<T>> for LinearRgb {
+    type Error = anyhow::Error;
+
+    fn try_from(other: Yuv<T>) -> Result<Self> {
+        LinearRgb::try_from(&other)
+    }
+}
+
 impl<T: Pixel> TryFrom<(Xyb, YuvConfig)> for Yuv<T> {
     type Error = anyhow::Error;
 
@@ -281,17 +336,33 @@ impl<T: Pixel> TryFrom<(Xyb, YuvConfig)> for Yuv<T> {
     }
 }
 
+impl From<Xyb> for LinearRgb {
+    fn from(other: Xyb) -> Self {
+        LinearRgb::from(&other)
+    }
+}
+
 impl<T: Pixel> TryFrom<&Yuv<T>> for Xyb {
     type Error = anyhow::Error;
 
     fn try_from(other: &Yuv<T>) -> Result<Self> {
         let lrgb = yuv_to_linear_rgb(other)?;
-        #[cfg(feature = "dump")]
-        let data = linear_rgb_to_xyb(&lrgb, (other.width() as u32, other.height() as u32));
-        #[cfg(not(feature = "dump"))]
         let data = linear_rgb_to_xyb(&lrgb);
         Ok(Xyb {
             data,
+            width: other.width(),
+            height: other.height(),
+        })
+    }
+}
+
+impl<T: Pixel> TryFrom<&Yuv<T>> for LinearRgb {
+    type Error = anyhow::Error;
+
+    fn try_from(other: &Yuv<T>) -> Result<Self> {
+        let lrgb = yuv_to_linear_rgb(other)?;
+        Ok(LinearRgb {
+            data: lrgb,
             width: other.width(),
             height: other.height(),
         })
@@ -306,11 +377,19 @@ impl<T: Pixel> TryFrom<(&Xyb, YuvConfig)> for Yuv<T> {
     fn try_from(other: (&Xyb, YuvConfig)) -> Result<Self> {
         let data = other.0;
         let config = other.1.fix_unspecified_data(data.width(), data.height());
-        #[cfg(feature = "dump")]
-        let lrgb = xyb_to_linear_rgb(data.data(), (data.width() as u32, data.height() as u32));
-        #[cfg(not(feature = "dump"))]
         let lrgb = xyb_to_linear_rgb(data.data());
         linear_rgb_to_yuv(&lrgb, data.width(), data.height(), config)
+    }
+}
+
+impl From<&Xyb> for LinearRgb {
+    fn from(other: &Xyb) -> Self {
+        let lrgb = xyb_to_linear_rgb(other.data());
+        LinearRgb {
+            data: lrgb,
+            width: other.width(),
+            height: other.height(),
+        }
     }
 }
 
@@ -372,15 +451,18 @@ mod tests {
                 });
             }
         }
-        let yuv = Yuv::new(data, YuvConfig {
-            bit_depth: 8,
-            subsampling_x: ss.0,
-            subsampling_y: ss.1,
-            full_range,
-            matrix_coefficients: mc,
-            transfer_characteristics: tc,
-            color_primaries: cp,
-        })
+        let yuv = Yuv::new(
+            data,
+            YuvConfig {
+                bit_depth: 8,
+                subsampling_x: ss.0,
+                subsampling_y: ss.1,
+                full_range,
+                matrix_coefficients: mc,
+                transfer_characteristics: tc,
+                color_primaries: cp,
+            },
+        )
         .unwrap();
         let xyb = Xyb::try_from(yuv.clone()).unwrap();
         let yuv2 = Yuv::<u8>::try_from((xyb, yuv.config())).unwrap();
@@ -532,15 +614,18 @@ mod tests {
                 });
             }
         }
-        let yuv = Yuv::new(data, YuvConfig {
-            bit_depth: 10,
-            subsampling_x: ss.0,
-            subsampling_y: ss.1,
-            full_range,
-            matrix_coefficients: mc,
-            transfer_characteristics: tc,
-            color_primaries: cp,
-        })
+        let yuv = Yuv::new(
+            data,
+            YuvConfig {
+                bit_depth: 10,
+                subsampling_x: ss.0,
+                subsampling_y: ss.1,
+                full_range,
+                matrix_coefficients: mc,
+                transfer_characteristics: tc,
+                color_primaries: cp,
+            },
+        )
         .unwrap();
         let xyb = Xyb::try_from(yuv.clone()).unwrap();
         let yuv2 = Yuv::<u16>::try_from((xyb, yuv.config())).unwrap();
