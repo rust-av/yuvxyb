@@ -342,6 +342,12 @@ impl From<Xyb> for LinearRgb {
     }
 }
 
+impl From<LinearRgb> for Xyb {
+    fn from(other: LinearRgb) -> Self {
+        Xyb::from(&other)
+    }
+}
+
 impl<T: Pixel> TryFrom<&Yuv<T>> for Xyb {
     type Error = anyhow::Error;
 
@@ -387,6 +393,17 @@ impl From<&Xyb> for LinearRgb {
         let lrgb = xyb_to_linear_rgb(other.data());
         LinearRgb {
             data: lrgb,
+            width: other.width(),
+            height: other.height(),
+        }
+    }
+}
+
+impl From<&LinearRgb> for Xyb {
+    fn from(other: &LinearRgb) -> Self {
+        let xyb = linear_rgb_to_xyb(other.data());
+        Xyb {
+            data: xyb,
             width: other.width(),
             height: other.height(),
         }
