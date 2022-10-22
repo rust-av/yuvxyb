@@ -230,6 +230,10 @@ pub fn transform_primaries(
     in_primaries: ColorPrimaries,
     out_primaries: ColorPrimaries,
 ) -> Result<Vec<[f32; 3]>> {
+    if in_primaries == out_primaries {
+        return Ok(input.to_vec());
+    }
+
     let transform = gamut_xyz_to_rgb_matrix(out_primaries)?
         * white_point_adaptation_matrix(in_primaries, out_primaries)
         * gamut_rgb_to_xyz_matrix(in_primaries)?;

@@ -121,8 +121,7 @@ mod tests {
         let expected_data = expected
             .data
             .chunks_exact(3)
-            .map(|chunk| [chunk[0], chunk[1], chunk[2]])
-            .collect::<Vec<_>>();
+            .map(|chunk| [chunk[0], chunk[1], chunk[2]]);
 
         let result = linear_rgb_to_xyb(&source_data);
         for (exp, res) in expected_data.into_iter().zip(result.into_iter()) {
@@ -165,8 +164,7 @@ mod tests {
         let expected_data = expected
             .data
             .chunks_exact(3)
-            .map(|chunk| [chunk[0], chunk[1], chunk[2]])
-            .collect::<Vec<_>>();
+            .map(|chunk| [chunk[0], chunk[1], chunk[2]]);
 
         let result = xyb_to_linear_rgb(&source_data);
         for (exp, res) in expected_data.into_iter().zip(result.into_iter()) {

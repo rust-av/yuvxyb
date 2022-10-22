@@ -1,3 +1,7 @@
+## Version 0.1.2
+
+- Add intermediate structs for `Rgb` and `LinearRgb` to make this crate more versatile
+
 ## Version 0.1.1
 
 - Improvements to XYB conversion accuracy
