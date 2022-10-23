@@ -40,7 +40,7 @@ const NEG_OPSIN_ABSORBANCE_BIAS: [f32; 3] = [-K_B0, -K_B1, -K_B2];
 pub fn linear_rgb_to_xyb(input: &[[f32; 3]]) -> Vec<[f32; 3]> {
     let mut absorbance_bias = [0.0f32; 3];
     for (out, bias) in absorbance_bias.iter_mut().zip(OPSIN_ABSORBANCE_BIAS.iter()) {
-        *out = -(bias.cbrt());
+        *out = -(bias.powf(1f32 / 3f32));
     }
 
     input
@@ -51,7 +51,7 @@ pub fn linear_rgb_to_xyb(input: &[[f32; 3]]) -> Vec<[f32; 3]> {
                 if *mixed < 0.0 {
                     *mixed = 0.0;
                 }
-                *mixed = mixed.cbrt() + (*absorb);
+                *mixed = mixed.powf(1f32 / 3f32) + (*absorb);
             }
             // For wide-gamut inputs, r/g/b and valx (but not y/z) are often negative.
             mixed_to_xyb(&mixed)
@@ -65,7 +65,7 @@ pub fn linear_rgb_to_xyb(input: &[[f32; 3]]) -> Vec<[f32; 3]> {
 pub fn xyb_to_linear_rgb(input: &[[f32; 3]]) -> Vec<[f32; 3]> {
     let mut biases_cbrt = NEG_OPSIN_ABSORBANCE_BIAS;
     for bias in &mut biases_cbrt {
-        *bias = bias.cbrt();
+        *bias = bias.powf(1f32 / 3f32);
     }
 
     input
