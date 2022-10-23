@@ -1,3 +1,7 @@
+## Version 0.1.4
+
+- Improve performance of conversions between linear RGB and XYB
+
 ## Version 0.1.3
 
 - Fix conversions to and from XYB. All previous versions should not be used, as this conversion was very wrong prior to this.
