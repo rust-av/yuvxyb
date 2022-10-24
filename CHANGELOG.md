@@ -1,3 +1,7 @@
+## Version 0.1.5
+
+- Speed up cube roots by allowing autovectorization
+
 ## Version 0.1.4
 
 - Improve performance of conversions between linear RGB and XYB

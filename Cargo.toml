@@ -1,7 +1,7 @@
 [package]
 name = "yuvxyb"
 description = "Direct conversions between YUV (YCbCr) and XYB colorspaces"
-version = "0.1.4"
+version = "0.1.5"
 edition = "2021"
 license = "MIT"
 documentation = "https://docs.rs/yuvxyb"
