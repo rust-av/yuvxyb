@@ -41,6 +41,7 @@
 
 // This is pub and doc hidden so it can be run through cargo asm for
 // optimization easier
+mod fastmath;
 #[doc(hidden)]
 pub mod rgb_xyz;
 #[doc(hidden)]

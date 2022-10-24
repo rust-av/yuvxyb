@@ -1,5 +1,7 @@
 #![allow(clippy::many_single_char_names)]
 
+use crate::fastmath::cbrtf;
+
 const K_M02: f32 = 0.078f32;
 const K_M00: f32 = 0.30f32;
 const K_M01: f32 = 1.0f32 - K_M02 - K_M00;
@@ -40,7 +42,7 @@ const NEG_OPSIN_ABSORBANCE_BIAS: [f32; 3] = [-K_B0, -K_B1, -K_B2];
 pub fn linear_rgb_to_xyb(input: &[[f32; 3]]) -> Vec<[f32; 3]> {
     let mut absorbance_bias = [0.0f32; 3];
     for (out, bias) in absorbance_bias.iter_mut().zip(OPSIN_ABSORBANCE_BIAS.iter()) {
-        *out = -(bias.powf(1f32 / 3f32));
+        *out = -cbrtf(*bias);
     }
 
     input
@@ -51,7 +53,7 @@ pub fn linear_rgb_to_xyb(input: &[[f32; 3]]) -> Vec<[f32; 3]> {
                 if *mixed < 0.0 {
                     *mixed = 0.0;
                 }
-                *mixed = mixed.powf(1f32 / 3f32) + (*absorb);
+                *mixed = cbrtf(*mixed) + (*absorb);
             }
             // For wide-gamut inputs, r/g/b and valx (but not y/z) are often negative.
             mixed_to_xyb(&mixed)
@@ -65,7 +67,7 @@ pub fn linear_rgb_to_xyb(input: &[[f32; 3]]) -> Vec<[f32; 3]> {
 pub fn xyb_to_linear_rgb(input: &[[f32; 3]]) -> Vec<[f32; 3]> {
     let mut biases_cbrt = NEG_OPSIN_ABSORBANCE_BIAS;
     for bias in &mut biases_cbrt {
-        *bias = bias.powf(1f32 / 3f32);
+        *bias = cbrtf(*bias);
     }
 
     input
