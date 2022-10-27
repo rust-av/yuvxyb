@@ -1,3 +1,7 @@
+## Version 0.2.0
+
+- Add HSL color space, which can be converted to/from Linear RGB
+
 ## Version 0.1.5
 
 - Speed up cube roots by allowing autovectorization

@@ -47,6 +47,9 @@ pub mod rgb_xyz;
 #[doc(hidden)]
 pub mod yuv_rgb;
 
+#[doc(hidden)]
+pub mod hsl;
+
 use std::mem::size_of;
 
 use anyhow::{bail, Result};
