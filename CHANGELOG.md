@@ -1,3 +1,7 @@
+## Version 0.2.1
+
+- Add more exports from the crate root
+
 ## Version 0.2.0
 
 - Add HSL color space, which can be converted to/from Linear RGB
