@@ -50,11 +50,12 @@ pub mod yuv_rgb;
 #[doc(hidden)]
 pub mod hsl;
 
-use std::mem::size_of;
-
 use anyhow::{bail, Result};
 pub use av_data::pixel::{ColorPrimaries, MatrixCoefficients, TransferCharacteristic};
+pub use hsl::Hsl;
+pub use num_traits::{FromPrimitive, ToPrimitive};
 use rgb_xyz::{linear_rgb_to_xyb, xyb_to_linear_rgb};
+use std::mem::size_of;
 pub use v_frame::{
     frame::Frame,
     plane::Plane,
