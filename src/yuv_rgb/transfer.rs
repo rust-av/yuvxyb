@@ -92,10 +92,10 @@ impl TransferFunction for TransferCharacteristic {
                     ]
                 })
                 .collect(),
+            TransferCharacteristic::Linear => input.to_owned(),
             // Unsupported
             TransferCharacteristic::Reserved0
             | TransferCharacteristic::Reserved
-            | TransferCharacteristic::Linear
             | TransferCharacteristic::BT1361E
             | TransferCharacteristic::ST428 => {
                 bail!("Cannot convert YUV<->RGB using this transfer function")
@@ -202,10 +202,10 @@ impl TransferFunction for TransferCharacteristic {
                     ]
                 })
                 .collect(),
+            TransferCharacteristic::Linear => input.to_owned(),
             // Unsupported
             TransferCharacteristic::Reserved0
             | TransferCharacteristic::Reserved
-            | TransferCharacteristic::Linear
             | TransferCharacteristic::BT1361E
             | TransferCharacteristic::ST428 => {
                 bail!("Cannot convert YUV<->RGB using this transfer function")
