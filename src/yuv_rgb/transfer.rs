@@ -13,82 +13,19 @@ pub trait TransferFunction {
 impl TransferFunction for TransferCharacteristic {
     fn to_linear(&self, input: &[[f32; 3]]) -> Result<Vec<[f32; 3]>> {
         Ok(match *self {
-            TransferCharacteristic::Logarithmic100 => input
-                .iter()
-                .map(|pix| {
-                    let input = f32x4::new([pix[0], pix[1], pix[2], 0f32]);
-                    let output = log100_inverse_oetf(input).to_array();
-                    [output[0], output[1], output[2]]
-                })
-                .collect(),
-            TransferCharacteristic::Logarithmic316 => input
-                .iter()
-                .map(|pix| {
-                    let input = f32x4::new([pix[0], pix[1], pix[2], 0f32]);
-                    let output = log316_inverse_oetf(input).to_array();
-                    [output[0], output[1], output[2]]
-                })
-                .collect(),
+            TransferCharacteristic::Logarithmic100 => image_log100_inverse_oetf(input),
+            TransferCharacteristic::Logarithmic316 => image_log316_inverse_oetf(input),
             TransferCharacteristic::BT1886
             | TransferCharacteristic::ST170M
             | TransferCharacteristic::ST240M
             | TransferCharacteristic::BT2020Ten
-            | TransferCharacteristic::BT2020Twelve => input
-                .iter()
-                .map(|pix| {
-                    let input = f32x4::new([pix[0], pix[1], pix[2], 0f32]);
-                    let output = rec_1886_eotf(input).to_array();
-                    [output[0], output[1], output[2]]
-                })
-                .collect(),
-            TransferCharacteristic::BT470M => input
-                .iter()
-                .map(|pix| {
-                    let input = f32x4::new([pix[0], pix[1], pix[2], 0f32]);
-                    let output = rec_470m_oetf(input).to_array();
-                    [output[0], output[1], output[2]]
-                })
-                .collect(),
-            TransferCharacteristic::BT470BG => input
-                .iter()
-                .map(|pix| {
-                    let input = f32x4::new([pix[0], pix[1], pix[2], 0f32]);
-                    let output = rec_470bg_oetf(input).to_array();
-                    [output[0], output[1], output[2]]
-                })
-                .collect(),
-            TransferCharacteristic::XVYCC => input
-                .iter()
-                .map(|pix| {
-                    let input = f32x4::new([pix[0], pix[1], pix[2], 0f32]);
-                    let output = xvycc_eotf(input).to_array();
-                    [output[0], output[1], output[2]]
-                })
-                .collect(),
-            TransferCharacteristic::SRGB => input
-                .iter()
-                .map(|pix| {
-                    let input = f32x4::new([pix[0], pix[1], pix[2], 0f32]);
-                    let output = srgb_eotf(input).to_array();
-                    [output[0], output[1], output[2]]
-                })
-                .collect(),
-            TransferCharacteristic::PerceptualQuantizer => input
-                .iter()
-                .map(|pix| {
-                    let input = f32x4::new([pix[0], pix[1], pix[2], 0f32]);
-                    let output = st_2084_inverse_oetf(input).to_array();
-                    [output[0], output[1], output[2]]
-                })
-                .collect(),
-            TransferCharacteristic::HybridLogGamma => input
-                .iter()
-                .map(|pix| {
-                    let input = f32x4::new([pix[0], pix[1], pix[2], 0f32]);
-                    let output = arib_b67_inverse_oetf(input).to_array();
-                    [output[0], output[1], output[2]]
-                })
-                .collect(),
+            | TransferCharacteristic::BT2020Twelve => image_rec_1886_eotf(input),
+            TransferCharacteristic::BT470M => image_rec_470m_oetf(input),
+            TransferCharacteristic::BT470BG => image_rec_470bg_oetf(input),
+            TransferCharacteristic::XVYCC => image_xvycc_eotf(input),
+            TransferCharacteristic::SRGB => image_srgb_eotf(input),
+            TransferCharacteristic::PerceptualQuantizer => image_st_2084_inverse_oetf(input),
+            TransferCharacteristic::HybridLogGamma => image_arib_b67_inverse_oetf(input),
             TransferCharacteristic::Linear => input.to_owned(),
             // Unsupported
             TransferCharacteristic::Reserved0
@@ -105,82 +42,19 @@ impl TransferFunction for TransferCharacteristic {
     #[allow(clippy::too_many_lines)]
     fn to_gamma(&self, input: &[[f32; 3]]) -> Result<Vec<[f32; 3]>> {
         Ok(match *self {
-            TransferCharacteristic::Logarithmic100 => input
-                .iter()
-                .map(|pix| {
-                    let input = f32x4::new([pix[0], pix[1], pix[2], 0f32]);
-                    let output = log100_oetf(input).to_array();
-                    [output[0], output[1], output[2]]
-                })
-                .collect(),
-            TransferCharacteristic::Logarithmic316 => input
-                .iter()
-                .map(|pix| {
-                    let input = f32x4::new([pix[0], pix[1], pix[2], 0f32]);
-                    let output = log316_oetf(input).to_array();
-                    [output[0], output[1], output[2]]
-                })
-                .collect(),
+            TransferCharacteristic::Logarithmic100 => image_log100_oetf(input),
+            TransferCharacteristic::Logarithmic316 => image_log316_oetf(input),
             TransferCharacteristic::BT1886
             | TransferCharacteristic::ST170M
             | TransferCharacteristic::ST240M
             | TransferCharacteristic::BT2020Ten
-            | TransferCharacteristic::BT2020Twelve => input
-                .iter()
-                .map(|pix| {
-                    let input = f32x4::new([pix[0], pix[1], pix[2], 0f32]);
-                    let output = rec_1886_inverse_eotf(input).to_array();
-                    [output[0], output[1], output[2]]
-                })
-                .collect(),
-            TransferCharacteristic::BT470M => input
-                .iter()
-                .map(|pix| {
-                    let input = f32x4::new([pix[0], pix[1], pix[2], 0f32]);
-                    let output = rec_470m_inverse_oetf(input).to_array();
-                    [output[0], output[1], output[2]]
-                })
-                .collect(),
-            TransferCharacteristic::BT470BG => input
-                .iter()
-                .map(|pix| {
-                    let input = f32x4::new([pix[0], pix[1], pix[2], 0f32]);
-                    let output = rec_470bg_inverse_oetf(input).to_array();
-                    [output[0], output[1], output[2]]
-                })
-                .collect(),
-            TransferCharacteristic::XVYCC => input
-                .iter()
-                .map(|pix| {
-                    let input = f32x4::new([pix[0], pix[1], pix[2], 0f32]);
-                    let output = xvycc_inverse_eotf(input).to_array();
-                    [output[0], output[1], output[2]]
-                })
-                .collect(),
-            TransferCharacteristic::SRGB => input
-                .iter()
-                .map(|pix| {
-                    let input = f32x4::new([pix[0], pix[1], pix[2], 0f32]);
-                    let output = srgb_inverse_eotf(input).to_array();
-                    [output[0], output[1], output[2]]
-                })
-                .collect(),
-            TransferCharacteristic::PerceptualQuantizer => input
-                .iter()
-                .map(|pix| {
-                    let input = f32x4::new([pix[0], pix[1], pix[2], 0f32]);
-                    let output = st_2084_oetf(input).to_array();
-                    [output[0], output[1], output[2]]
-                })
-                .collect(),
-            TransferCharacteristic::HybridLogGamma => input
-                .iter()
-                .map(|pix| {
-                    let input = f32x4::new([pix[0], pix[1], pix[2], 0f32]);
-                    let output = arib_b67_oetf(input).to_array();
-                    [output[0], output[1], output[2]]
-                })
-                .collect(),
+            | TransferCharacteristic::BT2020Twelve => image_rec_1886_inverse_eotf(input),
+            TransferCharacteristic::BT470M => image_rec_470m_inverse_oetf(input),
+            TransferCharacteristic::BT470BG => image_rec_470bg_inverse_oetf(input),
+            TransferCharacteristic::XVYCC => image_xvycc_inverse_eotf(input),
+            TransferCharacteristic::SRGB => image_srgb_inverse_eotf(input),
+            TransferCharacteristic::PerceptualQuantizer => image_st_2084_oetf(input),
+            TransferCharacteristic::HybridLogGamma => image_arib_b67_oetf(input),
             TransferCharacteristic::Linear => input.to_owned(),
             // Unsupported
             TransferCharacteristic::Reserved0
@@ -194,6 +68,43 @@ impl TransferFunction for TransferCharacteristic {
         })
     }
 }
+
+macro_rules! image_transfer_fn {
+    ($name:ident) => {
+        paste::item! {
+            fn [<image_ $name>](input: &[[f32; 3]]) -> Vec<[f32; 3]> {
+                input
+                    .iter()
+                    .map(|pix| {
+                        let input = f32x4::new([pix[0], pix[1], pix[2], 0f32]);
+                        let output = $name(input).to_array();
+                        [output[0], output[1], output[2]]
+                    })
+                    .collect()
+            }
+        }
+    };
+}
+
+image_transfer_fn!(log100_inverse_oetf);
+image_transfer_fn!(log316_inverse_oetf);
+image_transfer_fn!(rec_1886_eotf);
+image_transfer_fn!(rec_470m_oetf);
+image_transfer_fn!(rec_470bg_oetf);
+image_transfer_fn!(xvycc_eotf);
+image_transfer_fn!(srgb_eotf);
+image_transfer_fn!(st_2084_inverse_oetf);
+image_transfer_fn!(arib_b67_inverse_oetf);
+
+image_transfer_fn!(log100_oetf);
+image_transfer_fn!(log316_oetf);
+image_transfer_fn!(rec_1886_inverse_eotf);
+image_transfer_fn!(rec_470m_inverse_oetf);
+image_transfer_fn!(rec_470bg_inverse_oetf);
+image_transfer_fn!(xvycc_inverse_eotf);
+image_transfer_fn!(srgb_inverse_eotf);
+image_transfer_fn!(st_2084_oetf);
+image_transfer_fn!(arib_b67_oetf);
 
 const REC709_ALPHA: f32 = 1.099_296_8;
 const REC709_BETA: f32 = 0.018_053_97;
