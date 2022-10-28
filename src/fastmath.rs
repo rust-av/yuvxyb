@@ -132,25 +132,25 @@ fn poly0(_x: f32x4, c0: f32) -> f32x4 {
 
 #[inline(always)]
 fn poly1(x: f32x4, c0: f32, c1: f32) -> f32x4 {
-    poly0(x, c1) * x + c0
+    poly0(x, c1).mul_add(x, f32x4::from(c0))
 }
 
 #[inline(always)]
 fn poly2(x: f32x4, c0: f32, c1: f32, c2: f32) -> f32x4 {
-    poly1(x, c1, c2) * x + c0
+    poly1(x, c1, c2).mul_add(x, f32x4::from(c0))
 }
 
 #[inline(always)]
 fn poly3(x: f32x4, c0: f32, c1: f32, c2: f32, c3: f32) -> f32x4 {
-    poly2(x, c1, c2, c3) * x + c0
+    poly2(x, c1, c2, c3).mul_add(x, f32x4::from(c0))
 }
 
 #[inline(always)]
 fn poly4(x: f32x4, c0: f32, c1: f32, c2: f32, c3: f32, c4: f32) -> f32x4 {
-    poly3(x, c1, c2, c3, c4) * x + c0
+    poly3(x, c1, c2, c3, c4).mul_add(x, f32x4::from(c0))
 }
 
 #[inline(always)]
 fn poly5(x: f32x4, c0: f32, c1: f32, c2: f32, c3: f32, c4: f32, c5: f32) -> f32x4 {
-    poly4(x, c1, c2, c3, c4, c5) * x + c0
+    poly4(x, c1, c2, c3, c4, c5).mul_add(x, f32x4::from(c0))
 }
