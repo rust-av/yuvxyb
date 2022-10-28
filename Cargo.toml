@@ -20,7 +20,7 @@ nalgebra = "0.31.1"
 num-traits = "0.2.15"
 paste = "1.0.9"
 v_frame = "0.3.0"
-wide = "0.7.5"
+wide = { git = "https://github.com/shssoichiro/wide", branch = "fast-cast-fns" }
 
 [dev-dependencies]
 criterion = "0.4.0"
@@ -31,6 +31,3 @@ rand = "0.8.5"
 [[bench]]
 name = "benches"
 harness = false
-
-[patch.crates-io]
-wide = { git = "https://github.com/shssoichiro/wide", branch = "fast-cast-fns" }
