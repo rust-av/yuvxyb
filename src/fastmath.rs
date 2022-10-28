@@ -76,6 +76,7 @@ pub fn cbrtf(x: f32) -> f32 {
     t as f32
 }
 
+// Credit to https://jrfonseca.blogspot.com/2008/09/fast-sse2-pow-tables-or-polynomials.html
 pub fn powf_wide(x: f32x4, pow: f32) -> f32x4 {
     exp2_wide(log2_wide(x) * pow)
 }

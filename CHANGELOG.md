@@ -1,3 +1,7 @@
+## Version 0.2.3 (unreleased)
+
+- More optimizations to linear/gamma conversion functions
+
 ## Version 0.2.2
 
 - Optimizations to linear/gamma conversion functions
