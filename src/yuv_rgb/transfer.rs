@@ -5,6 +5,8 @@ use av_data::pixel::TransferCharacteristic;
 use debug_unreachable::debug_unreachable;
 use wide::{f32x4, CmpGe, CmpGt, CmpLe, CmpLt};
 
+use crate::fastmath::powf_wide;
+
 pub trait TransferFunction {
     fn to_linear(&self, input: &[[f32; 3]]) -> Result<Vec<[f32; 3]>>;
     fn to_gamma(&self, input: &[[f32; 3]]) -> Result<Vec<[f32; 3]>>;
@@ -157,32 +159,35 @@ fn log316_inverse_oetf(x: f32x4) -> f32x4 {
 // Ignore the BT.1886 provisions for limited contrast and assume an ideal CRT.
 #[inline(always)]
 fn rec_1886_eotf(x: f32x4) -> f32x4 {
-    x.cmp_lt(f32x4::ZERO).blend(f32x4::ZERO, x.powf(2.4))
+    x.cmp_lt(f32x4::ZERO).blend(f32x4::ZERO, powf_wide(x, 2.4))
 }
 
 #[inline(always)]
 fn rec_1886_inverse_eotf(x: f32x4) -> f32x4 {
-    x.cmp_lt(f32x4::ZERO).blend(f32x4::ZERO, x.powf(1.0 / 2.4))
+    x.cmp_lt(f32x4::ZERO)
+        .blend(f32x4::ZERO, powf_wide(x, 1.0 / 2.4))
 }
 
 #[inline(always)]
 fn rec_470m_oetf(x: f32x4) -> f32x4 {
-    x.cmp_lt(f32x4::ZERO).blend(f32x4::ZERO, x.powf(2.2))
+    x.cmp_lt(f32x4::ZERO).blend(f32x4::ZERO, powf_wide(x, 2.2))
 }
 
 #[inline(always)]
 fn rec_470m_inverse_oetf(x: f32x4) -> f32x4 {
-    x.cmp_lt(f32x4::ZERO).blend(f32x4::ZERO, x.powf(1.0 / 2.2))
+    x.cmp_lt(f32x4::ZERO)
+        .blend(f32x4::ZERO, powf_wide(x, 1.0 / 2.2))
 }
 
 #[inline(always)]
 fn rec_470bg_oetf(x: f32x4) -> f32x4 {
-    x.cmp_lt(f32x4::ZERO).blend(f32x4::ZERO, x.powf(2.8))
+    x.cmp_lt(f32x4::ZERO).blend(f32x4::ZERO, powf_wide(x, 2.8))
 }
 
 #[inline(always)]
 fn rec_470bg_inverse_oetf(x: f32x4) -> f32x4 {
-    x.cmp_lt(f32x4::ZERO).blend(f32x4::ZERO, x.powf(1.0 / 2.8))
+    x.cmp_lt(f32x4::ZERO)
+        .blend(f32x4::ZERO, powf_wide(x, 1.0 / 2.8))
 }
 
 #[inline(always)]
@@ -192,7 +197,7 @@ fn rec_709_oetf(x: f32x4) -> f32x4 {
     x.cmp_lt(f32x4::from(REC709_BETA)).blend(
         x * 4.5,
         // REC709_ALPHA * x.powf(0.45) - (REC709_ALPHA - 1.0)
-        f32x4::from(REC709_ALPHA).mul_sub(x.powf(0.45), f32x4::from(REC709_ALPHA - 1.0)),
+        f32x4::from(REC709_ALPHA).mul_sub(powf_wide(x, 0.45), f32x4::from(REC709_ALPHA - 1.0)),
     )
 }
 
@@ -202,7 +207,7 @@ fn rec_709_inverse_oetf(x: f32x4) -> f32x4 {
 
     x.cmp_lt(f32x4::from(4.5 * REC709_BETA)).blend(
         x / 4.5,
-        ((x + (REC709_ALPHA - 1.0)) / REC709_ALPHA).powf(1.0 / 0.45),
+        powf_wide((x + (REC709_ALPHA - 1.0)) / REC709_ALPHA, 1.0 / 0.45),
     )
 }
 
@@ -226,8 +231,10 @@ fn xvycc_inverse_eotf(x: f32x4) -> f32x4 {
 fn srgb_eotf(x: f32x4) -> f32x4 {
     let x = x.fast_max(f32x4::ZERO);
 
-    x.cmp_lt(f32x4::from(12.92 * SRGB_BETA))
-        .blend(x / 12.92, ((x + (SRGB_ALPHA - 1.0)) / SRGB_ALPHA).powf(2.4))
+    x.cmp_lt(f32x4::from(12.92 * SRGB_BETA)).blend(
+        x / 12.92,
+        powf_wide((x + (SRGB_ALPHA - 1.0)) / SRGB_ALPHA, 2.4),
+    )
 }
 
 #[inline(always)]
@@ -237,7 +244,7 @@ fn srgb_inverse_eotf(x: f32x4) -> f32x4 {
     x.cmp_lt(SRGB_BETA).blend(
         x * 12.92,
         // SRGB_ALPHA * x.powf(1.0 / 2.4) - (SRGB_ALPHA - 1.0)
-        f32x4::from(SRGB_ALPHA).mul_sub(x.powf(1.0 / 2.4), f32x4::from(SRGB_ALPHA - 1.0)),
+        f32x4::from(SRGB_ALPHA).mul_sub(powf_wide(x, 1.0 / 2.4), f32x4::from(SRGB_ALPHA - 1.0)),
     )
 }
 
@@ -248,7 +255,7 @@ fn st_2084_inverse_eotf(x: f32x4) -> f32x4 {
 
     x.cmp_gt(f32x4::ZERO).blend(
         {
-            let xpow = x.powf(ST2084_M1);
+            let xpow = powf_wide(x, ST2084_M1);
 
             // More stable arrangement that avoids some cancellation error.
             // (ST2084_C1 - 1.0) + (ST2084_C2 - ST2084_C3) * xpow
@@ -256,7 +263,7 @@ fn st_2084_inverse_eotf(x: f32x4) -> f32x4 {
                 f32x4::from(ST2084_C2 - ST2084_C3).mul_add(xpow, f32x4::from(ST2084_C1 - 1.0));
             // 1.0 + ST2084_C3 * xpow
             let den = f32x4::from(ST2084_C3).mul_add(xpow, f32x4::ONE);
-            (1.0 + num / den).powf(ST2084_M2)
+            powf_wide(1.0 + num / den, ST2084_M2)
         },
         f32x4::ZERO,
     )
@@ -276,13 +283,13 @@ fn ootf_st2084(x: f32x4) -> f32x4 {
 fn st_2084_eotf(x: f32x4) -> f32x4 {
     x.cmp_gt(f32x4::ZERO).blend(
         {
-            let xpow = x.powf(1.0 / ST2084_M2);
+            let xpow = powf_wide(x, 1.0 / ST2084_M2);
             let num = (xpow - ST2084_C1).fast_max(f32x4::ZERO);
             // ST2084_C2 - (ST2084_C3 * xpow)
             let den = xpow
                 .mul_neg_add(f32x4::from(ST2084_C3), f32x4::from(ST2084_C2))
                 .fast_max(f32x4::from(f32::EPSILON));
-            (num / den).powf(1.0 / ST2084_M1)
+            powf_wide(num / den, 1.0 / ST2084_M1)
         },
         f32x4::ZERO,
     )

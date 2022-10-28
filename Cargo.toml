@@ -31,3 +31,6 @@ rand = "0.8.5"
 [[bench]]
 name = "benches"
 harness = false
+
+[patch.crates-io]
+wide = { git = "https://github.com/shssoichiro/wide", branch = "fast-cast-fns" }
