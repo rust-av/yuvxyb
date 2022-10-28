@@ -73,34 +73,9 @@ pub fn cbrtf(x: f32) -> f32 {
     t as f32
 }
 
-#[inline(always)]
-fn poly5(x: f32, c0: f32, c1: f32, c2: f32, c3: f32, c4: f32, c5: f32) -> f32 {
-    x.mul_add(poly4(x, c1, c2, c3, c4, c5), c0)
-}
-
-#[inline(always)]
-fn poly4(x: f32, c0: f32, c1: f32, c2: f32, c3: f32, c4: f32) -> f32 {
-    x.mul_add(poly3(x, c1, c2, c3, c4), c0)
-}
-
-#[inline(always)]
-fn poly3(x: f32, c0: f32, c1: f32, c2: f32, c3: f32) -> f32 {
-    x.mul_add(poly2(x, c1, c2, c3), c0)
-}
-
-#[inline(always)]
-fn poly2(x: f32, c0: f32, c1: f32, c2: f32) -> f32 {
-    x.mul_add(poly1(x, c1, c2), c0)
-}
-
-#[inline(always)]
-fn poly1(x: f32, c0: f32, c1: f32) -> f32 {
-    x.mul_add(poly0(x, c1), c0)
-}
-
-#[inline(always)]
-const fn poly0(_x: f32, c0: f32) -> f32 {
-    c0
+// Based on https://jrfonseca.blogspot.com/2008/09/fast-sse2-pow-tables-or-polynomials.html
+pub fn powf(x: f32, y: f32) -> f32 {
+    exp2(log2(x) * y)
 }
 
 fn exp2(x: f32) -> f32 {
@@ -148,6 +123,32 @@ fn log2(x: f32) -> f32 {
     polynomial + exp
 }
 
-pub fn powf(x: f32, y: f32) -> f32 {
-    exp2(log2(x) * y)
+#[inline(always)]
+fn poly5(x: f32, c0: f32, c1: f32, c2: f32, c3: f32, c4: f32, c5: f32) -> f32 {
+    x.mul_add(poly4(x, c1, c2, c3, c4, c5), c0)
+}
+
+#[inline(always)]
+fn poly4(x: f32, c0: f32, c1: f32, c2: f32, c3: f32, c4: f32) -> f32 {
+    x.mul_add(poly3(x, c1, c2, c3, c4), c0)
+}
+
+#[inline(always)]
+fn poly3(x: f32, c0: f32, c1: f32, c2: f32, c3: f32) -> f32 {
+    x.mul_add(poly2(x, c1, c2, c3), c0)
+}
+
+#[inline(always)]
+fn poly2(x: f32, c0: f32, c1: f32, c2: f32) -> f32 {
+    x.mul_add(poly1(x, c1, c2), c0)
+}
+
+#[inline(always)]
+fn poly1(x: f32, c0: f32, c1: f32) -> f32 {
+    x.mul_add(poly0(x, c1), c0)
+}
+
+#[inline(always)]
+const fn poly0(_x: f32, c0: f32) -> f32 {
+    c0
 }
