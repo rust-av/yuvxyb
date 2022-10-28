@@ -43,7 +43,7 @@
 // optimization easier
 mod fastmath;
 #[doc(hidden)]
-pub mod rgb_xyz;
+pub mod rgb_xyb;
 #[doc(hidden)]
 pub mod yuv_rgb;
 
@@ -54,7 +54,7 @@ use anyhow::{bail, Result};
 pub use av_data::pixel::{ColorPrimaries, MatrixCoefficients, TransferCharacteristic};
 pub use hsl::Hsl;
 pub use num_traits::{FromPrimitive, ToPrimitive};
-use rgb_xyz::{linear_rgb_to_xyb, xyb_to_linear_rgb};
+use rgb_xyb::{linear_rgb_to_xyb, xyb_to_linear_rgb};
 use std::mem::size_of;
 pub use v_frame::{
     frame::Frame,
