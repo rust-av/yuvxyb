@@ -23,56 +23,35 @@ use std::mem::transmute;
 use wide::{f32x4, i32x4};
 
 const B1: u32 = 709_958_130; /* B1 = (127-127.0/3-0.03306235651)*2**23 */
-const B2: u32 = 642_849_266; /* B2 = (127-127.0/3-24/3-0.03306235651)*2**23 */
 
 /// Cube root (f32)
 ///
 /// Computes the cube root of the argument.
+/// The argument must be normal (not NaN, +/-INF or subnormal).
+/// This is required for optimization purposes.
 pub fn cbrtf(x: f32) -> f32 {
-    let x1p24 = f32::from_bits(0x4b80_0000); // 0x1p24f === 2 ^ 24
+    debug_assert!(x.is_normal());
+    let x64 = f64::from(x);
 
-    let mut r: f64;
-    let mut t: f64;
-    let mut ui: u32 = x.to_bits();
-    let mut hx: u32 = ui & 0x7fff_ffff;
+    let x_bits = x.to_bits();
+    let sign = x_bits & 0x8000_0000;
 
-    if hx >= 0x7f80_0000 {
-        /* cbrt(NaN,INF) is itself */
-        return x + x;
-    }
+    // rough cbrt to 5 bits
+    let hx = sign | ((x_bits ^ sign) / 3 + B1);
 
-    /* rough cbrt to 5 bits */
-    if hx < 0x0080_0000 {
-        /* zero or subnormal? */
-        if hx == 0 {
-            return x; /* cbrt(+-0) is itself */
-        }
-        ui = (x * x1p24).to_bits();
-        hx = ui & 0x7fff_ffff;
-        hx = hx / 3 + B2;
-    } else {
-        hx = hx / 3 + B1;
-    }
-    ui &= 0x8000_0000;
-    ui |= hx;
+    // First step Newton iteration (solving t*t-x/t == 0) to 16 bits.
+    // In double precision so that its terms can be arranged for
+    // efficiency without causing overflow or underflow.
+    let t = f64::from(f32::from_bits(hx));
+    let r = t * t * t;
+    let t = t * (x64 + x64 + r) / (x64 + r + r);
 
-    /*
-     * First step Newton iteration (solving t*t-x/t == 0) to 16 bits.  In
-     * double precision so that its terms can be arranged for efficiency
-     * without causing overflow or underflow.
-     */
-    t = f64::from(f32::from_bits(ui));
-    r = t * t * t;
-    t = t * (f64::from(x) + f64::from(x) + r) / (f64::from(x) + r + r);
+    // Second step Newton iteration to 47 bits.
+    // In double precision for efficiency and accuracy.
+    let r = t * t * t;
+    let t = t * (x64 + x64 + r) / (x64 + r + r);
 
-    /*
-     * Second step Newton iteration to 47 bits.  In double precision for
-     * efficiency and accuracy.
-     */
-    r = t * t * t;
-    t = t * (f64::from(x) + f64::from(x) + r) / (f64::from(x) + r + r);
-
-    /* rounding to 24 bits is perfect in round-to-nearest mode */
+    // rounding to 24 bits is perfect in round-to-nearest mode
     t as f32
 }
 

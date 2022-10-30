@@ -50,10 +50,11 @@ pub fn linear_rgb_to_xyb(input: &[[f32; 3]]) -> Vec<[f32; 3]> {
         .map(|pix| {
             let mut mixed = opsin_absorbance(pix);
             for (mixed, absorb) in mixed.iter_mut().zip(absorbance_bias.iter()) {
-                if *mixed < 0.0 {
-                    *mixed = 0.0;
+                if *mixed <= 0.0 {
+                    *mixed = *absorb;
+                } else {
+                    *mixed = cbrtf(*mixed) + *absorb;
                 }
-                *mixed = cbrtf(*mixed) + (*absorb);
             }
             // For wide-gamut inputs, r/g/b and valx (but not y/z) are often negative.
             mixed_to_xyb(&mixed)
