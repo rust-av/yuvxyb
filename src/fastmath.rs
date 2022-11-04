@@ -30,7 +30,7 @@ pub fn cbrtf(x: f32) -> f32 {
     let mut r: f64;
     let mut t: f64;
     let mut ui: u32 = x.to_bits();
-    let mut hx: u32 = ui & 0x7fff_ffff;
+    let mut hx: u32 = ui & 0x7FFF_FFFF;
 
     hx = hx / 3 + B1;
     ui &= 0x8000_0000;
