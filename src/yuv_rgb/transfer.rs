@@ -1,11 +1,9 @@
-use std::ops::BitAnd;
-
 use anyhow::{bail, Result};
 use av_data::pixel::TransferCharacteristic;
 use debug_unreachable::debug_unreachable;
-use wide::{f32x4, CmpGe, CmpGt, CmpLe, CmpLt};
+use std::slice::{from_raw_parts, from_raw_parts_mut};
 
-use crate::fastmath::powf_wide;
+use crate::fastmath::powf;
 
 pub trait TransferFunction {
     fn to_linear(&self, input: &[[f32; 3]]) -> Result<Vec<[f32; 3]>>;
@@ -75,14 +73,23 @@ macro_rules! image_transfer_fn {
     ($name:ident) => {
         paste::item! {
             fn [<image_ $name>](input: &[[f32; 3]]) -> Vec<[f32; 3]> {
-                input
-                    .iter()
-                    .map(|pix| {
-                        let input = f32x4::new([pix[0], pix[1], pix[2], 0f32]);
-                        let output = $name(input).to_array();
-                        [output[0], output[1], output[2]]
-                    })
-                    .collect()
+                let mut result = vec![[0_f32; 3]; input.len()];
+
+                // SAFETY: Referencing preallocated memory (input)
+                let input_flat = unsafe {
+                    from_raw_parts(input.as_ptr().cast::<f32>(), input.len() * 3)
+                };
+
+                // SAFETY: Referencing preallocated memory (results)
+                let result_flat = unsafe {
+                    from_raw_parts_mut(result.as_mut_ptr().cast::<f32>(), result.len() * 3)
+                };
+
+                for (dst, src) in result_flat.iter_mut().zip(input_flat.iter()) {
+                    *dst = $name(*src);
+                }
+
+                result
             }
         }
     };
@@ -128,203 +135,231 @@ const ST2084_OOTF_SCALE: f32 = 59.490_803;
 const ARIB_B67_A: f32 = 0.178_832_77;
 const ARIB_B67_B: f32 = 0.284_668_92;
 const ARIB_B67_C: f32 = 0.559_910_7;
-
 #[inline(always)]
-fn log100_oetf(x: f32x4) -> f32x4 {
-    x.cmp_le(0.01).blend(f32x4::ZERO, 1.0 + x.log10() / 2.0)
+fn log100_oetf(x: f32) -> f32 {
+    if x <= 0.01 {
+        0.0
+    } else {
+        1.0 + x.log10() / 2.0
+    }
 }
 
 #[inline(always)]
-fn log100_inverse_oetf(x: f32x4) -> f32x4 {
-    x.cmp_le(0.00).blend(
-        f32x4::from(0.01),
-        f32x4::from(10.0f32).pow_f32x4(2.0 * (x - 1.0)),
-    )
+fn log100_inverse_oetf(x: f32) -> f32 {
+    if x <= 0.0 {
+        0.01
+    } else {
+        powf(10.0, 2.0 * (x - 1.0))
+    }
 }
 
 #[inline(always)]
-fn log316_oetf(x: f32x4) -> f32x4 {
-    x.cmp_le(0.003_162_277_6)
-        .blend(f32x4::ZERO, 1.0 + x.log10() / 2.5)
+fn log316_oetf(x: f32) -> f32 {
+    if x <= 0.003_162_277_6 {
+        0.0
+    } else {
+        1.0 + x.log10() / 2.5
+    }
 }
 
 #[inline(always)]
-fn log316_inverse_oetf(x: f32x4) -> f32x4 {
-    x.cmp_le(f32x4::ZERO).blend(
-        f32x4::from(0.003_162_277_6),
-        f32x4::from(10.0f32).pow_f32x4(2.5 * (x - 1.0)),
-    )
+fn log316_inverse_oetf(x: f32) -> f32 {
+    if x <= 0.0 {
+        0.003_162_277_6
+    } else {
+        powf(10.0, 2.5 * (x - 1.0))
+    }
 }
 
 // Ignore the BT.1886 provisions for limited contrast and assume an ideal CRT.
 #[inline(always)]
-fn rec_1886_eotf(x: f32x4) -> f32x4 {
-    x.cmp_lt(f32x4::ZERO).blend(f32x4::ZERO, powf_wide(x, 2.4))
+fn rec_1886_eotf(x: f32) -> f32 {
+    if x < 0.0 {
+        0.0
+    } else {
+        powf(x, 2.4)
+    }
 }
 
 #[inline(always)]
-fn rec_1886_inverse_eotf(x: f32x4) -> f32x4 {
-    x.cmp_lt(f32x4::ZERO)
-        .blend(f32x4::ZERO, powf_wide(x, 1.0 / 2.4))
+fn rec_1886_inverse_eotf(x: f32) -> f32 {
+    if x < 0.0 {
+        0.0
+    } else {
+        powf(x, 1.0 / 2.4)
+    }
 }
 
 #[inline(always)]
-fn rec_470m_oetf(x: f32x4) -> f32x4 {
-    x.cmp_lt(f32x4::ZERO).blend(f32x4::ZERO, powf_wide(x, 2.2))
+fn rec_470m_oetf(x: f32) -> f32 {
+    if x < 0.0 {
+        0.0
+    } else {
+        powf(x, 2.2)
+    }
 }
 
 #[inline(always)]
-fn rec_470m_inverse_oetf(x: f32x4) -> f32x4 {
-    x.cmp_lt(f32x4::ZERO)
-        .blend(f32x4::ZERO, powf_wide(x, 1.0 / 2.2))
+fn rec_470m_inverse_oetf(x: f32) -> f32 {
+    if x < 0.0 {
+        0.0
+    } else {
+        powf(x, 1.0 / 2.2)
+    }
 }
 
 #[inline(always)]
-fn rec_470bg_oetf(x: f32x4) -> f32x4 {
-    x.cmp_lt(f32x4::ZERO).blend(f32x4::ZERO, powf_wide(x, 2.8))
+fn rec_470bg_oetf(x: f32) -> f32 {
+    if x < 0.0 {
+        0.0
+    } else {
+        powf(x, 2.8)
+    }
 }
 
 #[inline(always)]
-fn rec_470bg_inverse_oetf(x: f32x4) -> f32x4 {
-    x.cmp_lt(f32x4::ZERO)
-        .blend(f32x4::ZERO, powf_wide(x, 1.0 / 2.8))
+fn rec_470bg_inverse_oetf(x: f32) -> f32 {
+    if x < 0.0 {
+        0.0
+    } else {
+        powf(x, 1.0 / 2.8)
+    }
 }
 
 #[inline(always)]
-fn rec_709_oetf(x: f32x4) -> f32x4 {
-    let x = x.fast_max(f32x4::ZERO);
+fn rec_709_oetf(x: f32) -> f32 {
+    let x = x.max(0.0);
 
-    x.cmp_lt(f32x4::from(REC709_BETA)).blend(
-        x * 4.5,
+    if x < REC709_BETA {
+        x * 4.5
+    } else {
         // REC709_ALPHA * x.powf(0.45) - (REC709_ALPHA - 1.0)
-        f32x4::from(REC709_ALPHA).mul_sub(powf_wide(x, 0.45), f32x4::from(REC709_ALPHA - 1.0)),
-    )
+        REC709_ALPHA.mul_add(powf(x, 0.45), -(REC709_ALPHA - 1.0))
+    }
 }
 
 #[inline(always)]
-fn rec_709_inverse_oetf(x: f32x4) -> f32x4 {
-    let x = x.fast_max(f32x4::ZERO);
+fn rec_709_inverse_oetf(x: f32) -> f32 {
+    let x = x.max(0.0);
 
-    x.cmp_lt(f32x4::from(4.5 * REC709_BETA)).blend(
-        x / 4.5,
-        powf_wide((x + (REC709_ALPHA - 1.0)) / REC709_ALPHA, 1.0 / 0.45),
-    )
+    if x < 4.5 * REC709_BETA {
+        x / 4.5
+    } else {
+        powf((x + (REC709_ALPHA - 1.0)) / REC709_ALPHA, 1.0 / 0.45)
+    }
 }
 
 #[inline(always)]
-fn xvycc_eotf(x: f32x4) -> f32x4 {
-    x.cmp_ge(f32x4::ZERO).bitand(x.cmp_lt(f32x4::ONE)).blend(
-        rec_1886_eotf(x.abs()).copysign(x),
-        rec_709_inverse_oetf(x.abs()).copysign(x),
-    )
+fn xvycc_eotf(x: f32) -> f32 {
+    if (0.0..=1.0).contains(&x) {
+        rec_1886_eotf(x.abs()).copysign(x)
+    } else {
+        rec_709_inverse_oetf(x.abs()).copysign(x)
+    }
 }
 
 #[inline(always)]
-fn xvycc_inverse_eotf(x: f32x4) -> f32x4 {
-    x.cmp_ge(f32x4::ZERO).bitand(x.cmp_lt(f32x4::ONE)).blend(
-        rec_1886_inverse_eotf(x.abs()).copysign(x),
-        rec_709_oetf(x.abs()).copysign(x),
-    )
+fn xvycc_inverse_eotf(x: f32) -> f32 {
+    if (0.0..=1.0).contains(&x) {
+        rec_1886_inverse_eotf(x.abs()).copysign(x)
+    } else {
+        rec_709_oetf(x.abs()).copysign(x)
+    }
 }
 
 #[inline(always)]
-fn srgb_eotf(x: f32x4) -> f32x4 {
-    let x = x.fast_max(f32x4::ZERO);
+fn srgb_eotf(x: f32) -> f32 {
+    let x = x.max(0.0);
 
-    x.cmp_lt(f32x4::from(12.92 * SRGB_BETA)).blend(
-        x / 12.92,
-        powf_wide((x + (SRGB_ALPHA - 1.0)) / SRGB_ALPHA, 2.4),
-    )
+    if x < 12.92 * SRGB_BETA {
+        x / 12.92
+    } else {
+        powf((x + (SRGB_ALPHA - 1.0)) / SRGB_ALPHA, 2.4)
+    }
 }
 
 #[inline(always)]
-fn srgb_inverse_eotf(x: f32x4) -> f32x4 {
-    let x = x.fast_max(f32x4::ZERO);
+fn srgb_inverse_eotf(x: f32) -> f32 {
+    let x = x.max(0.0);
 
-    x.cmp_lt(SRGB_BETA).blend(
-        x * 12.92,
+    if x < SRGB_BETA {
+        x * 12.92
+    } else {
         // SRGB_ALPHA * x.powf(1.0 / 2.4) - (SRGB_ALPHA - 1.0)
-        f32x4::from(SRGB_ALPHA).mul_sub(powf_wide(x, 1.0 / 2.4), f32x4::from(SRGB_ALPHA - 1.0)),
-    )
+        SRGB_ALPHA.mul_add(powf(x, 1.0 / 2.4), -(SRGB_ALPHA - 1.0))
+    }
 }
 
 #[inline(always)]
-fn st_2084_inverse_eotf(x: f32x4) -> f32x4 {
+fn st_2084_inverse_eotf(x: f32) -> f32 {
     // Filter negative values to avoid NAN, and also special-case 0 so that (f(g(0))
     // == 0).
 
-    x.cmp_gt(f32x4::ZERO).blend(
-        {
-            let xpow = powf_wide(x, ST2084_M1);
+    if x > 0.0 {
+        let xpow = powf(x, ST2084_M1);
 
-            // More stable arrangement that avoids some cancellation error.
-            // (ST2084_C1 - 1.0) + (ST2084_C2 - ST2084_C3) * xpow
-            let num =
-                f32x4::from(ST2084_C2 - ST2084_C3).mul_add(xpow, f32x4::from(ST2084_C1 - 1.0));
-            // 1.0 + ST2084_C3 * xpow
-            let den = f32x4::from(ST2084_C3).mul_add(xpow, f32x4::ONE);
-            powf_wide(1.0 + num / den, ST2084_M2)
-        },
-        f32x4::ZERO,
-    )
+        // More stable arrangement that avoids some cancellation error.
+        // (ST2084_C1 - 1.0) + (ST2084_C2 - ST2084_C3) * xpow
+        let num = (ST2084_C2 - ST2084_C3).mul_add(xpow, ST2084_C1 - 1.0);
+        // 1.0 + ST2084_C3 * xpow
+        let den = ST2084_C3.mul_add(xpow, 1.0);
+        powf(1.0 + num / den, ST2084_M2)
+    } else {
+        0.0
+    }
 }
 
 #[inline(always)]
-fn inverse_ootf_st2084(x: f32x4) -> f32x4 {
+fn inverse_ootf_st2084(x: f32) -> f32 {
     rec_709_inverse_oetf(rec_1886_inverse_eotf(x * 100.0)) / ST2084_OOTF_SCALE
 }
 
 #[inline(always)]
-fn ootf_st2084(x: f32x4) -> f32x4 {
+fn ootf_st2084(x: f32) -> f32 {
     rec_1886_eotf(rec_709_oetf(x * ST2084_OOTF_SCALE)) / 100.0
 }
 
 #[inline(always)]
-fn st_2084_eotf(x: f32x4) -> f32x4 {
-    x.cmp_gt(f32x4::ZERO).blend(
-        {
-            let xpow = powf_wide(x, 1.0 / ST2084_M2);
-            let num = (xpow - ST2084_C1).fast_max(f32x4::ZERO);
-            // ST2084_C2 - (ST2084_C3 * xpow)
-            let den = xpow
-                .mul_neg_add(f32x4::from(ST2084_C3), f32x4::from(ST2084_C2))
-                .fast_max(f32x4::from(f32::EPSILON));
-            powf_wide(num / den, 1.0 / ST2084_M1)
-        },
-        f32x4::ZERO,
-    )
+fn st_2084_eotf(x: f32) -> f32 {
+    if x > 0.0 {
+        let xpow = powf(x, 1.0 / ST2084_M2);
+        let num = (xpow - ST2084_C1).max(0.0);
+        let den = (ST2084_C2 - ST2084_C3 * xpow).max(f32::EPSILON);
+        powf(num / den, 1.0 / ST2084_M1)
+    } else {
+        0.0
+    }
 }
 
 #[inline(always)]
-fn st_2084_inverse_oetf(x: f32x4) -> f32x4 {
+fn st_2084_inverse_oetf(x: f32) -> f32 {
     inverse_ootf_st2084(st_2084_eotf(x))
 }
 
 #[inline(always)]
-fn st_2084_oetf(x: f32x4) -> f32x4 {
+fn st_2084_oetf(x: f32) -> f32 {
     st_2084_inverse_eotf(ootf_st2084(x))
 }
 
 #[inline(always)]
-fn arib_b67_inverse_oetf(x: f32x4) -> f32x4 {
-    let x = x.fast_max(f32x4::ZERO);
+fn arib_b67_inverse_oetf(x: f32) -> f32 {
+    let x = x.max(0.0);
 
-    x.cmp_le(f32x4::from(0.5)).blend(
-        (x * x) * (1.0 / 3.0),
-        (((x - ARIB_B67_C) / ARIB_B67_A).exp() + ARIB_B67_B) / 12.0,
-    )
+    if x <= 0.5 {
+        (x * x) * (1.0 / 3.0)
+    } else {
+        (((x - ARIB_B67_C) / ARIB_B67_A).exp() + ARIB_B67_B) / 12.0
+    }
 }
 
 #[inline(always)]
-fn arib_b67_oetf(x: f32x4) -> f32x4 {
-    let x = x.fast_max(f32x4::ZERO);
+fn arib_b67_oetf(x: f32) -> f32 {
+    let x = x.max(0.0);
 
-    x.cmp_le(1.0 / 12.0).blend(
-        (3.0 * x).sqrt(),
+    if x <= 1.0 / 12.0 {
+        (3.0 * x).sqrt()
+    } else {
         // ARIB_B67_A * (12.0 * x - ARIB_B67_B).ln() + ARIB_B67_C
-        f32x4::from(ARIB_B67_A).mul_add(
-            f32x4::from(12.0).mul_sub(x, f32x4::from(ARIB_B67_B)).ln(),
-            f32x4::from(ARIB_B67_C),
-        ),
-    )
+        ARIB_B67_A.mul_add((12.0f32.mul_add(x, -ARIB_B67_B)).ln(), ARIB_B67_C)
+    }
 }
