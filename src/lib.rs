@@ -412,14 +412,6 @@ impl TryFrom<Rgb> for Xyb {
     }
 }
 
-impl TryFrom<&Rgb> for Xyb {
-    type Error = anyhow::Error;
-
-    fn try_from(rgb: &Rgb) -> Result<Self> {
-        Self::try_from(rgb.clone())
-    }
-}
-
 impl From<LinearRgb> for Xyb {
     fn from(lrgb: LinearRgb) -> Self {
         let data = linear_rgb_to_xyb(lrgb.data);
@@ -429,12 +421,6 @@ impl From<LinearRgb> for Xyb {
             width: lrgb.width,
             height: lrgb.height,
         }
-    }
-}
-
-impl From<&LinearRgb> for Xyb {
-    fn from(lrgb: &LinearRgb) -> Self {
-        Self::from(lrgb.clone())
     }
 }
 
@@ -468,14 +454,6 @@ impl TryFrom<Rgb> for LinearRgb {
             width: rgb.width,
             height: rgb.height,
         })
-    }
-}
-
-impl TryFrom<&Rgb> for LinearRgb {
-    type Error = anyhow::Error;
-
-    fn try_from(rgb: &Rgb) -> Result<Self> {
-        Self::try_from(rgb.clone())
     }
 }
 
@@ -516,30 +494,12 @@ impl<T: Pixel> TryFrom<(Xyb, YuvConfig)> for Yuv<T> {
     }
 }
 
-impl<T: Pixel> TryFrom<(&Xyb, YuvConfig)> for Yuv<T> {
-    type Error = anyhow::Error;
-
-    /// # Errors
-    /// - If the `YuvConfig` would produce an invalid image
-    fn try_from(other: (&Xyb, YuvConfig)) -> Result<Self> {
-        Self::try_from((other.0.clone(), other.1))
-    }
-}
-
 impl TryFrom<(Xyb, TransferCharacteristic, ColorPrimaries)> for Rgb {
     type Error = anyhow::Error;
 
     fn try_from(other: (Xyb, TransferCharacteristic, ColorPrimaries)) -> Result<Self> {
         let lrgb = LinearRgb::from(other.0);
         Self::try_from((lrgb, other.1, other.2))
-    }
-}
-
-impl TryFrom<(&Xyb, TransferCharacteristic, ColorPrimaries)> for Rgb {
-    type Error = anyhow::Error;
-
-    fn try_from(other: (&Xyb, TransferCharacteristic, ColorPrimaries)) -> Result<Self> {
-        Self::try_from((other.0.clone(), other.1, other.2))
     }
 }
 
@@ -555,12 +515,6 @@ impl From<Xyb> for LinearRgb {
     }
 }
 
-impl From<&Xyb> for LinearRgb {
-    fn from(xyb: &Xyb) -> Self {
-        Self::from(xyb.clone())
-    }
-}
-
 // From Linear RGB
 impl<T: Pixel> TryFrom<(LinearRgb, YuvConfig)> for Yuv<T> {
     type Error = anyhow::Error;
@@ -573,14 +527,6 @@ impl<T: Pixel> TryFrom<(LinearRgb, YuvConfig)> for Yuv<T> {
             config.color_primaries,
         ))?;
         Self::try_from((&rgb, config))
-    }
-}
-
-impl<T: Pixel> TryFrom<(&LinearRgb, YuvConfig)> for Yuv<T> {
-    type Error = anyhow::Error;
-
-    fn try_from(other: (&LinearRgb, YuvConfig)) -> Result<Self> {
-        Self::try_from((other.0.clone(), other.1))
     }
 }
 
@@ -614,16 +560,6 @@ impl TryFrom<(LinearRgb, TransferCharacteristic, ColorPrimaries)> for Rgb {
             transfer,
             primaries,
         })
-    }
-}
-
-impl TryFrom<(&LinearRgb, TransferCharacteristic, ColorPrimaries)> for Rgb {
-    type Error = anyhow::Error;
-
-    fn try_from(
-        other: (&LinearRgb, TransferCharacteristic, ColorPrimaries),
-    ) -> Result<Self, Self::Error> {
-        Self::try_from((other.0.clone(), other.1, other.2))
     }
 }
 
