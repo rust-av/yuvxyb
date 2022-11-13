@@ -61,7 +61,7 @@ pub use v_frame::{
     plane::Plane,
     prelude::{CastFromPrimitive, Pixel},
 };
-use yuv_rgb::{linear_rgb_to_rgb, rgb_to_linear_rgb, rgb_to_yuv, yuv_to_rgb};
+use yuv_rgb::{rgb_to_yuv, yuv_to_rgb, TransferFunction, transform_primaries};
 
 #[derive(Debug, Clone)]
 pub struct Xyb {
@@ -460,7 +460,8 @@ impl TryFrom<Rgb> for LinearRgb {
     type Error = anyhow::Error;
 
     fn try_from(rgb: Rgb) -> Result<Self> {
-        let data = rgb_to_linear_rgb(rgb.data, rgb.transfer, rgb.primaries)?;
+        let data = rgb.transfer.to_linear(rgb.data)?;
+        let data = transform_primaries(data, rgb.primaries, ColorPrimaries::BT709)?;
 
         Ok(Self {
             data,
@@ -584,7 +585,23 @@ impl TryFrom<(LinearRgb, TransferCharacteristic, ColorPrimaries)> for Rgb {
 
     fn try_from(other: (LinearRgb, TransferCharacteristic, ColorPrimaries)) -> Result<Self> {
         let lrgb = other.0;
-        let (data, transfer, primaries) = linear_rgb_to_rgb(lrgb.data, other.1, other.2)?;
+        let (mut transfer, mut primaries) = (other.1, other.2);
+
+        if transfer == TransferCharacteristic::Unspecified {
+            transfer = TransferCharacteristic::SRGB;
+            log::warn!(
+                "Transfer characteristics not specified. Guessing {}",
+                transfer
+            );
+        }
+    
+        if primaries == ColorPrimaries::Unspecified {
+            primaries = ColorPrimaries::BT709;
+            log::warn!("Color primaries not specified. Guessing {}", primaries);
+        }    
+
+        let data = transform_primaries(lrgb.data, ColorPrimaries::BT709, primaries)?;
+        let data = transfer.to_gamma(data)?;
 
         Ok(Self {
             data,
