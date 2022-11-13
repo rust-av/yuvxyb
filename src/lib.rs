@@ -61,7 +61,7 @@ pub use v_frame::{
     plane::Plane,
     prelude::{CastFromPrimitive, Pixel},
 };
-use yuv_rgb::{rgb_to_yuv, yuv_to_rgb, TransferFunction, transform_primaries};
+use yuv_rgb::{rgb_to_yuv, transform_primaries, yuv_to_rgb, TransferFunction};
 
 #[derive(Debug, Clone)]
 pub struct Xyb {
@@ -567,7 +567,11 @@ impl<T: Pixel> TryFrom<(LinearRgb, YuvConfig)> for Yuv<T> {
 
     fn try_from(other: (LinearRgb, YuvConfig)) -> Result<Self> {
         let config = other.1;
-        let rgb = Rgb::try_from((other.0, config.transfer_characteristics, config.color_primaries))?;
+        let rgb = Rgb::try_from((
+            other.0,
+            config.transfer_characteristics,
+            config.color_primaries,
+        ))?;
         Self::try_from((&rgb, config))
     }
 }
@@ -594,11 +598,11 @@ impl TryFrom<(LinearRgb, TransferCharacteristic, ColorPrimaries)> for Rgb {
                 transfer
             );
         }
-    
+
         if primaries == ColorPrimaries::Unspecified {
             primaries = ColorPrimaries::BT709;
             log::warn!("Color primaries not specified. Guessing {}", primaries);
-        }    
+        }
 
         let data = transform_primaries(lrgb.data, ColorPrimaries::BT709, primaries)?;
         let data = transfer.to_gamma(data)?;
@@ -616,10 +620,11 @@ impl TryFrom<(LinearRgb, TransferCharacteristic, ColorPrimaries)> for Rgb {
 impl TryFrom<(&LinearRgb, TransferCharacteristic, ColorPrimaries)> for Rgb {
     type Error = anyhow::Error;
 
-    fn try_from(other: (&LinearRgb, TransferCharacteristic, ColorPrimaries)) -> Result<Self, Self::Error> {
+    fn try_from(
+        other: (&LinearRgb, TransferCharacteristic, ColorPrimaries),
+    ) -> Result<Self, Self::Error> {
         Self::try_from((other.0.clone(), other.1, other.2))
     }
-
 }
 
 // From RGB

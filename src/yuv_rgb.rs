@@ -135,7 +135,6 @@ fn ypbpr_to_ycbcr<T: Pixel>(
     }
 }
 
-
 #[inline(always)]
 fn to_f32_luma<T: Pixel>(val: T, scale: f32, offset: f32) -> f32 {
     // Converts to a float value in the range 0.0..=1.0
