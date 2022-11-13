@@ -45,20 +45,22 @@ pub fn linear_rgb_to_xyb(input: &[[f32; 3]]) -> Vec<[f32; 3]> {
         *out = -cbrtf(*bias);
     }
 
-    input
-        .iter()
-        .map(|pix| {
-            let mut mixed = opsin_absorbance(pix);
-            for (mixed, absorb) in mixed.iter_mut().zip(absorbance_bias.iter()) {
-                if *mixed < 0.0 {
-                    *mixed = 0.0;
-                }
-                *mixed = cbrtf(*mixed) + (*absorb);
+    for pix in &mut input {
+        let mut mixed = opsin_absorbance(pix);
+        for (mixed, absorb) in mixed.iter_mut().zip(absorbance_bias.iter()) {
+            if *mixed < 0.0 {
+                *mixed = 0.0;
             }
-            // For wide-gamut inputs, r/g/b and valx (but not y/z) are often negative.
-            mixed_to_xyb(&mixed)
-        })
-        .collect()
+            *mixed = cbrtf(*mixed) + (*absorb);
+        }
+
+        let res = mixed_to_xyb(&mixed);
+        pix[0] = res[0];
+        pix[1] = res[1];
+        pix[2] = res[2];
+    }
+
+    input
 }
 
 /// Converts 32-bit floating point XYB to Linear RGB. This does not perform
@@ -70,35 +72,37 @@ pub fn xyb_to_linear_rgb(input: &[[f32; 3]]) -> Vec<[f32; 3]> {
         *bias = cbrtf(*bias);
     }
 
-    input
-        .iter()
-        .map(|pix| {
-            // Color space: XYB -> RGB
-            let mut gamma_rgb = [pix[1] + pix[0], pix[1] - pix[0], pix[2]];
-            for ((rgb, bias_cbrt), neg_bias) in gamma_rgb
-                .iter_mut()
-                .zip(biases_cbrt.iter())
-                .zip(NEG_OPSIN_ABSORBANCE_BIAS.iter())
-            {
-                *rgb -= *bias_cbrt;
-                // Undo gamma compression: linear = gamma^3 for efficiency.
-                let tmp = (*rgb) * (*rgb);
-                *rgb = tmp.mul_add(*rgb, *neg_bias);
-            }
+    for pix in &mut input {
+        // Color space: XYB -> RGB
+        let mut gamma_rgb = [pix[1] + pix[0], pix[1] - pix[0], pix[2]];
+        for ((rgb, bias_cbrt), neg_bias) in gamma_rgb
+            .iter_mut()
+            .zip(biases_cbrt.iter())
+            .zip(NEG_OPSIN_ABSORBANCE_BIAS.iter())
+        {
+            *rgb -= *bias_cbrt;
+            // Undo gamma compression: linear = gamma^3 for efficiency.
+            let tmp = (*rgb) * (*rgb);
+            *rgb = tmp.mul_add(*rgb, *neg_bias);
+        }
 
-            let mut out = gamma_rgb;
-            out[0] = INVERSE_OPSIN_ABSORBANCE_MATRIX[0] * gamma_rgb[0];
-            out[1] = INVERSE_OPSIN_ABSORBANCE_MATRIX[3] * gamma_rgb[0];
-            out[2] = INVERSE_OPSIN_ABSORBANCE_MATRIX[6] * gamma_rgb[0];
-            out[0] = INVERSE_OPSIN_ABSORBANCE_MATRIX[1].mul_add(gamma_rgb[1], out[0]);
-            out[1] = INVERSE_OPSIN_ABSORBANCE_MATRIX[4].mul_add(gamma_rgb[1], out[1]);
-            out[2] = INVERSE_OPSIN_ABSORBANCE_MATRIX[7].mul_add(gamma_rgb[1], out[2]);
-            out[0] = INVERSE_OPSIN_ABSORBANCE_MATRIX[2].mul_add(gamma_rgb[2], out[0]);
-            out[1] = INVERSE_OPSIN_ABSORBANCE_MATRIX[5].mul_add(gamma_rgb[2], out[1]);
-            out[2] = INVERSE_OPSIN_ABSORBANCE_MATRIX[8].mul_add(gamma_rgb[2], out[2]);
-            out
-        })
-        .collect()
+        let mut out = gamma_rgb;
+        out[0] = INVERSE_OPSIN_ABSORBANCE_MATRIX[0] * gamma_rgb[0];
+        out[1] = INVERSE_OPSIN_ABSORBANCE_MATRIX[3] * gamma_rgb[0];
+        out[2] = INVERSE_OPSIN_ABSORBANCE_MATRIX[6] * gamma_rgb[0];
+        out[0] = INVERSE_OPSIN_ABSORBANCE_MATRIX[1].mul_add(gamma_rgb[1], out[0]);
+        out[1] = INVERSE_OPSIN_ABSORBANCE_MATRIX[4].mul_add(gamma_rgb[1], out[1]);
+        out[2] = INVERSE_OPSIN_ABSORBANCE_MATRIX[7].mul_add(gamma_rgb[1], out[2]);
+        out[0] = INVERSE_OPSIN_ABSORBANCE_MATRIX[2].mul_add(gamma_rgb[2], out[0]);
+        out[1] = INVERSE_OPSIN_ABSORBANCE_MATRIX[5].mul_add(gamma_rgb[2], out[1]);
+        out[2] = INVERSE_OPSIN_ABSORBANCE_MATRIX[8].mul_add(gamma_rgb[2], out[2]);
+
+        pix[0] = out[0];
+        pix[1] = out[1];
+        pix[2] = out[2];
+    }
+
+    input
 }
 
 #[inline]

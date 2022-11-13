@@ -1,18 +1,18 @@
 use anyhow::{bail, Result};
 use av_data::pixel::TransferCharacteristic;
 use debug_unreachable::debug_unreachable;
-use std::slice::{from_raw_parts, from_raw_parts_mut};
+use std::slice::from_raw_parts_mut;
 
 use fastapprox::fast::pow as powf;
 
 
 pub trait TransferFunction {
-    fn to_linear(&self, input: &[[f32; 3]]) -> Result<Vec<[f32; 3]>>;
-    fn to_gamma(&self, input: &[[f32; 3]]) -> Result<Vec<[f32; 3]>>;
+    fn to_linear(&self, input: Vec<[f32; 3]>) -> Result<Vec<[f32; 3]>>;
+    fn to_gamma(&self, input: Vec<[f32; 3]>) -> Result<Vec<[f32; 3]>>;
 }
 
 impl TransferFunction for TransferCharacteristic {
-    fn to_linear(&self, input: &[[f32; 3]]) -> Result<Vec<[f32; 3]>> {
+    fn to_linear(&self, input: Vec<[f32; 3]>) -> Result<Vec<[f32; 3]>> {
         Ok(match *self {
             TransferCharacteristic::Logarithmic100 => image_log100_inverse_oetf(input),
             TransferCharacteristic::Logarithmic316 => image_log316_inverse_oetf(input),
@@ -27,7 +27,7 @@ impl TransferFunction for TransferCharacteristic {
             TransferCharacteristic::SRGB => image_srgb_eotf(input),
             TransferCharacteristic::PerceptualQuantizer => image_st_2084_inverse_oetf(input),
             TransferCharacteristic::HybridLogGamma => image_arib_b67_inverse_oetf(input),
-            TransferCharacteristic::Linear => input.to_owned(),
+            TransferCharacteristic::Linear => input,
             // Unsupported
             TransferCharacteristic::Reserved0
             | TransferCharacteristic::Reserved
@@ -41,7 +41,7 @@ impl TransferFunction for TransferCharacteristic {
     }
 
     #[allow(clippy::too_many_lines)]
-    fn to_gamma(&self, input: &[[f32; 3]]) -> Result<Vec<[f32; 3]>> {
+    fn to_gamma(&self, input: Vec<[f32; 3]>) -> Result<Vec<[f32; 3]>> {
         Ok(match *self {
             TransferCharacteristic::Logarithmic100 => image_log100_oetf(input),
             TransferCharacteristic::Logarithmic316 => image_log316_oetf(input),
@@ -56,7 +56,7 @@ impl TransferFunction for TransferCharacteristic {
             TransferCharacteristic::SRGB => image_srgb_inverse_eotf(input),
             TransferCharacteristic::PerceptualQuantizer => image_st_2084_oetf(input),
             TransferCharacteristic::HybridLogGamma => image_arib_b67_oetf(input),
-            TransferCharacteristic::Linear => input.to_owned(),
+            TransferCharacteristic::Linear => input,
             // Unsupported
             TransferCharacteristic::Reserved0
             | TransferCharacteristic::Reserved
@@ -73,24 +73,17 @@ impl TransferFunction for TransferCharacteristic {
 macro_rules! image_transfer_fn {
     ($name:ident) => {
         paste::item! {
-            fn [<image_ $name>](input: &[[f32; 3]]) -> Vec<[f32; 3]> {
-                let mut result = vec![[0_f32; 3]; input.len()];
-
+            fn [<image_ $name>](mut input: Vec<[f32; 3]>) -> Vec<[f32; 3]> {
                 // SAFETY: Referencing preallocated memory (input)
                 let input_flat = unsafe {
-                    from_raw_parts(input.as_ptr().cast::<f32>(), input.len() * 3)
+                    from_raw_parts_mut(input.as_mut_ptr().cast::<f32>(), input.len() * 3)
                 };
 
-                // SAFETY: Referencing preallocated memory (results)
-                let result_flat = unsafe {
-                    from_raw_parts_mut(result.as_mut_ptr().cast::<f32>(), result.len() * 3)
-                };
-
-                for (dst, src) in result_flat.iter_mut().zip(input_flat.iter()) {
-                    *dst = $name(*src);
+                for val in input_flat {
+                    *val = $name(*val);
                 }
 
-                result
+                input
             }
         }
     };
