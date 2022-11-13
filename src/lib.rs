@@ -61,7 +61,7 @@ pub use v_frame::{
     plane::Plane,
     prelude::{CastFromPrimitive, Pixel},
 };
-use yuv_rgb::{rgb_to_yuv, transform_primaries, yuv_to_rgb, TransferFunction};
+use yuv_rgb::{linear_rgb_to_rgb, rgb_to_linear_rgb, rgb_to_yuv, yuv_to_rgb};
 
 #[derive(Debug, Clone)]
 pub struct Xyb {
@@ -399,8 +399,7 @@ impl<T: Pixel> TryFrom<&Yuv<T>> for Xyb {
 
     fn try_from(yuv: &Yuv<T>) -> Result<Self> {
         let rgb = Rgb::try_from(yuv)?;
-        let lrgb = LinearRgb::try_from(rgb)?;
-        Ok(Xyb::from(lrgb))
+        Self::try_from(rgb)
     }
 }
 
@@ -408,7 +407,8 @@ impl TryFrom<Rgb> for Xyb {
     type Error = anyhow::Error;
 
     fn try_from(rgb: Rgb) -> Result<Self> {
-        Xyb::try_from(&rgb)
+        let lrgb = LinearRgb::try_from(rgb)?;
+        Ok(Self::from(lrgb))
     }
 }
 
@@ -416,25 +416,25 @@ impl TryFrom<&Rgb> for Xyb {
     type Error = anyhow::Error;
 
     fn try_from(rgb: &Rgb) -> Result<Self> {
-        let lrgb = LinearRgb::try_from(rgb)?;
-        Ok(Xyb::from(lrgb))
+        Self::try_from(rgb.clone())
     }
 }
 
 impl From<LinearRgb> for Xyb {
     fn from(lrgb: LinearRgb) -> Self {
-        Xyb::from(&lrgb)
+        let data = linear_rgb_to_xyb(lrgb.data);
+
+        Self {
+            data,
+            width: lrgb.width,
+            height: lrgb.height,
+        }
     }
 }
 
 impl From<&LinearRgb> for Xyb {
     fn from(lrgb: &LinearRgb) -> Self {
-        let xyb = linear_rgb_to_xyb(lrgb.data());
-        Xyb {
-            data: xyb,
-            width: lrgb.width(),
-            height: lrgb.height(),
-        }
+        Self::from(lrgb.clone())
     }
 }
 
@@ -452,7 +452,7 @@ impl<T: Pixel> TryFrom<&Yuv<T>> for LinearRgb {
 
     fn try_from(yuv: &Yuv<T>) -> Result<Self> {
         let rgb = Rgb::try_from(yuv)?;
-        LinearRgb::try_from(rgb)
+        Self::try_from(rgb)
     }
 }
 
@@ -460,7 +460,13 @@ impl TryFrom<Rgb> for LinearRgb {
     type Error = anyhow::Error;
 
     fn try_from(rgb: Rgb) -> Result<Self> {
-        LinearRgb::try_from(&rgb)
+        let data = rgb_to_linear_rgb(rgb.data, rgb.transfer, rgb.primaries)?;
+
+        Ok(Self {
+            data,
+            width: rgb.width,
+            height: rgb.height,
+        })
     }
 }
 
@@ -468,13 +474,7 @@ impl TryFrom<&Rgb> for LinearRgb {
     type Error = anyhow::Error;
 
     fn try_from(rgb: &Rgb) -> Result<Self> {
-        let lrgb = rgb.transfer.to_linear(&rgb.data)?;
-        let lrgb = transform_primaries(&lrgb, rgb.primaries, ColorPrimaries::BT709)?;
-        Ok(LinearRgb {
-            data: lrgb,
-            width: rgb.width(),
-            height: rgb.height(),
-        })
+        Self::try_from(rgb.clone())
     }
 }
 
@@ -491,9 +491,10 @@ impl<T: Pixel> TryFrom<&Yuv<T>> for Rgb {
     type Error = anyhow::Error;
 
     fn try_from(yuv: &Yuv<T>) -> Result<Self> {
-        let rgb = yuv_to_rgb(yuv)?;
-        Ok(Rgb {
-            data: rgb,
+        let data = yuv_to_rgb(yuv)?;
+
+        Ok(Self {
+            data,
             width: yuv.width(),
             height: yuv.height(),
             transfer: yuv.config.transfer_characteristics,
@@ -509,7 +510,8 @@ impl<T: Pixel> TryFrom<(Xyb, YuvConfig)> for Yuv<T> {
     /// # Errors
     /// - If the `YuvConfig` would produce an invalid image
     fn try_from(other: (Xyb, YuvConfig)) -> Result<Self> {
-        Yuv::<T>::try_from((&other.0, other.1))
+        let lrgb = LinearRgb::from(other.0);
+        Self::try_from((lrgb, other.1))
     }
 }
 
@@ -519,9 +521,7 @@ impl<T: Pixel> TryFrom<(&Xyb, YuvConfig)> for Yuv<T> {
     /// # Errors
     /// - If the `YuvConfig` would produce an invalid image
     fn try_from(other: (&Xyb, YuvConfig)) -> Result<Self> {
-        let xyb = other.0;
-        let lrgb = LinearRgb::from(xyb);
-        Yuv::try_from((&lrgb, other.1))
+        Self::try_from((other.0.clone(), other.1))
     }
 }
 
@@ -529,7 +529,8 @@ impl TryFrom<(Xyb, TransferCharacteristic, ColorPrimaries)> for Rgb {
     type Error = anyhow::Error;
 
     fn try_from(other: (Xyb, TransferCharacteristic, ColorPrimaries)) -> Result<Self> {
-        Rgb::try_from((&other.0, other.1, other.2))
+        let lrgb = LinearRgb::from(other.0);
+        Self::try_from((lrgb, other.1, other.2))
     }
 }
 
@@ -537,28 +538,25 @@ impl TryFrom<(&Xyb, TransferCharacteristic, ColorPrimaries)> for Rgb {
     type Error = anyhow::Error;
 
     fn try_from(other: (&Xyb, TransferCharacteristic, ColorPrimaries)) -> Result<Self> {
-        let xyb = other.0;
-        let transfer = other.1;
-        let primaries = other.2;
-        let lrgb = LinearRgb::from(xyb);
-        Rgb::try_from((&lrgb, transfer, primaries))
+        Self::try_from((other.0.clone(), other.1, other.2))
     }
 }
 
 impl From<Xyb> for LinearRgb {
     fn from(xyb: Xyb) -> Self {
-        LinearRgb::from(&xyb)
+        let data = xyb_to_linear_rgb(xyb.data);
+
+        Self {
+            data,
+            width: xyb.width,
+            height: xyb.height,
+        }
     }
 }
 
 impl From<&Xyb> for LinearRgb {
     fn from(xyb: &Xyb) -> Self {
-        let lrgb = xyb_to_linear_rgb(xyb.data());
-        LinearRgb {
-            data: lrgb,
-            width: xyb.width(),
-            height: xyb.height(),
-        }
+        Self::from(xyb.clone())
     }
 }
 
@@ -567,7 +565,9 @@ impl<T: Pixel> TryFrom<(LinearRgb, YuvConfig)> for Yuv<T> {
     type Error = anyhow::Error;
 
     fn try_from(other: (LinearRgb, YuvConfig)) -> Result<Self> {
-        Yuv::<T>::try_from((&other.0, other.1))
+        let config = other.1;
+        let rgb = Rgb::try_from((other.0, config.transfer_characteristics, config.color_primaries))?;
+        Self::try_from((&rgb, config))
     }
 }
 
@@ -575,12 +575,7 @@ impl<T: Pixel> TryFrom<(&LinearRgb, YuvConfig)> for Yuv<T> {
     type Error = anyhow::Error;
 
     fn try_from(other: (&LinearRgb, YuvConfig)) -> Result<Self> {
-        let rgb = Rgb::try_from((
-            other.0,
-            other.1.transfer_characteristics,
-            other.1.color_primaries,
-        ))?;
-        Yuv::try_from((&rgb, other.1))
+        Self::try_from((other.0.clone(), other.1))
     }
 }
 
@@ -588,41 +583,26 @@ impl TryFrom<(LinearRgb, TransferCharacteristic, ColorPrimaries)> for Rgb {
     type Error = anyhow::Error;
 
     fn try_from(other: (LinearRgb, TransferCharacteristic, ColorPrimaries)) -> Result<Self> {
-        Rgb::try_from((&other.0, other.1, other.2))
+        let lrgb = other.0;
+        let (data, transfer, primaries) = linear_rgb_to_rgb(lrgb.data, other.1, other.2)?;
+
+        Ok(Self {
+            data,
+            width: lrgb.width,
+            height: lrgb.height,
+            transfer,
+            primaries,
+        })
     }
 }
 
 impl TryFrom<(&LinearRgb, TransferCharacteristic, ColorPrimaries)> for Rgb {
     type Error = anyhow::Error;
 
-    fn try_from(other: (&LinearRgb, TransferCharacteristic, ColorPrimaries)) -> Result<Self> {
-        let lrgb = other.0;
-        let mut transfer = other.1;
-        let mut primaries = other.2;
-
-        if transfer == TransferCharacteristic::Unspecified {
-            transfer = TransferCharacteristic::SRGB;
-            log::warn!(
-                "Transfer characteristics not specified. Guessing {}",
-                transfer
-            );
-        }
-
-        if primaries == ColorPrimaries::Unspecified {
-            primaries = ColorPrimaries::BT709;
-            log::warn!("Color primaries not specified. Guessing {}", primaries);
-        }
-
-        let rgb = transform_primaries(lrgb.data(), ColorPrimaries::BT709, primaries)?;
-        let rgb = transfer.to_gamma(&rgb)?;
-        Ok(Rgb {
-            data: rgb,
-            width: lrgb.width(),
-            height: lrgb.height(),
-            transfer,
-            primaries,
-        })
+    fn try_from(other: (&LinearRgb, TransferCharacteristic, ColorPrimaries)) -> Result<Self, Self::Error> {
+        Self::try_from((other.0.clone(), other.1, other.2))
     }
+
 }
 
 // From RGB
@@ -715,7 +695,7 @@ mod tests {
             },
         )
         .unwrap();
-        let xyb = Xyb::try_from(yuv.clone()).unwrap();
+        let xyb = Xyb::try_from(&yuv).unwrap();
         let yuv2 = Yuv::<u8>::try_from((xyb, yuv.config())).unwrap();
         // assert_eq!(yuv.data(), yuv2.data());
         assert_eq!(yuv.width(), yuv2.width());
@@ -878,7 +858,7 @@ mod tests {
             },
         )
         .unwrap();
-        let xyb = Xyb::try_from(yuv.clone()).unwrap();
+        let xyb = Xyb::try_from(&yuv).unwrap();
         let yuv2 = Yuv::<u16>::try_from((xyb, yuv.config())).unwrap();
         // assert_eq!(yuv.data(), yuv2.data());
         assert_eq!(yuv.width(), yuv2.width());

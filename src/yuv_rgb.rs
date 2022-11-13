@@ -8,12 +8,13 @@
 mod color;
 mod transfer;
 
+use anyhow::Result;
 use num_traits::clamp;
 use v_frame::{frame::Frame, plane::Plane};
 
 pub use self::color::{rgb_to_yuv, transform_primaries, yuv_to_rgb};
 pub use self::transfer::TransferFunction;
-use crate::{CastFromPrimitive, Pixel, Yuv, YuvConfig};
+use crate::{CastFromPrimitive, ColorPrimaries, Pixel, TransferCharacteristic, Yuv, YuvConfig};
 
 fn ycbcr_to_ypbpr<T: Pixel>(input: &Yuv<T>) -> Vec<[f32; 3]> {
     let w = input.width();
@@ -135,6 +136,41 @@ fn ypbpr_to_ycbcr<T: Pixel>(
     }
 }
 
+pub fn rgb_to_linear_rgb(
+    data: Vec<[f32; 3]>,
+    transfer: TransferCharacteristic,
+    primaries: ColorPrimaries,
+) -> Result<Vec<[f32; 3]>> {
+    let data = transfer.to_linear(data)?;
+    let data = transform_primaries(data, primaries, ColorPrimaries::BT709)?;
+
+    Ok(data)
+}
+
+pub fn linear_rgb_to_rgb(
+    data: Vec<[f32; 3]>,
+    mut transfer: TransferCharacteristic,
+    mut primaries: ColorPrimaries,
+) -> Result<(Vec<[f32; 3]>, TransferCharacteristic, ColorPrimaries)> {
+    if transfer == TransferCharacteristic::Unspecified {
+        transfer = TransferCharacteristic::SRGB;
+        log::warn!(
+            "Transfer characteristics not specified. Guessing {}",
+            transfer
+        );
+    }
+
+    if primaries == ColorPrimaries::Unspecified {
+        primaries = ColorPrimaries::BT709;
+        log::warn!("Color primaries not specified. Guessing {}", primaries);
+    }
+
+    let data = transform_primaries(data, ColorPrimaries::BT709, primaries)?;
+    let data = transfer.to_gamma(data)?;
+
+    Ok((data, transfer, primaries))
+}
+
 #[inline(always)]
 fn to_f32_luma<T: Pixel>(val: T, scale: f32, offset: f32) -> f32 {
     // Converts to a float value in the range 0.0..=1.0
@@ -241,8 +277,12 @@ mod tests {
     /// in a range of 0.0..=1.0;
     fn yuv_to_linear_rgb<T: Pixel>(input: &Yuv<T>) -> Result<Vec<[f32; 3]>> {
         let rgb = yuv_to_rgb(input)?;
-        let linear = input.config().transfer_characteristics.to_linear(&rgb)?;
-        transform_primaries(&linear, input.config.color_primaries, ColorPrimaries::BT709)
+        let config = input.config();
+        rgb_to_linear_rgb(
+            rgb,
+            config.transfer_characteristics,
+            config.color_primaries,
+        )
     }
 
     /// Converts 32-bit floating point Linear RGB in a range of 0.0..=1.0
@@ -256,9 +296,12 @@ mod tests {
         height: usize,
         config: YuvConfig,
     ) -> Result<Yuv<T>> {
-        let rgb = transform_primaries(input, ColorPrimaries::BT709, config.color_primaries)?;
-        let rgb = config.transfer_characteristics.to_gamma(&rgb)?;
-        rgb_to_yuv(&rgb, width, height, config)
+        let (data, _, _) = linear_rgb_to_rgb(
+            input.to_vec(),
+            config.transfer_characteristics,
+            config.color_primaries,
+        )?;
+        rgb_to_yuv(&data, width, height, config)
     }
 
     #[test]

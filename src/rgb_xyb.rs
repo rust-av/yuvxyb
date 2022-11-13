@@ -39,7 +39,7 @@ const NEG_OPSIN_ABSORBANCE_BIAS: [f32; 3] = [-K_B0, -K_B1, -K_B2];
 /// that the input is Linear RGB. If you pass it gamma-encoded RGB, the results
 /// will be incorrect.
 #[must_use]
-pub fn linear_rgb_to_xyb(input: &[[f32; 3]]) -> Vec<[f32; 3]> {
+pub fn linear_rgb_to_xyb(mut input: Vec<[f32; 3]>) -> Vec<[f32; 3]> {
     let mut absorbance_bias = [0.0f32; 3];
     for (out, bias) in absorbance_bias.iter_mut().zip(OPSIN_ABSORBANCE_BIAS.iter()) {
         *out = -cbrtf(*bias);
@@ -66,7 +66,7 @@ pub fn linear_rgb_to_xyb(input: &[[f32; 3]]) -> Vec<[f32; 3]> {
 /// Converts 32-bit floating point XYB to Linear RGB. This does not perform
 /// gamma encoding on the resulting RGB.
 #[must_use]
-pub fn xyb_to_linear_rgb(input: &[[f32; 3]]) -> Vec<[f32; 3]> {
+pub fn xyb_to_linear_rgb(mut input: Vec<[f32; 3]>) -> Vec<[f32; 3]> {
     let mut biases_cbrt = NEG_OPSIN_ABSORBANCE_BIAS;
     for bias in &mut biases_cbrt {
         *bias = cbrtf(*bias);
@@ -190,7 +190,7 @@ mod tests {
         .unwrap();
         let expected_data = parse_xyb_txt(&expected_path);
 
-        let result = Xyb::try_from(&source).unwrap();
+        let result = Xyb::try_from(source).unwrap();
         for (exp, res) in expected_data.into_iter().zip(result.data()) {
             assert!(
                 (exp[0] - res[0]).abs() < 0.0005,
@@ -231,7 +231,7 @@ mod tests {
             .collect::<Vec<_>>();
 
         let result =
-            Rgb::try_from((&source, TransferCharacteristic::SRGB, ColorPrimaries::BT709)).unwrap();
+            Rgb::try_from((source, TransferCharacteristic::SRGB, ColorPrimaries::BT709)).unwrap();
         for (exp, res) in expected_data.into_iter().zip(result.data()) {
             assert!(
                 (exp[0] - res[0]).abs() < 0.0005,
