@@ -67,10 +67,7 @@ impl From<LinearRgb> for Hsl {
     fn from(lrgb: LinearRgb) -> Self {
         let mut data = lrgb.data;
         for pix in &mut data {
-            let hsl = lrgb_to_hsl(*pix);
-            pix[0] = hsl[0];
-            pix[1] = hsl[1];
-            pix[2] = hsl[2];
+            *pix = lrgb_to_hsl(*pix);
         }
 
         Hsl {
@@ -85,10 +82,7 @@ impl From<Hsl> for LinearRgb {
     fn from(hsl: Hsl) -> Self {
         let mut data = hsl.data;
         for pix in &mut data {
-            let lrgb = hsl_to_lrgb(*pix);
-            pix[0] = lrgb[0];
-            pix[1] = lrgb[1];
-            pix[2] = lrgb[2];
+            *pix = hsl_to_lrgb(*pix);
         }
 
         LinearRgb {
