@@ -54,10 +54,7 @@ pub fn linear_rgb_to_xyb(mut input: Vec<[f32; 3]>) -> Vec<[f32; 3]> {
             *mixed = cbrtf(*mixed) + (*absorb);
         }
 
-        let res = mixed_to_xyb(&mixed);
-        pix[0] = res[0];
-        pix[1] = res[1];
-        pix[2] = res[2];
+        *pix = mixed_to_xyb(&mixed);
     }
 
     input
@@ -86,20 +83,17 @@ pub fn xyb_to_linear_rgb(mut input: Vec<[f32; 3]>) -> Vec<[f32; 3]> {
             *rgb = tmp.mul_add(*rgb, *neg_bias);
         }
 
-        let mut out = gamma_rgb;
-        out[0] = INVERSE_OPSIN_ABSORBANCE_MATRIX[0] * gamma_rgb[0];
-        out[1] = INVERSE_OPSIN_ABSORBANCE_MATRIX[3] * gamma_rgb[0];
-        out[2] = INVERSE_OPSIN_ABSORBANCE_MATRIX[6] * gamma_rgb[0];
-        out[0] = INVERSE_OPSIN_ABSORBANCE_MATRIX[1].mul_add(gamma_rgb[1], out[0]);
-        out[1] = INVERSE_OPSIN_ABSORBANCE_MATRIX[4].mul_add(gamma_rgb[1], out[1]);
-        out[2] = INVERSE_OPSIN_ABSORBANCE_MATRIX[7].mul_add(gamma_rgb[1], out[2]);
-        out[0] = INVERSE_OPSIN_ABSORBANCE_MATRIX[2].mul_add(gamma_rgb[2], out[0]);
-        out[1] = INVERSE_OPSIN_ABSORBANCE_MATRIX[5].mul_add(gamma_rgb[2], out[1]);
-        out[2] = INVERSE_OPSIN_ABSORBANCE_MATRIX[8].mul_add(gamma_rgb[2], out[2]);
+        pix[0] = INVERSE_OPSIN_ABSORBANCE_MATRIX[0] * gamma_rgb[0];
+        pix[0] = INVERSE_OPSIN_ABSORBANCE_MATRIX[1].mul_add(gamma_rgb[1], pix[0]);
+        pix[0] = INVERSE_OPSIN_ABSORBANCE_MATRIX[2].mul_add(gamma_rgb[2], pix[0]);
 
-        pix[0] = out[0];
-        pix[1] = out[1];
-        pix[2] = out[2];
+        pix[1] = INVERSE_OPSIN_ABSORBANCE_MATRIX[3] * gamma_rgb[0];
+        pix[1] = INVERSE_OPSIN_ABSORBANCE_MATRIX[4].mul_add(gamma_rgb[1], pix[1]);
+        pix[1] = INVERSE_OPSIN_ABSORBANCE_MATRIX[5].mul_add(gamma_rgb[2], pix[1]);
+
+        pix[2] = INVERSE_OPSIN_ABSORBANCE_MATRIX[6] * gamma_rgb[0];
+        pix[2] = INVERSE_OPSIN_ABSORBANCE_MATRIX[7].mul_add(gamma_rgb[1], pix[2]);
+        pix[2] = INVERSE_OPSIN_ABSORBANCE_MATRIX[8].mul_add(gamma_rgb[2], pix[2]);
     }
 
     input
