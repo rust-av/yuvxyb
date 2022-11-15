@@ -39,66 +39,64 @@ const NEG_OPSIN_ABSORBANCE_BIAS: [f32; 3] = [-K_B0, -K_B1, -K_B2];
 /// that the input is Linear RGB. If you pass it gamma-encoded RGB, the results
 /// will be incorrect.
 #[must_use]
-pub fn linear_rgb_to_xyb(input: &[[f32; 3]]) -> Vec<[f32; 3]> {
+pub fn linear_rgb_to_xyb(mut input: Vec<[f32; 3]>) -> Vec<[f32; 3]> {
     let mut absorbance_bias = [0.0f32; 3];
     for (out, bias) in absorbance_bias.iter_mut().zip(OPSIN_ABSORBANCE_BIAS.iter()) {
         *out = -cbrtf(*bias);
     }
 
-    input
-        .iter()
-        .map(|pix| {
-            let mut mixed = opsin_absorbance(pix);
-            for (mixed, absorb) in mixed.iter_mut().zip(absorbance_bias.iter()) {
-                if *mixed < 0.0 {
-                    *mixed = 0.0;
-                }
-                *mixed = cbrtf(*mixed) + (*absorb);
+    for pix in &mut input {
+        let mut mixed = opsin_absorbance(pix);
+        for (mixed, absorb) in mixed.iter_mut().zip(absorbance_bias.iter()) {
+            if *mixed < 0.0 {
+                *mixed = 0.0;
             }
-            // For wide-gamut inputs, r/g/b and valx (but not y/z) are often negative.
-            mixed_to_xyb(&mixed)
-        })
-        .collect()
+            *mixed = cbrtf(*mixed) + (*absorb);
+        }
+
+        *pix = mixed_to_xyb(&mixed);
+    }
+
+    input
 }
 
 /// Converts 32-bit floating point XYB to Linear RGB. This does not perform
 /// gamma encoding on the resulting RGB.
 #[must_use]
-pub fn xyb_to_linear_rgb(input: &[[f32; 3]]) -> Vec<[f32; 3]> {
+pub fn xyb_to_linear_rgb(mut input: Vec<[f32; 3]>) -> Vec<[f32; 3]> {
     let mut biases_cbrt = NEG_OPSIN_ABSORBANCE_BIAS;
     for bias in &mut biases_cbrt {
         *bias = cbrtf(*bias);
     }
 
-    input
-        .iter()
-        .map(|pix| {
-            // Color space: XYB -> RGB
-            let mut gamma_rgb = [pix[1] + pix[0], pix[1] - pix[0], pix[2]];
-            for ((rgb, bias_cbrt), neg_bias) in gamma_rgb
-                .iter_mut()
-                .zip(biases_cbrt.iter())
-                .zip(NEG_OPSIN_ABSORBANCE_BIAS.iter())
-            {
-                *rgb -= *bias_cbrt;
-                // Undo gamma compression: linear = gamma^3 for efficiency.
-                let tmp = (*rgb) * (*rgb);
-                *rgb = tmp.mul_add(*rgb, *neg_bias);
-            }
+    for pix in &mut input {
+        // Color space: XYB -> RGB
+        let mut gamma_rgb = [pix[1] + pix[0], pix[1] - pix[0], pix[2]];
+        for ((rgb, bias_cbrt), neg_bias) in gamma_rgb
+            .iter_mut()
+            .zip(biases_cbrt.iter())
+            .zip(NEG_OPSIN_ABSORBANCE_BIAS.iter())
+        {
+            *rgb -= *bias_cbrt;
+            // Undo gamma compression: linear = gamma^3 for efficiency.
+            let tmp = (*rgb) * (*rgb);
+            *rgb = tmp.mul_add(*rgb, *neg_bias);
+        }
 
-            let mut out = gamma_rgb;
-            out[0] = INVERSE_OPSIN_ABSORBANCE_MATRIX[0] * gamma_rgb[0];
-            out[1] = INVERSE_OPSIN_ABSORBANCE_MATRIX[3] * gamma_rgb[0];
-            out[2] = INVERSE_OPSIN_ABSORBANCE_MATRIX[6] * gamma_rgb[0];
-            out[0] = INVERSE_OPSIN_ABSORBANCE_MATRIX[1].mul_add(gamma_rgb[1], out[0]);
-            out[1] = INVERSE_OPSIN_ABSORBANCE_MATRIX[4].mul_add(gamma_rgb[1], out[1]);
-            out[2] = INVERSE_OPSIN_ABSORBANCE_MATRIX[7].mul_add(gamma_rgb[1], out[2]);
-            out[0] = INVERSE_OPSIN_ABSORBANCE_MATRIX[2].mul_add(gamma_rgb[2], out[0]);
-            out[1] = INVERSE_OPSIN_ABSORBANCE_MATRIX[5].mul_add(gamma_rgb[2], out[1]);
-            out[2] = INVERSE_OPSIN_ABSORBANCE_MATRIX[8].mul_add(gamma_rgb[2], out[2]);
-            out
-        })
-        .collect()
+        pix[0] = INVERSE_OPSIN_ABSORBANCE_MATRIX[0] * gamma_rgb[0];
+        pix[0] = INVERSE_OPSIN_ABSORBANCE_MATRIX[1].mul_add(gamma_rgb[1], pix[0]);
+        pix[0] = INVERSE_OPSIN_ABSORBANCE_MATRIX[2].mul_add(gamma_rgb[2], pix[0]);
+
+        pix[1] = INVERSE_OPSIN_ABSORBANCE_MATRIX[3] * gamma_rgb[0];
+        pix[1] = INVERSE_OPSIN_ABSORBANCE_MATRIX[4].mul_add(gamma_rgb[1], pix[1]);
+        pix[1] = INVERSE_OPSIN_ABSORBANCE_MATRIX[5].mul_add(gamma_rgb[2], pix[1]);
+
+        pix[2] = INVERSE_OPSIN_ABSORBANCE_MATRIX[6] * gamma_rgb[0];
+        pix[2] = INVERSE_OPSIN_ABSORBANCE_MATRIX[7].mul_add(gamma_rgb[1], pix[2]);
+        pix[2] = INVERSE_OPSIN_ABSORBANCE_MATRIX[8].mul_add(gamma_rgb[2], pix[2]);
+    }
+
+    input
 }
 
 #[inline]
@@ -186,7 +184,7 @@ mod tests {
         .unwrap();
         let expected_data = parse_xyb_txt(&expected_path);
 
-        let result = Xyb::try_from(&source).unwrap();
+        let result = Xyb::try_from(source).unwrap();
         for (exp, res) in expected_data.into_iter().zip(result.data()) {
             assert!(
                 (exp[0] - res[0]).abs() < 0.0005,
@@ -227,7 +225,7 @@ mod tests {
             .collect::<Vec<_>>();
 
         let result =
-            Rgb::try_from((&source, TransferCharacteristic::SRGB, ColorPrimaries::BT709)).unwrap();
+            Rgb::try_from((source, TransferCharacteristic::SRGB, ColorPrimaries::BT709)).unwrap();
         for (exp, res) in expected_data.into_iter().zip(result.data()) {
             assert!(
                 (exp[0] - res[0]).abs() < 0.0005,

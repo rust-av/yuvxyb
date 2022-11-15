@@ -241,8 +241,9 @@ mod tests {
     /// in a range of 0.0..=1.0;
     fn yuv_to_linear_rgb<T: Pixel>(input: &Yuv<T>) -> Result<Vec<[f32; 3]>> {
         let rgb = yuv_to_rgb(input)?;
-        let linear = input.config().transfer_characteristics.to_linear(&rgb)?;
-        transform_primaries(&linear, input.config.color_primaries, ColorPrimaries::BT709)
+        let config = input.config();
+        let data = config.transfer_characteristics.to_linear(rgb)?;
+        transform_primaries(data, config.color_primaries, ColorPrimaries::BT709)
     }
 
     /// Converts 32-bit floating point Linear RGB in a range of 0.0..=1.0
@@ -251,14 +252,14 @@ mod tests {
     /// # Errors
     /// - If the `YuvConfig` would produce an invalid image
     fn linear_rgb_to_yuv<T: Pixel>(
-        input: &[[f32; 3]],
+        input: Vec<[f32; 3]>,
         width: usize,
         height: usize,
         config: YuvConfig,
     ) -> Result<Yuv<T>> {
-        let rgb = transform_primaries(input, ColorPrimaries::BT709, config.color_primaries)?;
-        let rgb = config.transfer_characteristics.to_gamma(&rgb)?;
-        rgb_to_yuv(&rgb, width, height, config)
+        let data = transform_primaries(input, ColorPrimaries::BT709, config.color_primaries)?;
+        let data = config.transfer_characteristics.to_gamma(data)?;
+        rgb_to_yuv(&data, width, height, config)
     }
 
     #[test]
@@ -714,7 +715,7 @@ mod tests {
                 expected.2
             );
         }
-        let yuv: Yuv<u8> = linear_rgb_to_yuv(&rgb, 2, 2, config).unwrap();
+        let yuv: Yuv<u8> = linear_rgb_to_yuv(rgb, 2, 2, config).unwrap();
         for y in 0..2 {
             for x in 0..2 {
                 let expected = yuv_pixels[y * 2 + x];
@@ -781,7 +782,7 @@ mod tests {
                 expected.2
             );
         }
-        let yuv: Yuv<u8> = linear_rgb_to_yuv(&rgb, 2, 2, config).unwrap();
+        let yuv: Yuv<u8> = linear_rgb_to_yuv(rgb, 2, 2, config).unwrap();
         for y in 0..2 {
             for x in 0..2 {
                 let expected = yuv_pixels[y * 2 + x];
@@ -851,7 +852,7 @@ mod tests {
                 expected.2
             );
         }
-        let yuv: Yuv<u16> = linear_rgb_to_yuv(&rgb, 2, 2, config).unwrap();
+        let yuv: Yuv<u16> = linear_rgb_to_yuv(rgb, 2, 2, config).unwrap();
         for y in 0..2 {
             for x in 0..2 {
                 let expected = yuv_pixels[y * 2 + x];
@@ -921,7 +922,7 @@ mod tests {
                 expected.2
             );
         }
-        let yuv: Yuv<u16> = linear_rgb_to_yuv(&rgb, 2, 2, config).unwrap();
+        let yuv: Yuv<u16> = linear_rgb_to_yuv(rgb, 2, 2, config).unwrap();
         for y in 0..2 {
             for x in 0..2 {
                 let expected = yuv_pixels[y * 2 + x];
@@ -988,7 +989,7 @@ mod tests {
                 expected.2
             );
         }
-        let yuv: Yuv<u8> = linear_rgb_to_yuv(&rgb, 2, 2, config).unwrap();
+        let yuv: Yuv<u8> = linear_rgb_to_yuv(rgb, 2, 2, config).unwrap();
         for y in 0..2 {
             for x in 0..2 {
                 let expected = yuv_pixels[y * 2 + x];
@@ -1055,7 +1056,7 @@ mod tests {
                 expected.2
             );
         }
-        let yuv: Yuv<u8> = linear_rgb_to_yuv(&rgb, 2, 2, config).unwrap();
+        let yuv: Yuv<u8> = linear_rgb_to_yuv(rgb, 2, 2, config).unwrap();
         for y in 0..2 {
             for x in 0..2 {
                 let expected = yuv_pixels[y * 2 + x];
@@ -1125,7 +1126,7 @@ mod tests {
                 expected.2
             );
         }
-        let yuv: Yuv<u16> = linear_rgb_to_yuv(&rgb, 2, 2, config).unwrap();
+        let yuv: Yuv<u16> = linear_rgb_to_yuv(rgb, 2, 2, config).unwrap();
         for y in 0..2 {
             for x in 0..2 {
                 let expected = yuv_pixels[y * 2 + x];
@@ -1195,7 +1196,7 @@ mod tests {
                 expected.2
             );
         }
-        let yuv: Yuv<u16> = linear_rgb_to_yuv(&rgb, 2, 2, config).unwrap();
+        let yuv: Yuv<u16> = linear_rgb_to_yuv(rgb, 2, 2, config).unwrap();
         for y in 0..2 {
             for x in 0..2 {
                 let expected = yuv_pixels[y * 2 + x];
@@ -1265,7 +1266,7 @@ mod tests {
                 expected.2
             );
         }
-        let yuv: Yuv<u16> = linear_rgb_to_yuv(&rgb, 2, 2, config).unwrap();
+        let yuv: Yuv<u16> = linear_rgb_to_yuv(rgb, 2, 2, config).unwrap();
         for y in 0..2 {
             for x in 0..2 {
                 let expected = yuv_pixels[y * 2 + x];
@@ -1335,7 +1336,7 @@ mod tests {
                 expected.2
             );
         }
-        let yuv: Yuv<u16> = linear_rgb_to_yuv(&rgb, 2, 2, config).unwrap();
+        let yuv: Yuv<u16> = linear_rgb_to_yuv(rgb, 2, 2, config).unwrap();
         for y in 0..2 {
             for x in 0..2 {
                 let expected = yuv_pixels[y * 2 + x];

@@ -65,14 +65,13 @@ impl Hsl {
 
 impl From<LinearRgb> for Hsl {
     fn from(lrgb: LinearRgb) -> Self {
-        let hsl = lrgb
-            .data
-            .iter()
-            .map(|pix| lrgb_to_hsl(*pix))
-            .collect::<Vec<_>>();
+        let mut data = lrgb.data;
+        for pix in &mut data {
+            *pix = lrgb_to_hsl(*pix);
+        }
 
         Hsl {
-            data: hsl,
+            data,
             width: lrgb.width,
             height: lrgb.height,
         }
@@ -81,14 +80,13 @@ impl From<LinearRgb> for Hsl {
 
 impl From<Hsl> for LinearRgb {
     fn from(hsl: Hsl) -> Self {
-        let lrgb = hsl
-            .data
-            .iter()
-            .map(|pix| hsl_to_lrgb(*pix))
-            .collect::<Vec<_>>();
+        let mut data = hsl.data;
+        for pix in &mut data {
+            *pix = hsl_to_lrgb(*pix);
+        }
 
         LinearRgb {
-            data: lrgb,
+            data,
             width: hsl.width,
             height: hsl.height,
         }

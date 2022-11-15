@@ -185,15 +185,16 @@ fn xy_to_xyz(x: f32, y: f32) -> [f32; 3] {
 /// in a range of 0.0..=1.0;
 pub fn yuv_to_rgb<T: Pixel>(input: &Yuv<T>) -> Result<Vec<[f32; 3]>> {
     let transform = get_yuv_to_rgb_matrix(input.config())?;
-    let data = ycbcr_to_ypbpr(input);
-    let data = data
-        .into_iter()
-        .map(|pix| {
-            let pix = Matrix3x1::from_column_slice(&pix);
-            let res = transform * pix;
-            [res[0], res[1], res[2]]
-        })
-        .collect::<Vec<_>>();
+    let mut data = ycbcr_to_ypbpr(input);
+
+    for pix in &mut data {
+        let pix_matrix = Matrix3x1::from_column_slice(pix);
+        let res = transform * pix_matrix;
+        pix[0] = res[0];
+        pix[1] = res[1];
+        pix[2] = res[2];
+    }
+
     Ok(data)
 }
 
@@ -226,26 +227,27 @@ pub fn rgb_to_yuv<T: Pixel>(
 }
 
 pub fn transform_primaries(
-    input: &[[f32; 3]],
+    mut input: Vec<[f32; 3]>,
     in_primaries: ColorPrimaries,
     out_primaries: ColorPrimaries,
 ) -> Result<Vec<[f32; 3]>> {
     if in_primaries == out_primaries {
-        return Ok(input.to_vec());
+        return Ok(input);
     }
 
     let transform = gamut_xyz_to_rgb_matrix(out_primaries)?
         * white_point_adaptation_matrix(in_primaries, out_primaries)
         * gamut_rgb_to_xyz_matrix(in_primaries)?;
-    let transformed = input
-        .iter()
-        .map(|pix| {
-            let pix = Matrix3x1::from_column_slice(pix);
-            let res = transform * pix;
-            [res[0], res[1], res[2]]
-        })
-        .collect::<Vec<_>>();
-    Ok(transformed)
+
+    for pix in &mut input {
+        let pix_matrix = Matrix3x1::from_column_slice(pix);
+        let res = transform * pix_matrix;
+        pix[0] = res[0];
+        pix[1] = res[1];
+        pix[2] = res[2];
+    }
+
+    Ok(input)
 }
 
 fn gamut_rgb_to_xyz_matrix(primaries: ColorPrimaries) -> Result<Matrix3<f32>> {
