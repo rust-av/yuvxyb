@@ -3,7 +3,8 @@ use av_data::pixel::TransferCharacteristic;
 use debug_unreachable::debug_unreachable;
 use std::slice::{from_raw_parts, from_raw_parts_mut};
 
-use crate::fastmath::powf;
+use fastapprox::fast::pow as powf;
+
 
 pub trait TransferFunction {
     fn to_linear(&self, input: &[[f32; 3]]) -> Result<Vec<[f32; 3]>>;
@@ -348,7 +349,7 @@ fn arib_b67_inverse_oetf(x: f32) -> f32 {
     if x <= 0.5 {
         (x * x) * (1.0 / 3.0)
     } else {
-        (((x - ARIB_B67_C) / ARIB_B67_A).exp() + ARIB_B67_B) / 12.0
+        (fastapprox::fast::exp((x - ARIB_B67_C) / ARIB_B67_A) + ARIB_B67_B) / 12.0
     }
 }
 
@@ -360,6 +361,9 @@ fn arib_b67_oetf(x: f32) -> f32 {
         (3.0 * x).sqrt()
     } else {
         // ARIB_B67_A * (12.0 * x - ARIB_B67_B).ln() + ARIB_B67_C
-        ARIB_B67_A.mul_add((12.0f32.mul_add(x, -ARIB_B67_B)).ln(), ARIB_B67_C)
+        ARIB_B67_A.mul_add(
+            fastapprox::fast::ln(12.0f32.mul_add(x, -ARIB_B67_B)),
+            ARIB_B67_C,
+        )
     }
 }
