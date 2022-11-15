@@ -346,7 +346,7 @@ fn arib_b67_inverse_oetf(x: f32) -> f32 {
     if x <= 0.5 {
         (x * x) * (1.0 / 3.0)
     } else {
-        (((x - ARIB_B67_C) / ARIB_B67_A).exp() + ARIB_B67_B) / 12.0
+        (fastapprox::fast::exp((x - ARIB_B67_C) / ARIB_B67_A) + ARIB_B67_B) / 12.0
     }
 }
 
@@ -358,6 +358,9 @@ fn arib_b67_oetf(x: f32) -> f32 {
         (3.0 * x).sqrt()
     } else {
         // ARIB_B67_A * (12.0 * x - ARIB_B67_B).ln() + ARIB_B67_C
-        ARIB_B67_A.mul_add((12.0f32.mul_add(x, -ARIB_B67_B)).ln(), ARIB_B67_C)
+        ARIB_B67_A.mul_add(
+            fastapprox::fast::ln(12.0f32.mul_add(x, -ARIB_B67_B)),
+            ARIB_B67_C,
+        )
     }
 }
