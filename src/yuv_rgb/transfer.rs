@@ -3,8 +3,6 @@ use av_data::pixel::TransferCharacteristic;
 use debug_unreachable::debug_unreachable;
 use std::slice::{from_raw_parts, from_raw_parts_mut};
 
-use crate::fastmath::powf;
-
 pub trait TransferFunction {
     fn to_linear(&self, input: &[[f32; 3]]) -> Result<Vec<[f32; 3]>>;
     fn to_gamma(&self, input: &[[f32; 3]]) -> Result<Vec<[f32; 3]>>;
@@ -234,7 +232,7 @@ fn rec_709_oetf(x: f32) -> f32 {
         x * 4.5
     } else {
         // REC709_ALPHA * x.powf(0.45) - (REC709_ALPHA - 1.0)
-        REC709_ALPHA.mul_add(powf(x, 0.45), -(REC709_ALPHA - 1.0))
+        REC709_ALPHA.mul_add(fastapprox::fast::pow(x, 0.45), -(REC709_ALPHA - 1.0))
     }
 }
 
@@ -286,7 +284,7 @@ fn srgb_inverse_eotf(x: f32) -> f32 {
         x * 12.92
     } else {
         // SRGB_ALPHA * x.powf(1.0 / 2.4) - (SRGB_ALPHA - 1.0)
-        SRGB_ALPHA.mul_add(powf(x, 1.0 / 2.4), -(SRGB_ALPHA - 1.0))
+        SRGB_ALPHA.mul_add(fastapprox::fast::pow(x, 1.0 / 2.4), -(SRGB_ALPHA - 1.0))
     }
 }
 
