@@ -149,7 +149,7 @@ fn log100_inverse_oetf(x: f32) -> f32 {
     if x <= 0.0 {
         0.01
     } else {
-        powf(10.0, 2.0 * (x - 1.0))
+        fastapprox::fast::pow(10.0, 2.0 * (x - 1.0))
     }
 }
 
@@ -167,7 +167,7 @@ fn log316_inverse_oetf(x: f32) -> f32 {
     if x <= 0.0 {
         0.003_162_277_6
     } else {
-        powf(10.0, 2.5 * (x - 1.0))
+        fastapprox::fast::pow(10.0, 2.5 * (x - 1.0))
     }
 }
 
@@ -177,7 +177,7 @@ fn rec_1886_eotf(x: f32) -> f32 {
     if x < 0.0 {
         0.0
     } else {
-        powf(x, 2.4)
+        fastapprox::fast::pow(x, 2.4)
     }
 }
 
@@ -186,7 +186,7 @@ fn rec_1886_inverse_eotf(x: f32) -> f32 {
     if x < 0.0 {
         0.0
     } else {
-        powf(x, 1.0 / 2.4)
+        fastapprox::fast::pow(x, 1.0 / 2.4)
     }
 }
 
@@ -195,7 +195,7 @@ fn rec_470m_oetf(x: f32) -> f32 {
     if x < 0.0 {
         0.0
     } else {
-        powf(x, 2.2)
+        fastapprox::fast::pow(x, 2.2)
     }
 }
 
@@ -204,7 +204,7 @@ fn rec_470m_inverse_oetf(x: f32) -> f32 {
     if x < 0.0 {
         0.0
     } else {
-        powf(x, 1.0 / 2.2)
+        fastapprox::fast::pow(x, 1.0 / 2.2)
     }
 }
 
@@ -213,7 +213,7 @@ fn rec_470bg_oetf(x: f32) -> f32 {
     if x < 0.0 {
         0.0
     } else {
-        powf(x, 2.8)
+        fastapprox::fast::pow(x, 2.8)
     }
 }
 
@@ -222,7 +222,7 @@ fn rec_470bg_inverse_oetf(x: f32) -> f32 {
     if x < 0.0 {
         0.0
     } else {
-        powf(x, 1.0 / 2.8)
+        fastapprox::fast::pow(x, 1.0 / 2.8)
     }
 }
 
@@ -245,7 +245,7 @@ fn rec_709_inverse_oetf(x: f32) -> f32 {
     if x < 4.5 * REC709_BETA {
         x / 4.5
     } else {
-        powf((x + (REC709_ALPHA - 1.0)) / REC709_ALPHA, 1.0 / 0.45)
+        fastapprox::fast::pow((x + (REC709_ALPHA - 1.0)) / REC709_ALPHA, 1.0 / 0.45)
     }
 }
 
@@ -274,7 +274,7 @@ fn srgb_eotf(x: f32) -> f32 {
     if x < 12.92 * SRGB_BETA {
         x / 12.92
     } else {
-        powf((x + (SRGB_ALPHA - 1.0)) / SRGB_ALPHA, 2.4)
+        fastapprox::fast::pow((x + (SRGB_ALPHA - 1.0)) / SRGB_ALPHA, 2.4)
     }
 }
 
@@ -296,14 +296,14 @@ fn st_2084_inverse_eotf(x: f32) -> f32 {
     // == 0).
 
     if x > 0.0 {
-        let xpow = powf(x, ST2084_M1);
+        let xpow = fastapprox::fast::pow(x, ST2084_M1);
 
         // More stable arrangement that avoids some cancellation error.
         // (ST2084_C1 - 1.0) + (ST2084_C2 - ST2084_C3) * xpow
         let num = (ST2084_C2 - ST2084_C3).mul_add(xpow, ST2084_C1 - 1.0);
         // 1.0 + ST2084_C3 * xpow
         let den = ST2084_C3.mul_add(xpow, 1.0);
-        powf(1.0 + num / den, ST2084_M2)
+        fastapprox::fast::pow(1.0 + num / den, ST2084_M2)
     } else {
         0.0
     }
@@ -322,10 +322,10 @@ fn ootf_st2084(x: f32) -> f32 {
 #[inline(always)]
 fn st_2084_eotf(x: f32) -> f32 {
     if x > 0.0 {
-        let xpow = powf(x, 1.0 / ST2084_M2);
+        let xpow = fastapprox::fast::pow(x, 1.0 / ST2084_M2);
         let num = (xpow - ST2084_C1).max(0.0);
         let den = (ST2084_C2 - ST2084_C3 * xpow).max(f32::EPSILON);
-        powf(num / den, 1.0 / ST2084_M1)
+        fastapprox::fast::pow(num / den, 1.0 / ST2084_M1)
     } else {
         0.0
     }
