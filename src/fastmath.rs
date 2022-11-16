@@ -66,13 +66,22 @@ pub fn cbrtf(x: f32) -> f32 {
     t as f32
 }
 
-// Based on https://jrfonseca.blogspot.com/2008/09/fast-sse2-pow-tables-or-polynomials.html
 #[cfg(not(feature = "fastmath"))]
 #[inline(always)]
 pub fn powf(x: f32, y: f32) -> f32 {
     x.powf(y)
 }
 
+// The following implementation of powf is based on José Fonseca's 
+// polynomial-based implementation, ported to Rust as scalar code
+// so that the compiler can auto-vectorize and otherwise optimize.
+// Original: https://jrfonseca.blogspot.com/2008/09/fast-sse2-pow-tables-or-polynomials.html
+
+/// Computes x raised to the power of y.
+/// 
+/// This optimized approach heavily benefits from FMA instructions being
+/// available on the target platform. Make sure to enable the relevant
+/// CPU feature during compilation.
 #[cfg(feature = "fastmath")]
 pub fn powf(x: f32, y: f32) -> f32 {
     exp2(log2(x) * y)
