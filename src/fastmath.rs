@@ -3,19 +3,6 @@
  * Conversion to float by Ian Lance Taylor, Cygnus Support, ian@cygnus.com.
  * Debugged and optimized by Bruce D. Evans.
  */
-/*
- * ====================================================
- * Copyright (C) 1993 by Sun Microsystems, Inc. All rights reserved.
- *
- * Developed at SunPro, a Sun Microsystems, Inc. business.
- * Permission to use, copy, modify, and distribute this
- * software is freely granted, provided that this notice
- * is preserved.
- * ====================================================
- */
-/* cbrtf(x)
- * Return cube root of x
- */
 
 use core::f32;
 
@@ -27,6 +14,20 @@ use core::f32;
 pub fn cbrtf(x: f32) -> f32 {
     x.cbrt()
 }
+
+// The following copyright notice applies to the optimized cube root
+// function (cbrtf) directly below it:
+
+/*
+ * ====================================================
+ * Copyright (C) 1993 by Sun Microsystems, Inc. All rights reserved.
+ *
+ * Developed at SunPro, a Sun Microsystems, Inc. business.
+ * Permission to use, copy, modify, and distribute this
+ * software is freely granted, provided that this notice
+ * is preserved.
+ * ====================================================
+ */
 
 /// Cube root (f32)
 ///
