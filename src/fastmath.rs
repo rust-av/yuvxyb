@@ -1,23 +1,16 @@
-/* origin: FreeBSD /usr/src/lib/msun/src/s_cbrtf.c */
+use core::f32;
+
+// The following cbrtf implementation is a port of FreeBSDs cbrtf function
+// found in <root>/lib/msun/src/s_cbrtf.c, modified to remove some edge case
+// handling if the argument x is a non-normal float.
+//
+// The description and copyright notice found below apply only to the function
+// cbrtf directly below it.
+
 /*
  * Conversion to float by Ian Lance Taylor, Cygnus Support, ian@cygnus.com.
  * Debugged and optimized by Bruce D. Evans.
  */
-
-use core::f32;
-
-
-/// Cube root (f32)
-///
-/// Computes the cube root of the argument.
-#[cfg(not(feature = "fastmath"))]
-pub fn cbrtf(x: f32) -> f32 {
-    x.cbrt()
-}
-
-// The following copyright notice applies to the optimized cube root
-// function (cbrtf) directly below it:
-
 /*
  * ====================================================
  * Copyright (C) 1993 by Sun Microsystems, Inc. All rights reserved.
@@ -29,14 +22,14 @@ pub fn cbrtf(x: f32) -> f32 {
  * ====================================================
  */
 
-/// Cube root (f32)
-///
 /// Computes the cube root of x.
+/// 
 /// The argument must be normal (not NaN, +/-INF or subnormal).
 /// This is required for optimization purposes.
 #[cfg(feature = "fastmath")]
 pub fn cbrtf(x: f32) -> f32 {
-    const B1: u32 = 709_958_130; /* B1 = (127-127.0/3-0.03306235651)*2**23 */
+    // B1 = (127-127.0/3-0.03306235651)*2**23
+    const B1: u32 = 709_958_130;
 
     let mut r: f64;
     let mut t: f64;
@@ -47,30 +40,20 @@ pub fn cbrtf(x: f32) -> f32 {
     ui &= 0x8000_0000;
     ui |= hx;
 
-    /*
-     * First step Newton iteration (solving t*t-x/t == 0) to 16 bits.  In
-     * double precision so that its terms can be arranged for efficiency
-     * without causing overflow or underflow.
-     */
+    // First step Newton iteration (solving t*t-x/t == 0) to 16 bits.  In
+    // double precision so that its terms can be arranged for efficiency
+    // without causing overflow or underflow.
     t = f64::from(f32::from_bits(ui));
     r = t * t * t;
     t = t * (f64::from(x) + f64::from(x) + r) / (f64::from(x) + r + r);
 
-    /*
-     * Second step Newton iteration to 47 bits.  In double precision for
-     * efficiency and accuracy.
-     */
+    // Second step Newton iteration to 47 bits.  In double precision for
+    // efficiency and accuracy.
     r = t * t * t;
     t = t * (f64::from(x) + f64::from(x) + r) / (f64::from(x) + r + r);
 
-    /* rounding to 24 bits is perfect in round-to-nearest mode */
+    // rounding to 24 bits is perfect in round-to-nearest mode
     t as f32
-}
-
-#[cfg(not(feature = "fastmath"))]
-#[inline(always)]
-pub fn powf(x: f32, y: f32) -> f32 {
-    x.powf(y)
 }
 
 // The following implementation of powf is based on José Fonseca's 
@@ -80,7 +63,7 @@ pub fn powf(x: f32, y: f32) -> f32 {
 
 /// Computes x raised to the power of y.
 /// 
-/// This optimized approach heavily benefits from FMA instructions being
+/// This implementation benefits a lot from FMA instructions being
 /// available on the target platform. Make sure to enable the relevant
 /// CPU feature during compilation.
 #[cfg(feature = "fastmath")]
@@ -169,4 +152,18 @@ fn poly1(x: f32, c0: f32, c1: f32) -> f32 {
 #[inline(always)]
 const fn poly0(_x: f32, c0: f32) -> f32 {
     c0
+}
+
+/// Computes the cube root of x.
+#[cfg(not(feature = "fastmath"))]
+#[inline(always)]
+pub fn cbrtf(x: f32) -> f32 {
+    x.cbrt()
+}
+
+/// Computes x raised to the power of y.
+#[cfg(not(feature = "fastmath"))]
+#[inline(always)]
+pub fn powf(x: f32, y: f32) -> f32 {
+    x.powf(y)
 }
