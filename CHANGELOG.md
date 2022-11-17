@@ -1,3 +1,14 @@
+## Version 0.3.0
+
+- More math optimizations
+- Increase speed and reduce memory usage by converting in place
+  - [Breaking] This required that some of the implementations of `From<&T>` be removed.
+    The recommendation is that crates which were using these and require the input to
+    not be moved should use `from(input.clone())`.
+- Add "slowmath" cargo feature to disable fastmath optimizations
+  - This is intended primarily for development and should not be used in the real world,
+    unless you just like making your crate 5x slower for no good reason.
+
 ## Version 0.2.3
 
 - More optimizations to linear/gamma conversion functions
