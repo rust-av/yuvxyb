@@ -1,9 +1,10 @@
 [package]
 name = "yuvxyb"
 description = "Conversions between YUV (YCbCr), XYB, and other colorspaces"
-version = "0.2.3"
+version = "0.3.0"
 edition = "2021"
 license = "MIT"
+rust-version = "1.61.0"
 documentation = "https://docs.rs/yuvxyb"
 homepage = "https://github.com/rust-av/yuvxyb"
 repository = "https://github.com/rust-av/yuvxyb"
