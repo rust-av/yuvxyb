@@ -47,12 +47,11 @@ pub mod rgb_xyb;
 #[doc(hidden)]
 pub mod yuv_rgb;
 
-#[doc(hidden)]
-pub mod hsl;
-pub mod xyb;
-pub mod yuv;
-pub mod rgb;
-pub mod linear_rgb;
+mod hsl;
+mod xyb;
+mod yuv;
+mod rgb;
+mod linear_rgb;
 
 pub use crate::hsl::Hsl;
 pub use crate::linear_rgb::LinearRgb;
