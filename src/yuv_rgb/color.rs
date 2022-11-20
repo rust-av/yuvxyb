@@ -220,8 +220,8 @@ pub fn rgb_to_yuv<T: Pixel>(
         .collect::<Vec<_>>();
     Ok(ypbpr_to_ycbcr(
         &yuv,
-        width as usize,
-        height as usize,
+        width,
+        height,
         config,
     ))
 }
