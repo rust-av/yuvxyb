@@ -55,7 +55,7 @@ impl<T: Pixel> TryFrom<Yuv<T>> for LinearRgb {
     type Error = anyhow::Error;
 
     fn try_from(yuv: Yuv<T>) -> Result<Self> {
-        LinearRgb::try_from(&yuv)
+        Self::try_from(&yuv)
     }
 }
 

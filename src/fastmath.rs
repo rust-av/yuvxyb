@@ -1,3 +1,7 @@
+#![allow(clippy::cast_possible_wrap)]
+#![allow(clippy::cast_precision_loss)]
+#![allow(clippy::cast_sign_loss)]
+
 use core::f32;
 
 // The following cbrtf implementation is a port of FreeBSDs cbrtf function

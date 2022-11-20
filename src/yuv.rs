@@ -147,7 +147,7 @@ impl<T: Pixel> TryFrom<(Rgb, YuvConfig)> for Yuv<T> {
     type Error = anyhow::Error;
 
     fn try_from(other: (Rgb, YuvConfig)) -> Result<Self> {
-        Yuv::<T>::try_from((&other.0, other.1))
+        Self::try_from((&other.0, other.1))
     }
 }
 

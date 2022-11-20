@@ -54,7 +54,7 @@ impl<T: Pixel> TryFrom<Yuv<T>> for Xyb {
     type Error = anyhow::Error;
 
     fn try_from(yuv: Yuv<T>) -> Result<Self> {
-        Xyb::try_from(&yuv)
+        Self::try_from(&yuv)
     }
 }
 

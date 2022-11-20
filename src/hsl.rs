@@ -70,7 +70,7 @@ impl From<LinearRgb> for Hsl {
             *pix = lrgb_to_hsl(*pix);
         }
 
-        Hsl {
+        Self {
             data,
             width: lrgb.width,
             height: lrgb.height,
@@ -85,7 +85,7 @@ impl From<Hsl> for LinearRgb {
             *pix = hsl_to_lrgb(*pix);
         }
 
-        LinearRgb {
+        Self {
             data,
             width: hsl.width,
             height: hsl.height,

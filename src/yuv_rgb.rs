@@ -3,6 +3,7 @@
 //! XYZ, LMS, and XYB to decrease the number of steps to just YUV -> sRGB ->
 //! Linear RGB -> XYB.
 
+#![allow(clippy::cast_sign_loss)]
 #![allow(clippy::many_single_char_names)]
 
 mod color;
