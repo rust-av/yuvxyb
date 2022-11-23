@@ -39,6 +39,7 @@ impl Xyb {
 
     #[must_use]
     #[inline(always)]
+    #[allow(clippy::missing_const_for_fn)]
     pub fn into_data(self) -> Vec<[f32; 3]> {
         self.data
     }
