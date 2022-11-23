@@ -31,19 +31,15 @@
 #![warn(clippy::use_debug)]
 #![warn(clippy::verbose_file_reads)]
 
-// This is pub and doc hidden so it can be run through cargo asm for
-// optimization easier
 mod fastmath;
-#[doc(hidden)]
-pub mod rgb_xyb;
-#[doc(hidden)]
-pub mod yuv_rgb;
+mod rgb_xyb;
+mod yuv_rgb;
 
 mod hsl;
+mod linear_rgb;
+mod rgb;
 mod xyb;
 mod yuv;
-mod rgb;
-mod linear_rgb;
 
 pub use crate::hsl::Hsl;
 pub use crate::linear_rgb::LinearRgb;
