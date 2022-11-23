@@ -110,8 +110,8 @@ impl<T: Pixel> TryFrom<&Yuv<T>> for Rgb {
             data,
             width: yuv.width(),
             height: yuv.height(),
-            transfer: yuv.config.transfer_characteristics,
-            primaries: yuv.config.color_primaries,
+            transfer: yuv.config().transfer_characteristics,
+            primaries: yuv.config().color_primaries,
         })
     }
 }

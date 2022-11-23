@@ -8,8 +8,8 @@ use crate::{Xyb, LinearRgb, Rgb, yuv_rgb::rgb_to_yuv};
 
 #[derive(Debug, Clone)]
 pub struct Yuv<T: Pixel> {
-    pub(crate) data: Frame<T>,
-    pub(crate) config: YuvConfig,
+    data: Frame<T>,
+    config: YuvConfig,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

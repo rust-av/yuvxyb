@@ -130,10 +130,8 @@ fn ypbpr_to_ycbcr<T: Pixel>(
             }
         }
     }
-    Yuv {
-        data: output,
-        config,
-    }
+
+    Yuv::new(output, config).unwrap()
 }
 
 #[inline(always)]
