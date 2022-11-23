@@ -6,11 +6,11 @@ use crate::{Yuv, LinearRgb, Xyb, yuv_rgb::{yuv_to_rgb, transform_primaries, Tran
 
 #[derive(Debug, Clone)]
 pub struct Rgb {
-    pub(crate) data: Vec<[f32; 3]>,
-    pub(crate) width: usize,
-    pub(crate) height: usize,
-    pub(crate) transfer: TransferCharacteristic,
-    pub(crate) primaries: ColorPrimaries,
+    data: Vec<[f32; 3]>,
+    width: usize,
+    height: usize,
+    transfer: TransferCharacteristic,
+    primaries: ColorPrimaries,
 }
 
 impl Rgb {
@@ -63,6 +63,12 @@ impl Rgb {
 
     #[must_use]
     #[inline(always)]
+    pub fn into_data(self) -> Vec<[f32; 3]> {
+        self.data
+    }
+
+    #[must_use]
+    #[inline(always)]
     pub const fn width(&self) -> usize {
         self.width
     }
@@ -71,6 +77,18 @@ impl Rgb {
     #[inline(always)]
     pub const fn height(&self) -> usize {
         self.height
+    }
+
+    #[must_use]
+    #[inline(always)]
+    pub fn transfer(&self) -> TransferCharacteristic {
+        self.transfer
+    }
+
+    #[must_use]
+    #[inline(always)]
+    pub fn primaries(&self) -> ColorPrimaries {
+        self.primaries
     }
 }
 
@@ -128,13 +146,15 @@ impl TryFrom<(LinearRgb, TransferCharacteristic, ColorPrimaries)> for Rgb {
             log::warn!("Color primaries not specified. Guessing {}", primaries);
         }
 
-        let data = transform_primaries(lrgb.data, ColorPrimaries::BT709, primaries)?;
+        let width = lrgb.width();
+        let height = lrgb.height();
+        let data = transform_primaries(lrgb.into_data(), ColorPrimaries::BT709, primaries)?;
         let data = transfer.to_gamma(data)?;
 
         Ok(Self {
             data,
-            width: lrgb.width,
-            height: lrgb.height,
+            width,
+            height,
             transfer,
             primaries,
         })

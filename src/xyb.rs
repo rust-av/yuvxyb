@@ -5,9 +5,9 @@ use crate::{Yuv, Rgb, LinearRgb, rgb_xyb::linear_rgb_to_xyb};
 
 #[derive(Debug, Clone)]
 pub struct Xyb {
-    pub(crate) data: Vec<[f32; 3]>,
-    pub(crate) width: usize,
-    pub(crate) height: usize,
+    data: Vec<[f32; 3]>,
+    width: usize,
+    height: usize,
 }
 
 impl Xyb {
@@ -35,6 +35,12 @@ impl Xyb {
     #[inline(always)]
     pub fn data_mut(&mut self) -> &mut [[f32; 3]] {
         &mut self.data
+    }
+
+    #[must_use]
+    #[inline(always)]
+    pub fn into_data(self) -> Vec<[f32; 3]> {
+        self.data
     }
 
     #[must_use]
@@ -78,12 +84,14 @@ impl TryFrom<Rgb> for Xyb {
 
 impl From<LinearRgb> for Xyb {
     fn from(lrgb: LinearRgb) -> Self {
-        let data = linear_rgb_to_xyb(lrgb.data);
+        let width = lrgb.width();
+        let height = lrgb.height();
+        let data = linear_rgb_to_xyb(lrgb.into_data());
 
         Self {
             data,
-            width: lrgb.width,
-            height: lrgb.height,
+            width,
+            height,
         }
     }
 }
