@@ -5,6 +5,7 @@
 
 #![allow(clippy::cast_sign_loss)]
 #![allow(clippy::many_single_char_names)]
+#![allow(clippy::doc_markdown)]
 
 mod color;
 mod transfer;

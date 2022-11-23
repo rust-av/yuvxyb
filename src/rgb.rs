@@ -85,13 +85,13 @@ impl Rgb {
 
     #[must_use]
     #[inline(always)]
-    pub fn transfer(&self) -> TransferCharacteristic {
+    pub const fn transfer(&self) -> TransferCharacteristic {
         self.transfer
     }
 
     #[must_use]
     #[inline(always)]
-    pub fn primaries(&self) -> ColorPrimaries {
+    pub const fn primaries(&self) -> ColorPrimaries {
         self.primaries
     }
 }
