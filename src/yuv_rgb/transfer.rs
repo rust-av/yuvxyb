@@ -15,11 +15,9 @@ impl TransferFunction for TransferCharacteristic {
         Ok(match *self {
             Self::Logarithmic100 => image_log100_inverse_oetf(input),
             Self::Logarithmic316 => image_log316_inverse_oetf(input),
-            Self::BT1886
-            | Self::ST170M
-            | Self::ST240M
-            | Self::BT2020Ten
-            | Self::BT2020Twelve => image_rec_1886_eotf(input),
+            Self::BT1886 | Self::ST170M | Self::ST240M | Self::BT2020Ten | Self::BT2020Twelve => {
+                image_rec_1886_eotf(input)
+            }
             Self::BT470M => image_rec_470m_oetf(input),
             Self::BT470BG => image_rec_470bg_oetf(input),
             Self::XVYCC => image_xvycc_eotf(input),
@@ -28,10 +26,7 @@ impl TransferFunction for TransferCharacteristic {
             Self::HybridLogGamma => image_arib_b67_inverse_oetf(input),
             Self::Linear => input,
             // Unsupported
-            Self::Reserved0
-            | Self::Reserved
-            | Self::BT1361E
-            | Self::ST428 => {
+            Self::Reserved0 | Self::Reserved | Self::BT1361E | Self::ST428 => {
                 bail!("Cannot convert YUV<->RGB using this transfer function")
             }
             // SAFETY: We guess any unspecified data when beginning conversion
@@ -44,11 +39,9 @@ impl TransferFunction for TransferCharacteristic {
         Ok(match *self {
             Self::Logarithmic100 => image_log100_oetf(input),
             Self::Logarithmic316 => image_log316_oetf(input),
-            Self::BT1886
-            | Self::ST170M
-            | Self::ST240M
-            | Self::BT2020Ten
-            | Self::BT2020Twelve => image_rec_1886_inverse_eotf(input),
+            Self::BT1886 | Self::ST170M | Self::ST240M | Self::BT2020Ten | Self::BT2020Twelve => {
+                image_rec_1886_inverse_eotf(input)
+            }
             Self::BT470M => image_rec_470m_inverse_oetf(input),
             Self::BT470BG => image_rec_470bg_inverse_oetf(input),
             Self::XVYCC => image_xvycc_inverse_eotf(input),
@@ -57,10 +50,7 @@ impl TransferFunction for TransferCharacteristic {
             Self::HybridLogGamma => image_arib_b67_oetf(input),
             Self::Linear => input,
             // Unsupported
-            Self::Reserved0
-            | Self::Reserved
-            | Self::BT1361E
-            | Self::ST428 => {
+            Self::Reserved0 | Self::Reserved | Self::BT1361E | Self::ST428 => {
                 bail!("Cannot convert YUV<->RGB using this transfer function")
             }
             // SAFETY: We guess any unspecified data when beginning conversion

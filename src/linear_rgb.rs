@@ -2,7 +2,11 @@ use anyhow::{bail, Result};
 use av_data::pixel::ColorPrimaries;
 use v_frame::prelude::Pixel;
 
-use crate::{Rgb, Yuv, yuv_rgb::{transform_primaries, TransferFunction}, rgb_xyb::xyb_to_linear_rgb, Xyb, Hsl};
+use crate::{
+    rgb_xyb::xyb_to_linear_rgb,
+    yuv_rgb::{transform_primaries, TransferFunction},
+    Hsl, Rgb, Xyb, Yuv,
+};
 
 #[derive(Debug, Clone)]
 pub struct LinearRgb {

@@ -1,8 +1,11 @@
-use anyhow::{Result, bail};
-use av_data::pixel::{TransferCharacteristic, ColorPrimaries};
+use anyhow::{bail, Result};
+use av_data::pixel::{ColorPrimaries, TransferCharacteristic};
 use v_frame::prelude::Pixel;
 
-use crate::{Yuv, LinearRgb, Xyb, yuv_rgb::{yuv_to_rgb, transform_primaries, TransferFunction}};
+use crate::{
+    yuv_rgb::{transform_primaries, yuv_to_rgb, TransferFunction},
+    LinearRgb, Xyb, Yuv,
+};
 
 #[derive(Debug, Clone)]
 pub struct Rgb {

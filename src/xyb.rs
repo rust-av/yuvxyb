@@ -1,7 +1,7 @@
 use anyhow::{bail, Result};
 use v_frame::prelude::Pixel;
 
-use crate::{Yuv, Rgb, LinearRgb, rgb_xyb::linear_rgb_to_xyb};
+use crate::{rgb_xyb::linear_rgb_to_xyb, LinearRgb, Rgb, Yuv};
 
 #[derive(Debug, Clone)]
 pub struct Xyb {

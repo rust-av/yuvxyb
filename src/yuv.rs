@@ -1,10 +1,10 @@
 use std::mem::size_of;
 
-use anyhow::{Result, bail};
-use av_data::pixel::{TransferCharacteristic, ColorPrimaries, MatrixCoefficients};
-use v_frame::{prelude::Pixel, frame::Frame, plane::Plane};
+use anyhow::{bail, Result};
+use av_data::pixel::{ColorPrimaries, MatrixCoefficients, TransferCharacteristic};
+use v_frame::{frame::Frame, plane::Plane, prelude::Pixel};
 
-use crate::{Xyb, LinearRgb, Rgb, yuv_rgb::rgb_to_yuv};
+use crate::{yuv_rgb::rgb_to_yuv, LinearRgb, Rgb, Xyb};
 
 #[derive(Debug, Clone)]
 pub struct Yuv<T: Pixel> {
