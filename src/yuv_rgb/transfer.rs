@@ -13,58 +13,48 @@ pub trait TransferFunction {
 impl TransferFunction for TransferCharacteristic {
     fn to_linear(&self, input: Vec<[f32; 3]>) -> Result<Vec<[f32; 3]>> {
         Ok(match *self {
-            TransferCharacteristic::Logarithmic100 => image_log100_inverse_oetf(input),
-            TransferCharacteristic::Logarithmic316 => image_log316_inverse_oetf(input),
-            TransferCharacteristic::BT1886
-            | TransferCharacteristic::ST170M
-            | TransferCharacteristic::ST240M
-            | TransferCharacteristic::BT2020Ten
-            | TransferCharacteristic::BT2020Twelve => image_rec_1886_eotf(input),
-            TransferCharacteristic::BT470M => image_rec_470m_oetf(input),
-            TransferCharacteristic::BT470BG => image_rec_470bg_oetf(input),
-            TransferCharacteristic::XVYCC => image_xvycc_eotf(input),
-            TransferCharacteristic::SRGB => image_srgb_eotf(input),
-            TransferCharacteristic::PerceptualQuantizer => image_st_2084_inverse_oetf(input),
-            TransferCharacteristic::HybridLogGamma => image_arib_b67_inverse_oetf(input),
-            TransferCharacteristic::Linear => input,
+            Self::Logarithmic100 => image_log100_inverse_oetf(input),
+            Self::Logarithmic316 => image_log316_inverse_oetf(input),
+            Self::BT1886 | Self::ST170M | Self::ST240M | Self::BT2020Ten | Self::BT2020Twelve => {
+                image_rec_1886_eotf(input)
+            }
+            Self::BT470M => image_rec_470m_oetf(input),
+            Self::BT470BG => image_rec_470bg_oetf(input),
+            Self::XVYCC => image_xvycc_eotf(input),
+            Self::SRGB => image_srgb_eotf(input),
+            Self::PerceptualQuantizer => image_st_2084_inverse_oetf(input),
+            Self::HybridLogGamma => image_arib_b67_inverse_oetf(input),
+            Self::Linear => input,
             // Unsupported
-            TransferCharacteristic::Reserved0
-            | TransferCharacteristic::Reserved
-            | TransferCharacteristic::BT1361E
-            | TransferCharacteristic::ST428 => {
+            Self::Reserved0 | Self::Reserved | Self::BT1361E | Self::ST428 => {
                 bail!("Cannot convert YUV<->RGB using this transfer function")
             }
             // SAFETY: We guess any unspecified data when beginning conversion
-            TransferCharacteristic::Unspecified => unsafe { debug_unreachable!() },
+            Self::Unspecified => unsafe { debug_unreachable!() },
         })
     }
 
     #[allow(clippy::too_many_lines)]
     fn to_gamma(&self, input: Vec<[f32; 3]>) -> Result<Vec<[f32; 3]>> {
         Ok(match *self {
-            TransferCharacteristic::Logarithmic100 => image_log100_oetf(input),
-            TransferCharacteristic::Logarithmic316 => image_log316_oetf(input),
-            TransferCharacteristic::BT1886
-            | TransferCharacteristic::ST170M
-            | TransferCharacteristic::ST240M
-            | TransferCharacteristic::BT2020Ten
-            | TransferCharacteristic::BT2020Twelve => image_rec_1886_inverse_eotf(input),
-            TransferCharacteristic::BT470M => image_rec_470m_inverse_oetf(input),
-            TransferCharacteristic::BT470BG => image_rec_470bg_inverse_oetf(input),
-            TransferCharacteristic::XVYCC => image_xvycc_inverse_eotf(input),
-            TransferCharacteristic::SRGB => image_srgb_inverse_eotf(input),
-            TransferCharacteristic::PerceptualQuantizer => image_st_2084_oetf(input),
-            TransferCharacteristic::HybridLogGamma => image_arib_b67_oetf(input),
-            TransferCharacteristic::Linear => input,
+            Self::Logarithmic100 => image_log100_oetf(input),
+            Self::Logarithmic316 => image_log316_oetf(input),
+            Self::BT1886 | Self::ST170M | Self::ST240M | Self::BT2020Ten | Self::BT2020Twelve => {
+                image_rec_1886_inverse_eotf(input)
+            }
+            Self::BT470M => image_rec_470m_inverse_oetf(input),
+            Self::BT470BG => image_rec_470bg_inverse_oetf(input),
+            Self::XVYCC => image_xvycc_inverse_eotf(input),
+            Self::SRGB => image_srgb_inverse_eotf(input),
+            Self::PerceptualQuantizer => image_st_2084_oetf(input),
+            Self::HybridLogGamma => image_arib_b67_oetf(input),
+            Self::Linear => input,
             // Unsupported
-            TransferCharacteristic::Reserved0
-            | TransferCharacteristic::Reserved
-            | TransferCharacteristic::BT1361E
-            | TransferCharacteristic::ST428 => {
+            Self::Reserved0 | Self::Reserved | Self::BT1361E | Self::ST428 => {
                 bail!("Cannot convert YUV<->RGB using this transfer function")
             }
             // SAFETY: We guess any unspecified data when beginning conversion
-            TransferCharacteristic::Unspecified => unsafe { debug_unreachable!() },
+            Self::Unspecified => unsafe { debug_unreachable!() },
         })
     }
 }

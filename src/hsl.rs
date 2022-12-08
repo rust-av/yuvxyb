@@ -52,6 +52,13 @@ impl Hsl {
 
     #[must_use]
     #[inline(always)]
+    #[allow(clippy::missing_const_for_fn)]
+    pub fn into_data(self) -> Vec<[f32; 3]> {
+        self.data
+    }
+
+    #[must_use]
+    #[inline(always)]
     pub const fn width(&self) -> usize {
         self.width
     }
@@ -65,30 +72,17 @@ impl Hsl {
 
 impl From<LinearRgb> for Hsl {
     fn from(lrgb: LinearRgb) -> Self {
-        let mut data = lrgb.data;
+        let width = lrgb.width();
+        let height = lrgb.height();
+        let mut data = lrgb.into_data();
         for pix in &mut data {
             *pix = lrgb_to_hsl(*pix);
         }
 
-        Hsl {
+        Self {
             data,
-            width: lrgb.width,
-            height: lrgb.height,
-        }
-    }
-}
-
-impl From<Hsl> for LinearRgb {
-    fn from(hsl: Hsl) -> Self {
-        let mut data = hsl.data;
-        for pix in &mut data {
-            *pix = hsl_to_lrgb(*pix);
-        }
-
-        LinearRgb {
-            data,
-            width: hsl.width,
-            height: hsl.height,
+            width,
+            height,
         }
     }
 }
@@ -116,26 +110,4 @@ fn lrgb_to_hsl(rgb: [f32; 3]) -> [f32; 3] {
         (2.0 * (v - l)) / (1.0 - (2.0 * l - 1.0).abs())
     };
     [h, s, l]
-}
-
-#[inline(always)]
-fn hsl_to_lrgb(hsl: [f32; 3]) -> [f32; 3] {
-    let c = (1.0 - (2.0 * hsl[2] - 1.0).abs()) * hsl[1];
-    let h_prime = hsl[0] / 60.0;
-    let x = c * (1.0 - (h_prime % 2.0 - 1.0).abs());
-    let (r1, g1, b1) = if (0.0..1.0).contains(&h_prime) {
-        (c, x, 0.0)
-    } else if (1.0..2.0).contains(&h_prime) {
-        (x, c, 0.0)
-    } else if (2.0..3.0).contains(&h_prime) {
-        (0.0, c, x)
-    } else if (3.0..4.0).contains(&h_prime) {
-        (0.0, x, c)
-    } else if (4.0..5.0).contains(&h_prime) {
-        (x, 0.0, c)
-    } else {
-        (c, 0.0, x)
-    };
-    let m = hsl[2] - c / 2.0;
-    [r1 + m, g1 + m, b1 + m]
 }

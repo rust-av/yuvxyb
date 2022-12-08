@@ -1,3 +1,7 @@
+#![allow(clippy::cast_possible_wrap)]
+#![allow(clippy::cast_precision_loss)]
+#![allow(clippy::cast_sign_loss)]
+
 use core::f32;
 
 // The following cbrtf implementation is a port of FreeBSDs cbrtf function
@@ -23,7 +27,7 @@ use core::f32;
  */
 
 /// Computes the cube root of x.
-/// 
+///
 /// The argument must be normal (not NaN, +/-INF or subnormal).
 /// This is required for optimization purposes.
 #[cfg(feature = "fastmath")]
@@ -56,13 +60,13 @@ pub fn cbrtf(x: f32) -> f32 {
     t as f32
 }
 
-// The following implementation of powf is based on José Fonseca's 
+// The following implementation of powf is based on José Fonseca's
 // polynomial-based implementation, ported to Rust as scalar code
 // so that the compiler can auto-vectorize and otherwise optimize.
 // Original: https://jrfonseca.blogspot.com/2008/09/fast-sse2-pow-tables-or-polynomials.html
 
 /// Computes x raised to the power of y.
-/// 
+///
 /// This implementation benefits a lot from FMA instructions being
 /// available on the target platform. Make sure to enable the relevant
 /// CPU feature during compilation.

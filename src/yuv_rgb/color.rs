@@ -218,12 +218,7 @@ pub fn rgb_to_yuv<T: Pixel>(
             [res[0], res[1], res[2]]
         })
         .collect::<Vec<_>>();
-    Ok(ypbpr_to_ycbcr(
-        &yuv,
-        width as usize,
-        height as usize,
-        config,
-    ))
+    Ok(ypbpr_to_ycbcr(&yuv, width, height, config))
 }
 
 pub fn transform_primaries(

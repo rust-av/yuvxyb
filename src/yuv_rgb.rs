@@ -3,7 +3,9 @@
 //! XYZ, LMS, and XYB to decrease the number of steps to just YUV -> sRGB ->
 //! Linear RGB -> XYB.
 
+#![allow(clippy::cast_sign_loss)]
 #![allow(clippy::many_single_char_names)]
+#![allow(clippy::doc_markdown)]
 
 mod color;
 mod transfer;
@@ -129,10 +131,8 @@ fn ypbpr_to_ycbcr<T: Pixel>(
             }
         }
     }
-    Yuv {
-        data: output,
-        config,
-    }
+
+    Yuv::new(output, config).unwrap()
 }
 
 #[inline(always)]
