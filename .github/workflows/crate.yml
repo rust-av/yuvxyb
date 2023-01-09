@@ -2,9 +2,15 @@ name: Crate
 
 on:
   push:
-    branches: ["main"]
+    paths-ignore:
+      - "*.yml"
+      - .gitignore
+      - "*.md"
   pull_request:
-    branches: ["main"]
+    paths-ignore:
+      - "*.yml"
+      - .gitignore
+      - "*.md"
 
 env:
   CARGO_TERM_COLOR: always
@@ -15,9 +21,34 @@ jobs:
 
     steps:
       - uses: actions/checkout@v3
+
+      - name: Set up cargo cache
+        uses: actions/cache@v3
+        continue-on-error: false
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/
+            ~/.cargo/git/
+            target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-
+
       - name: Lint
         run: cargo clippy --verbose -- -D warnings
+      
       - name: Build
         run: cargo build --verbose
+      
       - name: Run tests
         run: cargo test --verbose
+      
+      - name: Benchmark
+        if: ${{ github.event_name != 'pull_request' }}
+        run: cargo bench --verbose
+
+      - name: PR Benchmark
+        if: github.event_name == 'pull_request'
+        uses: boa-dev/criterion-compare-action@v3
+        with:
+          branchName: ${{ github.base_ref }}
