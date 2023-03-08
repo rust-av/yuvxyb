@@ -120,8 +120,8 @@ pub fn get_yuv_constants(matrix: MatrixCoefficients) -> Result<(f32, f32)> {
 pub fn ncl_rgb_to_yuv_matrix_from_kr_kb(kr: f32, kb: f32) -> Matrix3<f32> {
     let mut ret = [0.0; 9];
     let kg = 1.0 - kr - kb;
-    let uscale = 1.0 / (2.0 - 2.0 * kb);
-    let vscale = 1.0 / (2.0 - 2.0 * kr);
+    let uscale = 1.0 / 2.0f32.mul_add(-kb, 2.0);
+    let vscale = 1.0 / 2.0f32.mul_add(-kr, 2.0);
 
     ret[0] = kr;
     ret[1] = kg;

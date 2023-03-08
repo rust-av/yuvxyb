@@ -107,7 +107,7 @@ fn lrgb_to_hsl(rgb: [f32; 3]) -> [f32; 3] {
     let s = if l.abs() < f32::EPSILON || (l - 1.0).abs() < f32::EPSILON {
         0.0
     } else {
-        (2.0 * (v - l)) / (1.0 - (2.0 * l - 1.0).abs())
+        (2.0 * (v - l)) / (1.0 - 2.0f32.mul_add(l, -1.0).abs())
     };
     [h, s, l]
 }
