@@ -291,17 +291,13 @@ mod tests {
             let result = to_f32_luma(input, scale, offset);
             assert!(
                 (output - result).abs() < 0.0005,
-                "Result {:.6} differed from expected {:.6}",
-                result,
-                output
+                "Result {result:.6} differed from expected {output:.6}"
             );
             let (scale, offset) = get_scale_offset::<false>(bd, full_range, false);
             let result: u8 = from_f32_luma(result, scale, offset, bd);
             assert!(
                 input == result,
-                "Result {} differed from expected {}",
-                result,
-                input
+                "Result {result} differed from expected {input}"
             );
         }
     }
@@ -335,18 +331,14 @@ mod tests {
             let result = to_f32_luma(input, scale, offset);
             assert!(
                 (output - result).abs() < 0.0005,
-                "Result {:.6} differed from expected {:.6}",
-                result,
-                output
+                "Result {result:.6} differed from expected {output:.6}"
             );
             let (scale, offset) = get_scale_offset::<false>(bd, full_range, false);
             let result: u8 = from_f32_luma(result, scale, offset, bd);
             let expected = clamp(input, 16, 235);
             assert!(
                 expected == result,
-                "Result {} differed from expected {}",
-                result,
-                input
+                "Result {result} differed from expected {input}"
             );
         }
     }
@@ -380,17 +372,13 @@ mod tests {
             let result = to_f32_chroma(input, scale, offset);
             assert!(
                 (output - result).abs() < 0.0005,
-                "Result {:.6} differed from expected {:.6}",
-                result,
-                output
+                "Result {result:.6} differed from expected {output:.6}"
             );
             let (scale, offset) = get_scale_offset::<false>(bd, full_range, true);
             let result: u8 = from_f32_chroma(result, scale, offset, bd, full_range);
             assert!(
                 input == result,
-                "Result {} differed from expected {}",
-                result,
-                input
+                "Result {result} differed from expected {input}"
             );
         }
     }
@@ -424,18 +412,14 @@ mod tests {
             let result = to_f32_chroma(input, scale, offset);
             assert!(
                 (output - result).abs() < 0.0005,
-                "Result {:.6} differed from expected {:.6}",
-                result,
-                output
+                "Result {result:.6} differed from expected {output:.6}"
             );
             let (scale, offset) = get_scale_offset::<false>(bd, full_range, true);
             let result: u8 = from_f32_chroma(result, scale, offset, bd, full_range);
             let expected = clamp(input, 16, 240);
             assert!(
                 expected == result,
-                "Result {} differed from expected {}",
-                result,
-                input
+                "Result {result} differed from expected {input}"
             );
         }
     }
@@ -480,17 +464,13 @@ mod tests {
             let result = to_f32_luma(input, scale, offset);
             assert!(
                 (output - result).abs() < 0.0005,
-                "Result {:.6} differed from expected {:.6}",
-                result,
-                output
+                "Result {result:.6} differed from expected {output:.6}"
             );
             let (scale, offset) = get_scale_offset::<false>(bd, full_range, false);
             let result: u16 = from_f32_luma(result, scale, offset, bd);
             assert!(
                 input == result,
-                "Result {} differed from expected {}",
-                result,
-                input
+                "Result {result} differed from expected {input}"
             );
         }
     }
@@ -535,18 +515,14 @@ mod tests {
             let result = to_f32_luma(input, scale, offset);
             assert!(
                 (output - result).abs() < 0.0005,
-                "Result {:.6} differed from expected {:.6}",
-                result,
-                output
+                "Result {result:.6} differed from expected {output:.6}"
             );
             let (scale, offset) = get_scale_offset::<false>(bd, full_range, false);
             let result: u16 = from_f32_luma(result, scale, offset, bd);
             let expected = clamp(input, 16 << 2u8, 235 << 2u8);
             assert!(
                 expected == result,
-                "Result {} differed from expected {}",
-                result,
-                input
+                "Result {result} differed from expected {input}"
             );
         }
     }
@@ -591,17 +567,13 @@ mod tests {
             let result = to_f32_chroma(input, scale, offset);
             assert!(
                 (output - result).abs() < 0.0005,
-                "Result {:.6} differed from expected {:.6}",
-                result,
-                output
+                "Result {result:.6} differed from expected {output:.6}"
             );
             let (scale, offset) = get_scale_offset::<false>(bd, full_range, true);
             let result: u16 = from_f32_chroma(result, scale, offset, bd, full_range);
             assert!(
                 input == result,
-                "Result {} differed from expected {}",
-                result,
-                input
+                "Result {result} differed from expected {input}"
             );
         }
     }
@@ -646,18 +618,14 @@ mod tests {
             let result = to_f32_chroma(input, scale, offset);
             assert!(
                 (output - result).abs() < 0.0005,
-                "Result {:.6} differed from expected {:.6}",
-                result,
-                output
+                "Result {result:.6} differed from expected {output:.6}"
             );
             let (scale, offset) = get_scale_offset::<false>(bd, full_range, true);
             let result: u16 = from_f32_chroma(result, scale, offset, bd, full_range);
             let expected = clamp(input, 16 << 2u8, 240 << 2u8);
             assert!(
                 expected == result,
-                "Result {} differed from expected {}",
-                result,
-                input
+                "Result {result} differed from expected {input}"
             );
         }
     }

@@ -132,7 +132,7 @@ impl From<Hsl> for LinearRgb {
 
 #[inline(always)]
 fn hsl_to_lrgb(hsl: [f32; 3]) -> [f32; 3] {
-    let c = (1.0 - (2.0 * hsl[2] - 1.0).abs()) * hsl[1];
+    let c = (1.0 - 2.0f32.mul_add(hsl[2], -1.0).abs()) * hsl[1];
     let h_prime = hsl[0] / 60.0;
     let x = c * (1.0 - (h_prime % 2.0 - 1.0).abs());
     let (r1, g1, b1) = if (0.0..1.0).contains(&h_prime) {

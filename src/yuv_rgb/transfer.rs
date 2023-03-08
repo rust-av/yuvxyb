@@ -307,7 +307,7 @@ fn st_2084_eotf(x: f32) -> f32 {
     if x > 0.0 {
         let xpow = powf(x, 1.0 / ST2084_M2);
         let num = (xpow - ST2084_C1).max(0.0);
-        let den = (ST2084_C2 - ST2084_C3 * xpow).max(f32::EPSILON);
+        let den = ST2084_C3.mul_add(-xpow, ST2084_C2).max(f32::EPSILON);
         powf(num / den, 1.0 / ST2084_M1)
     } else {
         0.0
