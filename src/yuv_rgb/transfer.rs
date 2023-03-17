@@ -3,7 +3,7 @@ use av_data::pixel::TransferCharacteristic;
 use debug_unreachable::debug_unreachable;
 use std::slice::from_raw_parts_mut;
 
-use crate::fastmath::{powf, expf};
+use crate::math::{powf, expf};
 
 pub trait TransferFunction {
     fn to_linear(&self, input: Vec<[f32; 3]>) -> Result<Vec<[f32; 3]>>;

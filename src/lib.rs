@@ -31,7 +31,7 @@
 #![warn(clippy::use_debug)]
 #![warn(clippy::verbose_file_reads)]
 
-mod fastmath;
+mod math;
 mod rgb_xyb;
 mod yuv_rgb;
 
