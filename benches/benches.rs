@@ -194,6 +194,23 @@ fn bench_yuv_10b_420_limited_to_xyb(c: &mut Criterion) {
     });
 }
 
+fn bench_hybrid_log_gamma(c: &mut Criterion) {
+    c.bench_function("rgb to lrgb via hybrid log-gamma system", |b| {
+        let input = {
+            let yuv = make_yuv_10b(
+                (1, 1),
+                false,
+                MatrixCoefficients::BT2020NonConstantLuminance,
+                TransferCharacteristic::HybridLogGamma,
+                ColorPrimaries::BT2020,
+            );
+            Rgb::try_from(&yuv).unwrap()
+        };
+
+        b.iter(|| LinearRgb::try_from(black_box(input.clone())).unwrap())
+    });
+}
+
 criterion_group!(
     benches,
     bench_yuv_8b_444_full_to_xyb,
@@ -201,6 +218,7 @@ criterion_group!(
     bench_yuv_8b_420_limited_to_xyb,
     bench_yuv_10b_444_full_to_xyb,
     bench_yuv_10b_420_full_to_xyb,
-    bench_yuv_10b_420_limited_to_xyb
+    bench_yuv_10b_420_limited_to_xyb,
+    bench_hybrid_log_gamma,
 );
 criterion_main!(benches);
