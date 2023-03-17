@@ -158,6 +158,18 @@ const fn poly0(_x: f32, c0: f32) -> f32 {
     c0
 }
 
+// Based on a C implementation from stackoverflow:
+// https://stackoverflow.com/a/10792321/9727602
+
+/// Computes e raised to the power of x.
+#[cfg(feature = "fastmath")]
+pub fn expf(x: f32) -> f32 {
+    let t = 1.442_695_041 * x; // log2(e) * x
+    let ft = t.floor();
+    let f = t - ft;
+    exp2(ft) * exp2(f)
+}
+
 /// Computes the cube root of x.
 #[cfg(not(feature = "fastmath"))]
 #[inline(always)]
@@ -170,4 +182,11 @@ pub fn cbrtf(x: f32) -> f32 {
 #[inline(always)]
 pub fn powf(x: f32, y: f32) -> f32 {
     x.powf(y)
+}
+
+/// Computes e raised to the power of x.
+#[cfg(not(feature = "fastmath"))]
+#[inline(always)]
+pub fn expf(x: f32) -> f32 {
+    x.exp()
 }
