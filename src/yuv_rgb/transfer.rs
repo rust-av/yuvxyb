@@ -331,7 +331,7 @@ fn arib_b67_inverse_oetf(x: f32) -> f32 {
     if x <= 0.5 {
         (x * x) * (1.0 / 3.0)
     } else {
-        expf(((x - ARIB_B67_C) / ARIB_B67_A) + ARIB_B67_B) / 12.0
+        (expf((x - ARIB_B67_C) / ARIB_B67_A) + ARIB_B67_B) / 12.0
     }
 }
 
