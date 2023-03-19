@@ -3,6 +3,19 @@
 #![allow(clippy::cast_sign_loss)]
 
 use core::f32;
+use core::f32::consts::LOG2_E;
+
+/// Computes the cube root of x.
+/// 
+/// The argument must be normal (not NaN, +/-INF or subnormal).
+/// This is required for optimization purposes.
+pub fn cbrtf(x: f32) -> f32 {
+    if cfg!(feature = "fastmath") {
+        cbrtf_fast(x)
+    } else {
+        x.cbrt()
+    }
+}
 
 // The following cbrtf implementation is a port of FreeBSDs cbrtf function
 // found in <root>/lib/msun/src/s_cbrtf.c, modified to remove some edge case
@@ -25,13 +38,7 @@ use core::f32;
  * is preserved.
  * ====================================================
  */
-
-/// Computes the cube root of x.
-///
-/// The argument must be normal (not NaN, +/-INF or subnormal).
-/// This is required for optimization purposes.
-#[cfg(feature = "fastmath")]
-pub fn cbrtf(x: f32) -> f32 {
+fn cbrtf_fast(x: f32) -> f32 {
     // B1 = (127-127.0/3-0.03306235651)*2**23
     const B1: u32 = 709_958_130;
 
@@ -60,6 +67,7 @@ pub fn cbrtf(x: f32) -> f32 {
     t as f32
 }
 
+
 // The following implementation of powf is based on José Fonseca's
 // polynomial-based implementation, ported to Rust as scalar code
 // so that the compiler can auto-vectorize and otherwise optimize.
@@ -70,12 +78,14 @@ pub fn cbrtf(x: f32) -> f32 {
 /// This implementation benefits a lot from FMA instructions being
 /// available on the target platform. Make sure to enable the relevant
 /// CPU feature during compilation.
-#[cfg(feature = "fastmath")]
 pub fn powf(x: f32, y: f32) -> f32 {
-    exp2(log2(x) * y)
+    if cfg!(feature = "fastmath") {
+        exp2(log2(x) * y)
+    } else {
+        x.powf(y)
+    }
 }
 
-#[cfg(feature = "fastmath")]
 fn exp2(x: f32) -> f32 {
     let x = x.clamp(-126.99999, 129.0);
 
@@ -97,7 +107,6 @@ fn exp2(x: f32) -> f32 {
     expi * expf
 }
 
-#[cfg(feature = "fastmath")]
 fn log2(x: f32) -> f32 {
     let expmask = 0x7F80_0000_i32;
     let mantmask = 0x007F_FFFF_i32;
@@ -122,52 +131,47 @@ fn log2(x: f32) -> f32 {
     polynomial + exp
 }
 
-#[cfg(feature = "fastmath")]
 #[inline(always)]
 fn poly5(x: f32, c0: f32, c1: f32, c2: f32, c3: f32, c4: f32, c5: f32) -> f32 {
     x.mul_add(poly4(x, c1, c2, c3, c4, c5), c0)
 }
 
-#[cfg(feature = "fastmath")]
 #[inline(always)]
 fn poly4(x: f32, c0: f32, c1: f32, c2: f32, c3: f32, c4: f32) -> f32 {
     x.mul_add(poly3(x, c1, c2, c3, c4), c0)
 }
 
-#[cfg(feature = "fastmath")]
 #[inline(always)]
 fn poly3(x: f32, c0: f32, c1: f32, c2: f32, c3: f32) -> f32 {
     x.mul_add(poly2(x, c1, c2, c3), c0)
 }
 
-#[cfg(feature = "fastmath")]
 #[inline(always)]
 fn poly2(x: f32, c0: f32, c1: f32, c2: f32) -> f32 {
     x.mul_add(poly1(x, c1, c2), c0)
 }
 
-#[cfg(feature = "fastmath")]
 #[inline(always)]
 fn poly1(x: f32, c0: f32, c1: f32) -> f32 {
     x.mul_add(poly0(x, c1), c0)
 }
 
-#[cfg(feature = "fastmath")]
 #[inline(always)]
 const fn poly0(_x: f32, c0: f32) -> f32 {
     c0
 }
 
-/// Computes the cube root of x.
-#[cfg(not(feature = "fastmath"))]
-#[inline(always)]
-pub fn cbrtf(x: f32) -> f32 {
-    x.cbrt()
-}
+// Based on a C implementation from stackoverflow:
+// https://stackoverflow.com/a/10792321/9727602
 
-/// Computes x raised to the power of y.
-#[cfg(not(feature = "fastmath"))]
-#[inline(always)]
-pub fn powf(x: f32, y: f32) -> f32 {
-    x.powf(y)
+/// Computes e raised to the power of x.
+pub fn expf(x: f32) -> f32 {
+    if cfg!(feature = "fastmath") {
+        let t = LOG2_E * x;
+        let ft = t.floor();
+        let f = t - ft;
+        exp2(ft) * exp2(f)
+    } else {
+        x.exp()
+    }
 }
