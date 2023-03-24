@@ -13,6 +13,7 @@ exclude = ["test_data", "yuvxyb-dump"]
 [features]
 default = ["fastmath"]
 fastmath = []
+build-acctest = ["image", "plotters"]
 
 [dependencies]
 av-data = "0.4.1"
@@ -23,12 +24,20 @@ paste = "1.0.9"
 thiserror = "1.0.40"
 v_frame = "0.3.0"
 
+# acctest dependencies
+image = { version = "0.24.5", optional = true }
+plotters = { version = "0.3.1", optional = true }
+
 [dev-dependencies]
 criterion = "0.4.0"
-image = "0.24.4"
+image = "0.24.5"
 interpolate_name = "0.2.3"
 rand = "0.8.5"
 
 [[bench]]
 name = "benches"
 harness = false
+
+[[bin]]
+name = "acctest"
+required-features = ["build-acctest"]
