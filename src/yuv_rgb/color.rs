@@ -92,7 +92,7 @@ pub fn get_yuv_constants_from_primaries(
     Ok((kr, kb))
 }
 
-pub fn get_yuv_constants(matrix: MatrixCoefficients) -> Result<(f32, f32), ConversionError> {
+pub const fn get_yuv_constants(matrix: MatrixCoefficients) -> Result<(f32, f32), ConversionError> {
     Ok(match matrix {
         MatrixCoefficients::Identity => (0.0, 0.0),
         MatrixCoefficients::BT470M => (0.3, 0.11),
@@ -135,7 +135,7 @@ pub fn ncl_rgb_to_yuv_matrix_from_kr_kb(kr: f32, kb: f32) -> Matrix3<f32> {
     Matrix3::from_row_slice(&ret)
 }
 
-pub fn get_primaries_xy(primaries: ColorPrimaries) -> Result<[[f32; 2]; 3], ConversionError> {
+pub const fn get_primaries_xy(primaries: ColorPrimaries) -> Result<[[f32; 2]; 3], ConversionError> {
     Ok(match primaries {
         ColorPrimaries::BT470M => [[0.670, 0.330], [0.210, 0.710], [0.140, 0.080]],
         ColorPrimaries::BT470BG => [[0.640, 0.330], [0.290, 0.600], [0.150, 0.060]],
