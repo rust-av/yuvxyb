@@ -1,10 +1,9 @@
-use anyhow::{bail, Result};
 use av_data::pixel::{ColorPrimaries, TransferCharacteristic};
 use v_frame::prelude::Pixel;
 
 use crate::{
     yuv_rgb::{transform_primaries, yuv_to_rgb, TransferFunction},
-    LinearRgb, Xyb, Yuv,
+    ConversionError, CreationError, LinearRgb, Xyb, Yuv,
 };
 
 #[derive(Debug, Clone)]
@@ -25,9 +24,9 @@ impl Rgb {
         height: usize,
         mut transfer: TransferCharacteristic,
         mut primaries: ColorPrimaries,
-    ) -> Result<Self> {
+    ) -> Result<Self, CreationError> {
         if data.len() != width * height {
-            bail!("Data length does not match specified dimensions");
+            return Err(CreationError::ResolutionMismatch);
         }
 
         if transfer == TransferCharacteristic::Unspecified {
@@ -97,17 +96,17 @@ impl Rgb {
 }
 
 impl<T: Pixel> TryFrom<Yuv<T>> for Rgb {
-    type Error = anyhow::Error;
+    type Error = ConversionError;
 
-    fn try_from(yuv: Yuv<T>) -> Result<Self> {
+    fn try_from(yuv: Yuv<T>) -> Result<Self, Self::Error> {
         Self::try_from(&yuv)
     }
 }
 
 impl<T: Pixel> TryFrom<&Yuv<T>> for Rgb {
-    type Error = anyhow::Error;
+    type Error = ConversionError;
 
-    fn try_from(yuv: &Yuv<T>) -> Result<Self> {
+    fn try_from(yuv: &Yuv<T>) -> Result<Self, Self::Error> {
         let data = yuv_to_rgb(yuv)?;
 
         Ok(Self {
@@ -122,18 +121,20 @@ impl<T: Pixel> TryFrom<&Yuv<T>> for Rgb {
 
 // From XYB
 impl TryFrom<(Xyb, TransferCharacteristic, ColorPrimaries)> for Rgb {
-    type Error = anyhow::Error;
+    type Error = ConversionError;
 
-    fn try_from(other: (Xyb, TransferCharacteristic, ColorPrimaries)) -> Result<Self> {
+    fn try_from(other: (Xyb, TransferCharacteristic, ColorPrimaries)) -> Result<Self, Self::Error> {
         let lrgb = LinearRgb::from(other.0);
         Self::try_from((lrgb, other.1, other.2))
     }
 }
 
 impl TryFrom<(LinearRgb, TransferCharacteristic, ColorPrimaries)> for Rgb {
-    type Error = anyhow::Error;
+    type Error = ConversionError;
 
-    fn try_from(other: (LinearRgb, TransferCharacteristic, ColorPrimaries)) -> Result<Self> {
+    fn try_from(
+        other: (LinearRgb, TransferCharacteristic, ColorPrimaries),
+    ) -> Result<Self, Self::Error> {
         let lrgb = other.0;
         let (mut transfer, mut primaries) = (other.1, other.2);
 

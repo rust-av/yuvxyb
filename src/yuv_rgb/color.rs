@@ -1,18 +1,16 @@
-use anyhow::{bail, Result};
 use av_data::pixel::{ColorPrimaries, MatrixCoefficients};
-use debug_unreachable::debug_unreachable;
 use nalgebra::{Matrix1x3, Matrix3, Matrix3x1};
 
 use super::{ycbcr_to_ypbpr, ypbpr_to_ycbcr};
-use crate::{Pixel, Yuv, YuvConfig};
+use crate::{ConversionError, Pixel, Yuv, YuvConfig};
 
-pub fn get_yuv_to_rgb_matrix(config: YuvConfig) -> Result<Matrix3<f32>> {
+pub fn get_yuv_to_rgb_matrix(config: YuvConfig) -> Result<Matrix3<f32>, ConversionError> {
     Ok(get_rgb_to_yuv_matrix(config)?
         .try_inverse()
         .expect("Matrix can be inverted"))
 }
 
-pub fn get_rgb_to_yuv_matrix(config: YuvConfig) -> Result<Matrix3<f32>> {
+pub fn get_rgb_to_yuv_matrix(config: YuvConfig) -> Result<Matrix3<f32>, ConversionError> {
     match config.matrix_coefficients {
         MatrixCoefficients::Identity
         | MatrixCoefficients::BT2020ConstantLuminance
@@ -29,16 +27,14 @@ pub fn get_rgb_to_yuv_matrix(config: YuvConfig) -> Result<Matrix3<f32>> {
         | MatrixCoefficients::BT2020NonConstantLuminance => {
             ncl_rgb_to_yuv_matrix(config.matrix_coefficients)
         }
-        // Unusable
-        MatrixCoefficients::Reserved => {
-            bail!("Cannot convert YUV<->RGB using this transfer function")
-        }
-        // SAFETY: We guess any unspecified data when beginning conversion
-        MatrixCoefficients::Unspecified => unsafe { debug_unreachable!() },
+        MatrixCoefficients::Reserved => Err(ConversionError::UnsupportedMatrixCoefficients),
+        MatrixCoefficients::Unspecified => Err(ConversionError::UnspecifiedMatrixCoefficients),
     }
 }
 
-pub fn ncl_rgb_to_yuv_matrix_from_primaries(primaries: ColorPrimaries) -> Result<Matrix3<f32>> {
+pub fn ncl_rgb_to_yuv_matrix_from_primaries(
+    primaries: ColorPrimaries,
+) -> Result<Matrix3<f32>, ConversionError> {
     match primaries {
         ColorPrimaries::BT709 => ncl_rgb_to_yuv_matrix(MatrixCoefficients::BT709),
         ColorPrimaries::BT2020 => {
@@ -51,7 +47,7 @@ pub fn ncl_rgb_to_yuv_matrix_from_primaries(primaries: ColorPrimaries) -> Result
     }
 }
 
-pub fn ncl_rgb_to_yuv_matrix(matrix: MatrixCoefficients) -> Result<Matrix3<f32>> {
+pub fn ncl_rgb_to_yuv_matrix(matrix: MatrixCoefficients) -> Result<Matrix3<f32>, ConversionError> {
     Ok(match matrix {
         MatrixCoefficients::YCgCo => {
             Matrix3::from_row_slice(&[0.25, 0.5, 0.25, -0.25, 0.5, -0.25, 0.5, 0.0, -0.5])
@@ -74,7 +70,9 @@ pub fn ncl_rgb_to_yuv_matrix(matrix: MatrixCoefficients) -> Result<Matrix3<f32>>
     })
 }
 
-pub fn get_yuv_constants_from_primaries(primaries: ColorPrimaries) -> Result<(f32, f32)> {
+pub fn get_yuv_constants_from_primaries(
+    primaries: ColorPrimaries,
+) -> Result<(f32, f32), ConversionError> {
     // ITU-T H.265 Annex E, Eq (E-22) to (E-27).
     let primaries_xy = get_primaries_xy(primaries)?;
 
@@ -94,7 +92,7 @@ pub fn get_yuv_constants_from_primaries(primaries: ColorPrimaries) -> Result<(f3
     Ok((kr, kb))
 }
 
-pub fn get_yuv_constants(matrix: MatrixCoefficients) -> Result<(f32, f32)> {
+pub fn get_yuv_constants(matrix: MatrixCoefficients) -> Result<(f32, f32), ConversionError> {
     Ok(match matrix {
         MatrixCoefficients::Identity => (0.0, 0.0),
         MatrixCoefficients::BT470M => (0.3, 0.11),
@@ -109,11 +107,10 @@ pub fn get_yuv_constants(matrix: MatrixCoefficients) -> Result<(f32, f32)> {
         | MatrixCoefficients::ST2085
         | MatrixCoefficients::ChromaticityDerivedNonConstantLuminance
         | MatrixCoefficients::ChromaticityDerivedConstantLuminance
-        | MatrixCoefficients::ICtCp => {
-            bail!("Cannot convert YUV<->RGB using these matrix coefficients")
+        | MatrixCoefficients::ICtCp => return Err(ConversionError::UnsupportedMatrixCoefficients),
+        MatrixCoefficients::Unspecified => {
+            return Err(ConversionError::UnspecifiedMatrixCoefficients)
         }
-        // SAFETY: We guess any unspecified data when beginning conversion
-        MatrixCoefficients::Unspecified => unsafe { debug_unreachable!() },
     })
 }
 
@@ -138,7 +135,7 @@ pub fn ncl_rgb_to_yuv_matrix_from_kr_kb(kr: f32, kb: f32) -> Matrix3<f32> {
     Matrix3::from_row_slice(&ret)
 }
 
-pub fn get_primaries_xy(primaries: ColorPrimaries) -> Result<[[f32; 2]; 3]> {
+pub fn get_primaries_xy(primaries: ColorPrimaries) -> Result<[[f32; 2]; 3], ConversionError> {
     Ok(match primaries {
         ColorPrimaries::BT470M => [[0.670, 0.330], [0.210, 0.710], [0.140, 0.080]],
         ColorPrimaries::BT470BG => [[0.640, 0.330], [0.290, 0.600], [0.150, 0.060]],
@@ -153,10 +150,10 @@ pub fn get_primaries_xy(primaries: ColorPrimaries) -> Result<[[f32; 2]; 3]> {
         }
         ColorPrimaries::Tech3213 => [[0.630, 0.340], [0.295, 0.605], [0.155, 0.077]],
         ColorPrimaries::Reserved0 | ColorPrimaries::Reserved | ColorPrimaries::ST428 => {
-            bail!("Cannot convert YUV<->RGB using these primaries")
+            return Err(ConversionError::UnsupportedColorPrimaries)
         }
         // SAFETY: We guess any unspecified data when beginning conversion
-        ColorPrimaries::Unspecified => unsafe { debug_unreachable!() },
+        ColorPrimaries::Unspecified => return Err(ConversionError::UnspecifiedColorPrimaries),
     })
 }
 
@@ -183,7 +180,7 @@ fn xy_to_xyz(x: f32, y: f32) -> [f32; 3] {
 
 /// Converts 8..=16-bit YUV data to 32-bit floating point gamma-corrected RGB
 /// in a range of 0.0..=1.0;
-pub fn yuv_to_rgb<T: Pixel>(input: &Yuv<T>) -> Result<Vec<[f32; 3]>> {
+pub fn yuv_to_rgb<T: Pixel>(input: &Yuv<T>) -> Result<Vec<[f32; 3]>, ConversionError> {
     let transform = get_yuv_to_rgb_matrix(input.config())?;
     let mut data = ycbcr_to_ypbpr(input);
 
@@ -208,7 +205,7 @@ pub fn rgb_to_yuv<T: Pixel>(
     width: usize,
     height: usize,
     config: YuvConfig,
-) -> Result<Yuv<T>> {
+) -> Result<Yuv<T>, ConversionError> {
     let transform = get_rgb_to_yuv_matrix(config)?;
     let yuv = input
         .iter()
@@ -225,7 +222,7 @@ pub fn transform_primaries(
     mut input: Vec<[f32; 3]>,
     in_primaries: ColorPrimaries,
     out_primaries: ColorPrimaries,
-) -> Result<Vec<[f32; 3]>> {
+) -> Result<Vec<[f32; 3]>, ConversionError> {
     if in_primaries == out_primaries {
         return Ok(input);
     }
@@ -245,7 +242,7 @@ pub fn transform_primaries(
     Ok(input)
 }
 
-fn gamut_rgb_to_xyz_matrix(primaries: ColorPrimaries) -> Result<Matrix3<f32>> {
+fn gamut_rgb_to_xyz_matrix(primaries: ColorPrimaries) -> Result<Matrix3<f32>, ConversionError> {
     if primaries == ColorPrimaries::ST428 {
         return Ok(Matrix3::identity());
     }
@@ -262,7 +259,7 @@ fn gamut_rgb_to_xyz_matrix(primaries: ColorPrimaries) -> Result<Matrix3<f32>> {
     Ok(Matrix3::from_row_slice(&m))
 }
 
-fn gamut_xyz_to_rgb_matrix(primaries: ColorPrimaries) -> Result<Matrix3<f32>> {
+fn gamut_xyz_to_rgb_matrix(primaries: ColorPrimaries) -> Result<Matrix3<f32>, ConversionError> {
     if primaries == ColorPrimaries::ST428 {
         return Ok(Matrix3::identity());
     }
@@ -272,7 +269,7 @@ fn gamut_xyz_to_rgb_matrix(primaries: ColorPrimaries) -> Result<Matrix3<f32>> {
         .expect("has an inverse"))
 }
 
-fn get_primaries_xyz(primaries: ColorPrimaries) -> Result<Matrix3<f32>> {
+fn get_primaries_xyz(primaries: ColorPrimaries) -> Result<Matrix3<f32>, ConversionError> {
     // Columns: R G B
     // Rows: X Y Z
     let primaries_xy = get_primaries_xy(primaries)?;

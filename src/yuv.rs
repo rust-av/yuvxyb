@@ -1,10 +1,10 @@
 use std::mem::size_of;
 
-use anyhow::{bail, Result};
 use av_data::pixel::{ColorPrimaries, MatrixCoefficients, TransferCharacteristic};
+use thiserror::Error;
 use v_frame::{frame::Frame, plane::Plane, prelude::Pixel};
 
-use crate::{yuv_rgb::rgb_to_yuv, LinearRgb, Rgb, Xyb};
+use crate::{yuv_rgb::rgb_to_yuv, ConversionError, LinearRgb, Rgb, Xyb};
 
 #[derive(Debug, Clone)]
 pub struct Yuv<T: Pixel> {
@@ -23,6 +23,40 @@ pub struct YuvConfig {
     pub color_primaries: ColorPrimaries,
 }
 
+/// Error type for when creating a [`Yuv`] struct goes wrong.
+#[derive(Debug, Error, Clone, Copy, PartialEq, Eq)]
+pub enum YuvError {
+    /// The configured subsampling does not match
+    /// the actual subsampling in the frame data.
+    #[error("Configured subsampling does not match subsampling of frame data.")]
+    SubsamplingMismatch,
+
+    /// The width of the luminance plane is not
+    /// compatible with the configured subsampling.
+    ///
+    /// For example, for 4:2:0 chroma subsampling, the width
+    /// of the luminance plane must be divisible by 2.
+    #[error("The frame width does not support the configured subsampling.")]
+    InvalidLumaWidth,
+
+    /// The height of the luminance plane is not
+    /// compatible with the configured subsampling.
+    ///
+    /// For example, for 4:2:0 chroma subsampling, the height
+    /// of the luminance plane must be divisible by 2.
+    #[error("The frame height does not support the configured subsampling.")]
+    InvalidLumaHeight,
+
+    /// The supplied data contains values which are outside
+    /// the valid range for the configured bit depth.
+    ///
+    /// This error can not occur for bit depths of 8 and 16,
+    /// as the valid range of values matches the available
+    /// range in the underlying data type exactly.
+    #[error("Data contains values which are not valid for the configured bit depth.")]
+    InvalidData,
+}
+
 impl<T: Pixel> Yuv<T> {
     /// # Errors
     /// - If luma plane length does not match `width * height`
@@ -34,28 +68,22 @@ impl<T: Pixel> Yuv<T> {
     ///   frame data
     /// - If `data` contains values which are not valid for the specified bit
     ///   depth (note: out-of-range values for limited range are allowed)
-    pub fn new(data: Frame<T>, config: YuvConfig) -> Result<Self> {
+    pub fn new(data: Frame<T>, config: YuvConfig) -> Result<Self, YuvError> {
         if config.subsampling_x != data.planes[1].cfg.xdec as u8
             || config.subsampling_x != data.planes[2].cfg.xdec as u8
             || config.subsampling_y != data.planes[1].cfg.ydec as u8
             || config.subsampling_y != data.planes[2].cfg.ydec as u8
         {
-            bail!("Configured subsampling does not match subsampling of Frame data");
+            return Err(YuvError::SubsamplingMismatch);
         }
 
         let width = data.planes[0].cfg.width;
         let height = data.planes[0].cfg.height;
         if width % (1 << config.subsampling_x) != 0 {
-            bail!(
-                "Width must be a multiple of {} to support this chroma subsampling",
-                1u32 << config.subsampling_x
-            );
+            return Err(YuvError::InvalidLumaWidth);
         }
         if height % (1 << config.subsampling_y) != 0 {
-            bail!(
-                "Height must be a multiple of {} to support this chroma subsampling",
-                1u32 << config.subsampling_y
-            );
+            return Err(YuvError::InvalidLumaHeight);
         }
         if size_of::<T>() == 2 && config.bit_depth < 16 {
             let max_value = u16::MAX >> (16 - config.bit_depth);
@@ -64,10 +92,7 @@ impl<T: Pixel> Yuv<T> {
                     .iter()
                     .any(|pix| pix.to_u16().expect("This is a u16") > max_value)
             }) {
-                bail!(
-                    "Data contains values which are not valid for a bit depth of {}",
-                    config.bit_depth
-                );
+                return Err(YuvError::InvalidData);
             }
         }
 
@@ -133,28 +158,28 @@ impl YuvConfig {
 }
 
 impl<T: Pixel> TryFrom<(Xyb, YuvConfig)> for Yuv<T> {
-    type Error = anyhow::Error;
+    type Error = ConversionError;
 
     /// # Errors
     /// - If the `YuvConfig` would produce an invalid image
-    fn try_from(other: (Xyb, YuvConfig)) -> Result<Self> {
+    fn try_from(other: (Xyb, YuvConfig)) -> Result<Self, Self::Error> {
         let lrgb = LinearRgb::from(other.0);
         Self::try_from((lrgb, other.1))
     }
 }
 
 impl<T: Pixel> TryFrom<(Rgb, YuvConfig)> for Yuv<T> {
-    type Error = anyhow::Error;
+    type Error = ConversionError;
 
-    fn try_from(other: (Rgb, YuvConfig)) -> Result<Self> {
+    fn try_from(other: (Rgb, YuvConfig)) -> Result<Self, Self::Error> {
         Self::try_from((&other.0, other.1))
     }
 }
 
 impl<T: Pixel> TryFrom<(LinearRgb, YuvConfig)> for Yuv<T> {
-    type Error = anyhow::Error;
+    type Error = ConversionError;
 
-    fn try_from(other: (LinearRgb, YuvConfig)) -> Result<Self> {
+    fn try_from(other: (LinearRgb, YuvConfig)) -> Result<Self, Self::Error> {
         let config = other.1;
         let rgb = Rgb::try_from((
             other.0,
@@ -166,9 +191,9 @@ impl<T: Pixel> TryFrom<(LinearRgb, YuvConfig)> for Yuv<T> {
 }
 
 impl<T: Pixel> TryFrom<(&Rgb, YuvConfig)> for Yuv<T> {
-    type Error = anyhow::Error;
+    type Error = ConversionError;
 
-    fn try_from(other: (&Rgb, YuvConfig)) -> Result<Self> {
+    fn try_from(other: (&Rgb, YuvConfig)) -> Result<Self, Self::Error> {
         let rgb = other.0;
         let config = other.1;
         rgb_to_yuv(rgb.data(), rgb.width(), rgb.height(), config)

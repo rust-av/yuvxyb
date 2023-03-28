@@ -6,7 +6,7 @@ use core::f32;
 use core::f32::consts::LOG2_E;
 
 /// Computes the cube root of x.
-/// 
+///
 /// The argument must be normal (not NaN, +/-INF or subnormal).
 /// This is required for optimization purposes.
 pub fn cbrtf(x: f32) -> f32 {
@@ -66,7 +66,6 @@ fn cbrtf_fast(x: f32) -> f32 {
     // rounding to 24 bits is perfect in round-to-nearest mode
     t as f32
 }
-
 
 // The following implementation of powf is based on José Fonseca's
 // polynomial-based implementation, ported to Rust as scalar code

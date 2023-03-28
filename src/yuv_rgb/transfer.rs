@@ -1,17 +1,18 @@
-use anyhow::{bail, Result};
 use av_data::pixel::TransferCharacteristic;
-use debug_unreachable::debug_unreachable;
 use std::slice::from_raw_parts_mut;
 
-use crate::math::{powf, expf};
+use crate::{
+    math::{expf, powf},
+    ConversionError,
+};
 
 pub trait TransferFunction {
-    fn to_linear(&self, input: Vec<[f32; 3]>) -> Result<Vec<[f32; 3]>>;
-    fn to_gamma(&self, input: Vec<[f32; 3]>) -> Result<Vec<[f32; 3]>>;
+    fn to_linear(&self, input: Vec<[f32; 3]>) -> Result<Vec<[f32; 3]>, ConversionError>;
+    fn to_gamma(&self, input: Vec<[f32; 3]>) -> Result<Vec<[f32; 3]>, ConversionError>;
 }
 
 impl TransferFunction for TransferCharacteristic {
-    fn to_linear(&self, input: Vec<[f32; 3]>) -> Result<Vec<[f32; 3]>> {
+    fn to_linear(&self, input: Vec<[f32; 3]>) -> Result<Vec<[f32; 3]>, ConversionError> {
         Ok(match *self {
             Self::Logarithmic100 => image_log100_inverse_oetf(input),
             Self::Logarithmic316 => image_log316_inverse_oetf(input),
@@ -25,17 +26,15 @@ impl TransferFunction for TransferCharacteristic {
             Self::PerceptualQuantizer => image_st_2084_inverse_oetf(input),
             Self::HybridLogGamma => image_arib_b67_inverse_oetf(input),
             Self::Linear => input,
-            // Unsupported
             Self::Reserved0 | Self::Reserved | Self::BT1361E | Self::ST428 => {
-                bail!("Cannot convert YUV<->RGB using this transfer function")
+                return Err(ConversionError::UnsupportedTransferCharacteristic)
             }
-            // SAFETY: We guess any unspecified data when beginning conversion
-            Self::Unspecified => unsafe { debug_unreachable!() },
+            Self::Unspecified => return Err(ConversionError::UnspecifiedTransferCharacteristic),
         })
     }
 
     #[allow(clippy::too_many_lines)]
-    fn to_gamma(&self, input: Vec<[f32; 3]>) -> Result<Vec<[f32; 3]>> {
+    fn to_gamma(&self, input: Vec<[f32; 3]>) -> Result<Vec<[f32; 3]>, ConversionError> {
         Ok(match *self {
             Self::Logarithmic100 => image_log100_oetf(input),
             Self::Logarithmic316 => image_log316_oetf(input),
@@ -51,10 +50,9 @@ impl TransferFunction for TransferCharacteristic {
             Self::Linear => input,
             // Unsupported
             Self::Reserved0 | Self::Reserved | Self::BT1361E | Self::ST428 => {
-                bail!("Cannot convert YUV<->RGB using this transfer function")
+                return Err(ConversionError::UnsupportedTransferCharacteristic)
             }
-            // SAFETY: We guess any unspecified data when beginning conversion
-            Self::Unspecified => unsafe { debug_unreachable!() },
+            Self::Unspecified => return Err(ConversionError::UnspecifiedTransferCharacteristic),
         })
     }
 }
