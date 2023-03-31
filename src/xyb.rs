@@ -1,7 +1,6 @@
-use anyhow::{bail, Result};
 use v_frame::prelude::Pixel;
 
-use crate::{rgb_xyb::linear_rgb_to_xyb, LinearRgb, Rgb, Yuv};
+use crate::{rgb_xyb::linear_rgb_to_xyb, ConversionError, CreationError, LinearRgb, Rgb, Yuv};
 
 #[derive(Debug, Clone)]
 pub struct Xyb {
@@ -13,9 +12,9 @@ pub struct Xyb {
 impl Xyb {
     /// # Errors
     /// - If data length does not match `width * height`
-    pub fn new(data: Vec<[f32; 3]>, width: usize, height: usize) -> Result<Self> {
+    pub fn new(data: Vec<[f32; 3]>, width: usize, height: usize) -> Result<Self, CreationError> {
         if data.len() != width * height {
-            bail!("Data length does not match specified dimensions");
+            return Err(CreationError::ResolutionMismatch);
         }
 
         Ok(Self {
@@ -58,26 +57,26 @@ impl Xyb {
 }
 
 impl<T: Pixel> TryFrom<Yuv<T>> for Xyb {
-    type Error = anyhow::Error;
+    type Error = ConversionError;
 
-    fn try_from(yuv: Yuv<T>) -> Result<Self> {
+    fn try_from(yuv: Yuv<T>) -> Result<Self, Self::Error> {
         Self::try_from(&yuv)
     }
 }
 
 impl<T: Pixel> TryFrom<&Yuv<T>> for Xyb {
-    type Error = anyhow::Error;
+    type Error = ConversionError;
 
-    fn try_from(yuv: &Yuv<T>) -> Result<Self> {
+    fn try_from(yuv: &Yuv<T>) -> Result<Self, Self::Error> {
         let rgb = Rgb::try_from(yuv)?;
         Self::try_from(rgb)
     }
 }
 
 impl TryFrom<Rgb> for Xyb {
-    type Error = anyhow::Error;
+    type Error = ConversionError;
 
-    fn try_from(rgb: Rgb) -> Result<Self> {
+    fn try_from(rgb: Rgb) -> Result<Self, Self::Error> {
         let lrgb = LinearRgb::try_from(rgb)?;
         Ok(Self::from(lrgb))
     }

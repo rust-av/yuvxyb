@@ -1,6 +1,4 @@
-use anyhow::{bail, Result};
-
-use crate::LinearRgb;
+use crate::{CreationError, LinearRgb};
 
 /// HSL Color Space: Hue, Saturation, Lightness.
 ///
@@ -26,9 +24,9 @@ pub struct Hsl {
 impl Hsl {
     /// # Errors
     /// - If data length does not match `width * height`
-    pub fn new(data: Vec<[f32; 3]>, width: usize, height: usize) -> Result<Self> {
+    pub fn new(data: Vec<[f32; 3]>, width: usize, height: usize) -> Result<Self, CreationError> {
         if data.len() != width * height {
-            bail!("Data length does not match specified dimensions");
+            return Err(CreationError::ResolutionMismatch);
         }
 
         Ok(Self {

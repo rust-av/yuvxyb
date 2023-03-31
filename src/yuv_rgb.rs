@@ -231,15 +231,14 @@ fn pixel_offset(bit_depth: u8, full_range: bool, chroma: bool) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::Yuv;
-    use anyhow::Result;
+    use crate::{ConversionError, Yuv};
     use av_data::pixel::{ColorPrimaries, MatrixCoefficients, TransferCharacteristic};
     use num_traits::clamp;
     use v_frame::{frame::Frame, plane::Plane};
 
     /// Converts 8..=16-bit YUV data to 32-bit floating point Linear RGB
     /// in a range of 0.0..=1.0;
-    fn yuv_to_linear_rgb<T: Pixel>(input: &Yuv<T>) -> Result<Vec<[f32; 3]>> {
+    fn yuv_to_linear_rgb<T: Pixel>(input: &Yuv<T>) -> Result<Vec<[f32; 3]>, ConversionError> {
         let rgb = yuv_to_rgb(input)?;
         let config = input.config();
         let data = config.transfer_characteristics.to_linear(rgb)?;
@@ -256,7 +255,7 @@ mod tests {
         width: usize,
         height: usize,
         config: YuvConfig,
-    ) -> Result<Yuv<T>> {
+    ) -> Result<Yuv<T>, ConversionError> {
         let data = transform_primaries(input, ColorPrimaries::BT709, config.color_primaries)?;
         let data = config.transfer_characteristics.to_gamma(data)?;
         rgb_to_yuv(&data, width, height, config)

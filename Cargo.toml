@@ -15,13 +15,12 @@ default = ["fastmath"]
 fastmath = []
 
 [dependencies]
-anyhow = "1.0.65"
 av-data = "0.4.1"
-debug_unreachable = { package = "new_debug_unreachable", version = "1.0.4" }
 log = "0.4.17"
 nalgebra = "0.32.2"
 num-traits = "0.2.15"
 paste = "1.0.9"
+thiserror = "1.0.40"
 v_frame = "0.3.0"
 
 [dev-dependencies]
