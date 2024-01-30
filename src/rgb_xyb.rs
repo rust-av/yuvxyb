@@ -150,7 +150,7 @@ mod tests {
         let input = fs::read_to_string(path).unwrap();
         input
             .lines()
-            .map(|l| l.trim())
+            .map(str::trim)
             .filter(|l| !l.is_empty())
             .map(|l| {
                 let (x, l) = l.split_once(' ').unwrap();
@@ -168,7 +168,7 @@ mod tests {
         let expected_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("test_data")
             .join("tank_xyb.txt");
-        let source = image::open(&source_path).unwrap();
+        let source = image::open(source_path).unwrap();
         let source_data = source
             .to_rgb32f()
             .chunks_exact(3)
@@ -217,7 +217,11 @@ mod tests {
             .join("tank_srgb.png");
         let source_data = parse_xyb_txt(&source_path);
         let source = Xyb::new(source_data, 1448, 1080).unwrap();
-        let expected = image::open(&expected_path).unwrap();
+        let expected = image::open(expected_path).unwrap();
+
+        // Fixing this would result in worse code, and this
+        // needless collect() doesn't really matter in tests
+        #[allow(clippy::needless_collect)]
         let expected_data = expected
             .to_rgb32f()
             .chunks_exact(3)
