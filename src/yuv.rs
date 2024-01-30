@@ -68,6 +68,10 @@ impl<T: Pixel> Yuv<T> {
     ///   frame data
     /// - If `data` contains values which are not valid for the specified bit
     ///   depth (note: out-of-range values for limited range are allowed)
+    // Clippy complains about T::to_u16 maybe panicking, but it can be assumed
+    // to never panic because the Pixel trait is only implemented by u8 and
+    // u16, both of which will successfully return a u16 from to_u16.
+    #[allow(clippy::missing_panics_doc)]
     pub fn new(data: Frame<T>, config: YuvConfig) -> Result<Self, YuvError> {
         if config.subsampling_x != data.planes[1].cfg.xdec as u8
             || config.subsampling_x != data.planes[2].cfg.xdec as u8
