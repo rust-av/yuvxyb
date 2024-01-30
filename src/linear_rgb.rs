@@ -13,7 +13,7 @@ use crate::{
 /// considered to be in an unspecified linearized color space.
 ///
 /// This structure is useful for conversions from gamma-encoded RGB color spaces into other spaces
-/// or representations like [Hsl] and [Xyb].
+/// or representations like [`Hsl`] and [`Xyb`].
 #[derive(Debug, Clone)]
 pub struct LinearRgb {
     data: Vec<[f32; 3]>,
@@ -22,7 +22,7 @@ pub struct LinearRgb {
 }
 
 impl LinearRgb {
-    /// Create a new [LinearRgb] with the given data, width and height.
+    /// Create a new [`LinearRgb`] with the given data, width and height.
     ///
     /// # Errors
     /// - If data length does not match `width * height`

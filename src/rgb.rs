@@ -20,7 +20,7 @@ pub struct Rgb {
 }
 
 impl Rgb {
-    /// Create a new [Rgb] with the given data and configuration.
+    /// Create a new [`Rgb`] with the given data and configuration.
     ///
     /// It is up to the caller to ensure that the transfer characteristics and
     /// color primaries are correct for the data.
