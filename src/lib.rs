@@ -5,6 +5,7 @@
 #![allow(clippy::inline_always)]
 #![allow(clippy::module_name_repetitions)]
 #![allow(clippy::similar_names)]
+#![allow(clippy::doc_markdown)]
 #![warn(clippy::clone_on_ref_ptr)]
 #![warn(clippy::create_dir)]
 #![warn(clippy::dbg_macro)]
