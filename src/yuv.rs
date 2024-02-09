@@ -6,12 +6,24 @@ use v_frame::{frame::Frame, plane::Plane, prelude::Pixel};
 
 use crate::{yuv_rgb::rgb_to_yuv, ConversionError, LinearRgb, Rgb, Xyb};
 
+/// Contains a YCbCr image in a color space defined by [`YuvConfig`].
+///
+/// YCbCr (often called YUV) representations of images are transformed from a "true" RGB image.
+/// These transformations are dependent on the original RGB color space and use one luminance (Y)
+/// as well as two chrominance (U, V) components to represent a color.
+///
+/// The data in this structure supports chroma subsampling (e.g. 4:2:0), multiple bit depths,
+/// and limited range support.
 #[derive(Debug, Clone)]
 pub struct Yuv<T: Pixel> {
     data: Frame<T>,
     config: YuvConfig,
 }
 
+/// Contains the configuration data for a YCbCr image.
+///
+/// This includes color space information, bit depth, chroma subsampling and whether the data
+/// is full or limited range.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct YuvConfig {
     pub bit_depth: u8,
@@ -58,6 +70,8 @@ pub enum YuvError {
 }
 
 impl<T: Pixel> Yuv<T> {
+    /// Create a new [`Yuv`] with the given data and configuration.
+    ///
     /// # Errors
     /// - If luma plane length does not match `width * height`
     /// - If chroma plane lengths do not match `(width * height) >>
