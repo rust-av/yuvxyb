@@ -1,6 +1,6 @@
 use crate::{CreationError, LinearRgb};
 
-/// Contains an RGB image in the HSL representation.
+/// Contains an HSL image.
 ///
 /// HSL stands for Hue, Saturation and Lightness. It represents pixels in a way that is closer
 /// to human perception than RGB or YUV values.

@@ -7,7 +7,7 @@ use crate::{
     ConversionError, CreationError, Hsl, Rgb, Xyb, Yuv,
 };
 
-/// Contains an RGB image in a linearized RGB color space.
+/// Contains an RGB image in a linearized color space.
 ///
 /// The image is stored as pixels made of three 32-bit floating-point RGB components which are
 /// considered to be in an unspecified linearized color space.
