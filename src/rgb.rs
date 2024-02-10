@@ -6,6 +6,10 @@ use crate::{
     ConversionError, CreationError, LinearRgb, Xyb, Yuv,
 };
 
+/// Contains an RGB image.
+///
+/// The image is stored as pixels made of three 32-bit floating-point RGB components which are
+/// converted from/to linear color space by the specified transfer functions and color primaries.
 #[derive(Debug, Clone)]
 pub struct Rgb {
     data: Vec<[f32; 3]>,
@@ -16,6 +20,11 @@ pub struct Rgb {
 }
 
 impl Rgb {
+    /// Create a new [`Rgb`] with the given data and configuration.
+    ///
+    /// It is up to the caller to ensure that the transfer characteristics and
+    /// color primaries are correct for the data.
+    ///
     /// # Errors
     /// - If data length does not match `width * height`
     pub fn new(
@@ -118,7 +127,6 @@ impl<T: Pixel> TryFrom<&Yuv<T>> for Rgb {
     }
 }
 
-// From XYB
 impl TryFrom<(Xyb, TransferCharacteristic, ColorPrimaries)> for Rgb {
     type Error = ConversionError;
 

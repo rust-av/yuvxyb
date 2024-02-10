@@ -1,27 +1,32 @@
 use crate::{CreationError, LinearRgb};
 
-/// HSL Color Space: Hue, Saturation, Lightness.
+/// Contains an HSL image.
 ///
-/// The Y channel in YUV only has a loose correlation
-/// with human-perceived brightness.
-/// The L channel in this space is the closest
-/// to a pure measure of human-perceived brightness.
+/// HSL stands for Hue, Saturation and Lightness. It represents pixels in a way that is closer
+/// to human perception than RGB or YUV values.
 ///
-/// An L value of 0.0 is always black, and an L value
-/// of 1.0 is always white. Values in between gradiate
-/// as one would expect. Therefore, this is extremely
-/// useful for applications of measuring perceptual
-/// brightness.
+/// The Y channel in YUV only has a loose correlation with human-perceived brightness.
+/// The L channel in HSL is the closest to a pure measure of human-perceived brightness.
+///
+/// An L value of 0.0 is always black, and an L value of 1.0 is always white. Values in between
+/// gradiate as one would expect. Therefore, this is extremely useful for applications of measuring
+/// perceptual brightness.
+///
+/// Unlike the other structs using [`f32`] as pixel components, the components in this structure do
+/// not exclusively lie in the range [0, 1]. The first (H) component lies in the range [0, 360] and
+/// represents the number of degrees on the cylindrical coordinate system.
 #[derive(Debug, Clone)]
 pub struct Hsl {
-    /// H is a value between 0 and 360 (degrees).
-    /// S and L are values betwen 0.0 and 1.0.
+    // H is a value between 0 and 360 (degrees).
+    // S and L are values betwen 0.0 and 1.0.
     data: Vec<[f32; 3]>,
     width: usize,
     height: usize,
 }
 
 impl Hsl {
+    /// Create a new [`Hsl`] with the given data, width and height.
+    ///
     /// # Errors
     /// - If data length does not match `width * height`
     pub fn new(data: Vec<[f32; 3]>, width: usize, height: usize) -> Result<Self, CreationError> {

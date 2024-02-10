@@ -2,6 +2,14 @@ use v_frame::prelude::Pixel;
 
 use crate::{rgb_xyb::linear_rgb_to_xyb, ConversionError, CreationError, LinearRgb, Rgb, Yuv};
 
+/// Contains an XYB image.
+///
+/// XYB is a color space derived from the LMS color space. Instead of representing pixels as some
+/// combination of color components, LMS instead represents the sensitivity of the three cone types
+/// (long, medium, short) in the human eye for a given color.
+///
+/// XYB stores these LMS values in a slightly different way to optimize the perceived quality per
+/// amount of data. This representation is useful to emulate the human perception of colors.
 #[derive(Debug, Clone)]
 pub struct Xyb {
     data: Vec<[f32; 3]>,
@@ -10,6 +18,8 @@ pub struct Xyb {
 }
 
 impl Xyb {
+    /// Create a new [`Xyb`] with the given data, width and height.
+    ///
     /// # Errors
     /// - If data length does not match `width * height`
     pub fn new(data: Vec<[f32; 3]>, width: usize, height: usize) -> Result<Self, CreationError> {
