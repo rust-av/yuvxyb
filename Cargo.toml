@@ -15,7 +15,7 @@ default = ["fastmath"]
 fastmath = []
 
 [dependencies]
-av-data = "0.4.1"
+av-data = "0.4.2"
 log = "0.4.17"
 num-traits = "0.2.15"
 paste = "1.0.9"
