@@ -1,3 +1,10 @@
+## Version 0.4.0
+
+- Optimize HLG transfer function
+- Improve error types (breaking change)
+- Improve struct documentation
+- Remove unnecessary dependencies
+
 ## Version 0.3.1
 
 - Fix some clippy lints, including some which may improve performace a bit
