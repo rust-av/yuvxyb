@@ -132,27 +132,27 @@ fn log2(x: f32) -> f32 {
 
 #[inline(always)]
 fn poly5(x: f32, c0: f32, c1: f32, c2: f32, c3: f32, c4: f32, c5: f32) -> f32 {
-    x.mul_add(poly4(x, c1, c2, c3, c4, c5), c0)
+    multiply_add(x, poly4(x, c1, c2, c3, c4, c5), c0)
 }
 
 #[inline(always)]
 fn poly4(x: f32, c0: f32, c1: f32, c2: f32, c3: f32, c4: f32) -> f32 {
-    x.mul_add(poly3(x, c1, c2, c3, c4), c0)
+    multiply_add(x, poly3(x, c1, c2, c3, c4), c0)
 }
 
 #[inline(always)]
 fn poly3(x: f32, c0: f32, c1: f32, c2: f32, c3: f32) -> f32 {
-    x.mul_add(poly2(x, c1, c2, c3), c0)
+    multiply_add(x, poly2(x, c1, c2, c3), c0)
 }
 
 #[inline(always)]
 fn poly2(x: f32, c0: f32, c1: f32, c2: f32) -> f32 {
-    x.mul_add(poly1(x, c1, c2), c0)
+    multiply_add(x, poly1(x, c1, c2), c0)
 }
 
 #[inline(always)]
 fn poly1(x: f32, c0: f32, c1: f32) -> f32 {
-    x.mul_add(poly0(x, c1), c0)
+    multiply_add(x, poly0(x, c1), c0)
 }
 
 #[inline(always)]
@@ -172,5 +172,15 @@ pub fn expf(x: f32) -> f32 {
         exp2(ft) * exp2(f)
     } else {
         x.exp()
+    }
+}
+
+/// Computes (a * b) + c, leveraging FMA if available
+#[inline]
+pub fn multiply_add(a: f32, b: f32, c: f32) -> f32 {
+    if cfg!(target_feature = "fma") {
+        a.mul_add(b, c)
+    } else {
+        a * b + c
     }
 }
