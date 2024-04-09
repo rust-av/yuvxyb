@@ -4,11 +4,13 @@ description = "Conversions between YUV (YCbCr), XYB, and other colorspaces"
 version = "0.4.0"
 edition = "2021"
 license = "MIT"
-rust-version = "1.61.0"
 documentation = "https://docs.rs/yuvxyb"
 homepage = "https://github.com/rust-av/yuvxyb"
 repository = "https://github.com/rust-av/yuvxyb"
 exclude = ["test_data", "yuvxyb-dump"]
+
+# When changing MSRV: Also update .github/workflows/crate.yml
+rust-version = "1.61.0"
 
 [features]
 default = ["fastmath"]

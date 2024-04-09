@@ -7,9 +7,24 @@ on:
     branches: ["main"]
 
 env:
+  CARGO_INCREMENTAL: 0
+  RUSTFLAGS: "-Dwarnings"
   CARGO_TERM_COLOR: always
 
 jobs:
+  msrv:
+    runs-on: ubuntu-22.04
+
+    steps:
+      - uses: actions/checkout@v4
+      # rust-version from Cargo.toml
+      - name: Install Rust 1.61.0
+        uses: dtolnay/rust-toolchain@1.61.0
+      - name: Use predefined lockfile
+        run: mv Cargo.lock.MSRV Cargo.lock
+      - name: Build
+        run: cargo check --locked
+
   build:
     runs-on: ubuntu-latest
 
