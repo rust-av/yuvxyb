@@ -9,7 +9,7 @@ homepage = "https://github.com/rust-av/yuvxyb"
 repository = "https://github.com/rust-av/yuvxyb"
 exclude = ["test_data", "yuvxyb-dump"]
 
-# When changing MSRV: Also update .github/workflows/crate.yml
+# When changing MSRV: Also update README and .github/workflows/crate.yml
 rust-version = "1.61.0"
 
 [features]
