@@ -130,32 +130,32 @@ fn log2(x: f32) -> f32 {
     polynomial + exp
 }
 
-#[inline(always)]
+#[inline]
 fn poly5(x: f32, c0: f32, c1: f32, c2: f32, c3: f32, c4: f32, c5: f32) -> f32 {
     multiply_add(x, poly4(x, c1, c2, c3, c4, c5), c0)
 }
 
-#[inline(always)]
+#[inline]
 fn poly4(x: f32, c0: f32, c1: f32, c2: f32, c3: f32, c4: f32) -> f32 {
     multiply_add(x, poly3(x, c1, c2, c3, c4), c0)
 }
 
-#[inline(always)]
+#[inline]
 fn poly3(x: f32, c0: f32, c1: f32, c2: f32, c3: f32) -> f32 {
     multiply_add(x, poly2(x, c1, c2, c3), c0)
 }
 
-#[inline(always)]
+#[inline]
 fn poly2(x: f32, c0: f32, c1: f32, c2: f32) -> f32 {
     multiply_add(x, poly1(x, c1, c2), c0)
 }
 
-#[inline(always)]
+#[inline]
 fn poly1(x: f32, c0: f32, c1: f32) -> f32 {
     multiply_add(x, poly0(x, c1), c0)
 }
 
-#[inline(always)]
+#[inline]
 const fn poly0(_x: f32, c0: f32) -> f32 {
     c0
 }

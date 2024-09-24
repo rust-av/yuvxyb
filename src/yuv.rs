@@ -121,25 +121,25 @@ impl<T: Pixel> Yuv<T> {
     }
 
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn data(&self) -> &[Plane<T>] {
         &self.data.planes
     }
 
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn width(&self) -> usize {
         self.data.planes[0].cfg.width
     }
 
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn height(&self) -> usize {
         self.data.planes[0].cfg.height
     }
 
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn config(&self) -> YuvConfig {
         self.config
     }
