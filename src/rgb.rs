@@ -61,43 +61,43 @@ impl Rgb {
     }
 
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub fn data(&self) -> &[[f32; 3]] {
         &self.data
     }
 
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub fn data_mut(&mut self) -> &mut [[f32; 3]] {
         &mut self.data
     }
 
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub fn into_data(self) -> Vec<[f32; 3]> {
         self.data
     }
 
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn width(&self) -> usize {
         self.width
     }
 
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn height(&self) -> usize {
         self.height
     }
 
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn transfer(&self) -> TransferCharacteristic {
         self.transfer
     }
 
     #[must_use]
-    #[inline(always)]
+    #[inline]
     pub const fn primaries(&self) -> ColorPrimaries {
         self.primaries
     }
