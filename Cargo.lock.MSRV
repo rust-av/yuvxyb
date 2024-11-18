@@ -808,7 +808,12 @@ dependencies = [
  "rand",
  "thiserror",
  "v_frame",
+ "yuvxyb-math",
 ]
+
+[[package]]
+name = "yuvxyb-math"
+version = "0.1.0"
 
 [[package]]
 name = "zerocopy"
