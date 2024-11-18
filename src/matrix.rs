@@ -1,3 +1,5 @@
+use crate::math::multiply_add;
+
 #[derive(Debug, Clone)]
 #[must_use]
 pub struct RowVector(f32, f32, f32);
@@ -24,12 +26,20 @@ impl RowVector {
         let Self(sx, sy, sz) = *self;
         let Self(ox, oy, oz) = *other;
 
-        Self::new(sy * oz - sz * oy, sz * ox - sx * oz, sx * oy - sy * ox)
+        Self::new(
+            multiply_add(sy, oz, -(sz * oy)),
+            multiply_add(sz, ox, -(sx * oz)),
+            multiply_add(sx, oy, -(sy * ox)),
+        )
     }
 
     #[must_use]
     pub fn dot(&self, other: &Self) -> f32 {
-        self.0 * other.0 + self.1 * other.1 + self.2 * other.2
+        multiply_add(
+            self.0,
+            other.0,
+            multiply_add(self.1, other.1, self.2 * other.2),
+        )
     }
 
     pub fn scalar_div(&self, x: f32) -> Self {
@@ -138,19 +148,23 @@ impl Matrix {
         let RowVector(s21, s22, s23) = *r2;
         let RowVector(s31, s32, s33) = *r3;
 
-        let minor_11 = s22 * s33 - s32 * s23;
-        let minor_12 = s21 * s33 - s31 * s23;
-        let minor_13 = s21 * s32 - s31 * s22;
+        let minor_11 = multiply_add(s22, s33, -(s32 * s23));
+        let minor_12 = multiply_add(s21, s33, -(s31 * s23));
+        let minor_13 = multiply_add(s21, s32, -(s31 * s22));
 
-        let minor_21 = s12 * s33 - s32 * s13;
-        let minor_22 = s11 * s33 - s31 * s13;
-        let minor_23 = s11 * s32 - s31 * s12;
+        let minor_21 = multiply_add(s12, s33, -(s32 * s13));
+        let minor_22 = multiply_add(s11, s33, -(s31 * s13));
+        let minor_23 = multiply_add(s11, s32, -(s31 * s12));
 
-        let minor_31 = s12 * s23 - s22 * s13;
-        let minor_32 = s11 * s23 - s21 * s13;
-        let minor_33 = s11 * s22 - s21 * s12;
+        let minor_31 = multiply_add(s12, s23, -(s22 * s13));
+        let minor_32 = multiply_add(s11, s23, -(s21 * s13));
+        let minor_33 = multiply_add(s11, s22, -(s21 * s12));
 
-        let determinant = s11 * minor_11 - s12 * minor_12 + s13 * minor_13;
+        let determinant = multiply_add(
+            s11,
+            minor_11,
+            -multiply_add(s12, minor_12, -(s13 * minor_13)),
+        );
 
         Self::new(
             RowVector::new(minor_11, -minor_12, minor_13),
@@ -165,9 +179,9 @@ impl Matrix {
         let Self(ref r1, ref r2, ref r3) = *self;
 
         ColVector::new(
-            r1.0 * rhs.0 + r1.1 * rhs.1 + r1.2 * rhs.2,
-            r2.0 * rhs.0 + r2.1 * rhs.1 + r2.2 * rhs.2,
-            r3.0 * rhs.0 + r3.1 * rhs.1 + r3.2 * rhs.2,
+            multiply_add(r1.0, rhs.0, multiply_add(r1.1, rhs.1, r1.2 * rhs.2)),
+            multiply_add(r2.0, rhs.0, multiply_add(r2.1, rhs.1, r2.2 * rhs.2)),
+            multiply_add(r3.0, rhs.0, multiply_add(r3.1, rhs.1, r3.2 * rhs.2)),
         )
     }
 
@@ -177,19 +191,19 @@ impl Matrix {
 
         Self::new(
             RowVector::new(
-                r1.0 * o1.0 + r1.1 * o2.0 + r1.2 * o3.0,
-                r1.0 * o1.1 + r1.1 * o2.1 + r1.2 * o3.1,
-                r1.0 * o1.2 + r1.1 * o2.2 + r1.2 * o3.2,
+                multiply_add(r1.0, o1.0, multiply_add(r1.1, o2.0, r1.2 * o3.0)),
+                multiply_add(r1.0, o1.1, multiply_add(r1.1, o2.1, r1.2 * o3.1)),
+                multiply_add(r1.0, o1.2, multiply_add(r1.1, o2.2, r1.2 * o3.2)),
             ),
             RowVector::new(
-                r2.0 * o1.0 + r2.1 * o2.0 + r2.2 * o3.0,
-                r2.0 * o1.1 + r2.1 * o2.1 + r2.2 * o3.1,
-                r2.0 * o1.2 + r2.1 * o2.2 + r2.2 * o3.2,
+                multiply_add(r2.0, o1.0, multiply_add(r2.1, o2.0, r2.2 * o3.0)),
+                multiply_add(r2.0, o1.1, multiply_add(r2.1, o2.1, r2.2 * o3.1)),
+                multiply_add(r2.0, o1.2, multiply_add(r2.1, o2.2, r2.2 * o3.2)),
             ),
             RowVector::new(
-                r3.0 * o1.0 + r3.1 * o2.0 + r3.2 * o3.0,
-                r3.0 * o1.1 + r3.1 * o2.1 + r3.2 * o3.1,
-                r3.0 * o1.2 + r3.1 * o2.2 + r3.2 * o3.2,
+                multiply_add(r3.0, o1.0, multiply_add(r3.1, o2.0, r3.2 * o3.0)),
+                multiply_add(r3.0, o1.1, multiply_add(r3.1, o2.1, r3.2 * o3.1)),
+                multiply_add(r3.0, o1.2, multiply_add(r3.1, o2.2, r3.2 * o3.2)),
             ),
         )
     }
@@ -199,9 +213,9 @@ impl Matrix {
         let Self(ref r1, ref r2, ref r3) = *self;
 
         [
-            r1.0 * rhs[0] + r1.1 * rhs[1] + r1.2 * rhs[2],
-            r2.0 * rhs[0] + r2.1 * rhs[1] + r2.2 * rhs[2],
-            r3.0 * rhs[0] + r3.1 * rhs[1] + r3.2 * rhs[2],
+            multiply_add(r1.0, rhs[0], multiply_add(r1.1, rhs[1], r1.2 * rhs[2])),
+            multiply_add(r2.0, rhs[0], multiply_add(r2.1, rhs[1], r2.2 * rhs[2])),
+            multiply_add(r3.0, rhs[0], multiply_add(r3.1, rhs[1], r3.2 * rhs[2])),
         ]
     }
 }
