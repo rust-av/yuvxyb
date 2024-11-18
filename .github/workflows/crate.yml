@@ -35,3 +35,11 @@ jobs:
         run: cargo build
       - name: Run tests
         run: cargo test
+
+  lint-math:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Lint
+        run: cargo clippy --manifest-path yuvxyb-math/Cargo.toml
