@@ -9,14 +9,15 @@ homepage = "https://github.com/rust-av/yuvxyb"
 repository = "https://github.com/rust-av/yuvxyb"
 exclude = ["test_data", "yuvxyb-dump"]
 
-# When changing MSRV: Also update README and .github/workflows/crate.yml
+# When changing MSRV: Also update README, yuvxyb-matrix and .github/workflows/crate.yml
 rust-version = "1.64.0"
 
 [features]
 default = ["fastmath"]
-fastmath = []
+fastmath = ["yuvxyb-math/fastmath"]
 
 [dependencies]
+yuvxyb-math = { version = "0.1.0", path = "yuvxyb-math" }
 av-data = "0.4.2"
 log = "0.4.17"
 num-traits = "0.2.15"

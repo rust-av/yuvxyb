@@ -1,6 +1,6 @@
 #![allow(clippy::many_single_char_names)]
 
-use crate::math::cbrtf;
+use yuvxyb_math::cbrtf;
 
 const K_M02: f32 = 0.078f32;
 const K_M00: f32 = 0.30f32;

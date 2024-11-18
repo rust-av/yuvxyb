@@ -1,10 +1,8 @@
 use av_data::pixel::TransferCharacteristic;
 use std::slice::from_raw_parts_mut;
 
-use crate::{
-    math::{expf, powf},
-    ConversionError,
-};
+use crate::ConversionError;
+use yuvxyb_math::{expf, powf};
 
 pub trait TransferFunction {
     fn to_linear(&self, input: Vec<[f32; 3]>) -> Result<Vec<[f32; 3]>, ConversionError>;

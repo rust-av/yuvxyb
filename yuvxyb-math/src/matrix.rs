@@ -1,4 +1,4 @@
-use crate::math::multiply_add;
+use crate::multiply_add;
 
 #[derive(Debug, Clone)]
 #[must_use]

@@ -32,11 +32,6 @@
 #![warn(clippy::use_debug)]
 #![warn(clippy::verbose_file_reads)]
 
-/// Helper types for matrix math. Used internally, but can also be used by
-/// other libraries that need it. All types are of dimension 3 (3x3 matrix etc.)
-pub mod matrix;
-
-mod math;
 mod rgb_xyb;
 mod yuv_rgb;
 

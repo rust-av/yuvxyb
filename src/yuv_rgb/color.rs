@@ -1,5 +1,5 @@
-use crate::matrix::{ColVector, Matrix, RowVector};
 use av_data::pixel::{ColorPrimaries, MatrixCoefficients};
+use yuvxyb_math::{ColVector, Matrix, RowVector};
 
 use super::{ycbcr_to_ypbpr, ypbpr_to_ycbcr};
 use crate::{ConversionError, Pixel, Yuv, YuvConfig};
