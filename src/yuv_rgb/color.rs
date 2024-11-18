@@ -1,16 +1,14 @@
+use crate::matrix::{ColVector, Matrix, RowVector};
 use av_data::pixel::{ColorPrimaries, MatrixCoefficients};
-use nalgebra::{Matrix1x3, Matrix3, Matrix3x1};
 
 use super::{ycbcr_to_ypbpr, ypbpr_to_ycbcr};
 use crate::{ConversionError, Pixel, Yuv, YuvConfig};
 
-pub fn get_yuv_to_rgb_matrix(config: YuvConfig) -> Result<Matrix3<f32>, ConversionError> {
-    Ok(get_rgb_to_yuv_matrix(config)?
-        .try_inverse()
-        .expect("Matrix can be inverted"))
+pub fn get_yuv_to_rgb_matrix(config: YuvConfig) -> Result<Matrix, ConversionError> {
+    get_rgb_to_yuv_matrix(config).map(|m| m.invert())
 }
 
-pub fn get_rgb_to_yuv_matrix(config: YuvConfig) -> Result<Matrix3<f32>, ConversionError> {
+pub fn get_rgb_to_yuv_matrix(config: YuvConfig) -> Result<Matrix, ConversionError> {
     match config.matrix_coefficients {
         MatrixCoefficients::Identity
         | MatrixCoefficients::BT2020ConstantLuminance
@@ -34,7 +32,7 @@ pub fn get_rgb_to_yuv_matrix(config: YuvConfig) -> Result<Matrix3<f32>, Conversi
 
 pub fn ncl_rgb_to_yuv_matrix_from_primaries(
     primaries: ColorPrimaries,
-) -> Result<Matrix3<f32>, ConversionError> {
+) -> Result<Matrix, ConversionError> {
     match primaries {
         ColorPrimaries::BT709 => ncl_rgb_to_yuv_matrix(MatrixCoefficients::BT709),
         ColorPrimaries::BT2020 => {
@@ -47,22 +45,19 @@ pub fn ncl_rgb_to_yuv_matrix_from_primaries(
     }
 }
 
-pub fn ncl_rgb_to_yuv_matrix(matrix: MatrixCoefficients) -> Result<Matrix3<f32>, ConversionError> {
+pub fn ncl_rgb_to_yuv_matrix(matrix: MatrixCoefficients) -> Result<Matrix, ConversionError> {
     Ok(match matrix {
-        MatrixCoefficients::YCgCo => {
-            Matrix3::from_row_slice(&[0.25, 0.5, 0.25, -0.25, 0.5, -0.25, 0.5, 0.0, -0.5])
-        }
-        MatrixCoefficients::ST2085 => Matrix3::from_row_slice(&[
-            1688.0 / 4096.0,
-            2146.0 / 4096.0,
-            262.0 / 4096.0,
-            683.0 / 4096.0,
-            2951.0 / 4096.0,
-            462.0 / 4096.0,
-            99.0 / 4096.0,
-            309.0 / 4096.0,
-            3688.0 / 4096.0,
-        ]),
+        MatrixCoefficients::YCgCo => Matrix::new(
+            RowVector::new(0.25, 0.5, 0.25),
+            RowVector::new(-0.25, 0.5, -0.25),
+            RowVector::new(0.5, 0.0, -0.5),
+        ),
+        MatrixCoefficients::ST2085 => Matrix::new(
+            RowVector::new(1688.0, 2146.0, 262.0),
+            RowVector::new(683.0, 2951.0, 462.0),
+            RowVector::new(99.0, 309.0, 3688.0),
+        )
+        .scalar_div(4096.0),
         _ => {
             let (kr, kb) = get_yuv_constants(matrix)?;
             ncl_rgb_to_yuv_matrix_from_kr_kb(kr, kb)
@@ -76,14 +71,14 @@ pub fn get_yuv_constants_from_primaries(
     // ITU-T H.265 Annex E, Eq (E-22) to (E-27).
     let primaries_xy = get_primaries_xy(primaries)?;
 
-    let r_xyz = Matrix1x3::from_row_slice(&xy_to_xyz(primaries_xy[0][0], primaries_xy[0][1]));
-    let g_xyz = Matrix1x3::from_row_slice(&xy_to_xyz(primaries_xy[1][0], primaries_xy[1][1]));
-    let b_xyz = Matrix1x3::from_row_slice(&xy_to_xyz(primaries_xy[2][0], primaries_xy[2][1]));
-    let white_xyz = Matrix1x3::from_row_slice(&get_white_point(primaries));
+    let r_xyz = RowVector::from(xy_to_xyz(primaries_xy[0][0], primaries_xy[0][1]));
+    let g_xyz = RowVector::from(xy_to_xyz(primaries_xy[1][0], primaries_xy[1][1]));
+    let b_xyz = RowVector::from(xy_to_xyz(primaries_xy[2][0], primaries_xy[2][1]));
+    let white_xyz = RowVector::from(get_white_point(primaries));
 
-    let x_rgb = Matrix1x3::from_row_slice(&[r_xyz[0], g_xyz[0], b_xyz[0]]);
-    let y_rgb = Matrix1x3::from_row_slice(&[r_xyz[1], g_xyz[1], b_xyz[1]]);
-    let z_rgb = Matrix1x3::from_row_slice(&[r_xyz[2], g_xyz[2], b_xyz[2]]);
+    let x_rgb = RowVector::new(r_xyz.x(), g_xyz.x(), b_xyz.x());
+    let y_rgb = RowVector::new(r_xyz.y(), g_xyz.y(), b_xyz.y());
+    let z_rgb = RowVector::new(r_xyz.z(), g_xyz.z(), b_xyz.z());
 
     let denom = x_rgb.dot(&y_rgb.cross(&z_rgb));
     let kr = white_xyz.dot(&g_xyz.cross(&b_xyz)) / denom;
@@ -114,25 +109,16 @@ pub const fn get_yuv_constants(matrix: MatrixCoefficients) -> Result<(f32, f32),
     })
 }
 
-pub fn ncl_rgb_to_yuv_matrix_from_kr_kb(kr: f32, kb: f32) -> Matrix3<f32> {
-    let mut ret = [0.0; 9];
+pub fn ncl_rgb_to_yuv_matrix_from_kr_kb(kr: f32, kb: f32) -> Matrix {
     let kg = 1.0 - kr - kb;
     let uscale = 1.0 / 2.0f32.mul_add(-kb, 2.0);
     let vscale = 1.0 / 2.0f32.mul_add(-kr, 2.0);
 
-    ret[0] = kr;
-    ret[1] = kg;
-    ret[2] = kb;
-
-    ret[3] = -kr * uscale;
-    ret[4] = -kg * uscale;
-    ret[5] = (1.0 - kb) * uscale;
-
-    ret[6] = (1.0 - kr) * vscale;
-    ret[7] = -kg * vscale;
-    ret[8] = -kb * vscale;
-
-    Matrix3::from_row_slice(&ret)
+    Matrix::new(
+        RowVector::new(kr, kg, kb),
+        RowVector::new(-kr * uscale, -kg * uscale, (1.0 - kb) * uscale),
+        RowVector::new((1.0 - kr) * vscale, -kg * vscale, -kb * vscale),
+    )
 }
 
 pub const fn get_primaries_xy(primaries: ColorPrimaries) -> Result<[[f32; 2]; 3], ConversionError> {
@@ -185,11 +171,7 @@ pub fn yuv_to_rgb<T: Pixel>(input: &Yuv<T>) -> Result<Vec<[f32; 3]>, ConversionE
     let mut data = ycbcr_to_ypbpr(input);
 
     for pix in &mut data {
-        let pix_matrix = Matrix3x1::from_column_slice(pix);
-        let res = transform * pix_matrix;
-        pix[0] = res[0];
-        pix[1] = res[1];
-        pix[2] = res[2];
+        *pix = transform.mul_arr(*pix);
     }
 
     Ok(data)
@@ -207,14 +189,7 @@ pub fn rgb_to_yuv<T: Pixel>(
     config: YuvConfig,
 ) -> Result<Yuv<T>, ConversionError> {
     let transform = get_rgb_to_yuv_matrix(config)?;
-    let yuv = input
-        .iter()
-        .map(|pix| {
-            let pix = Matrix3x1::from_column_slice(pix);
-            let res = transform * pix;
-            [res[0], res[1], res[2]]
-        })
-        .collect::<Vec<_>>();
+    let yuv: Vec<_> = input.iter().map(|pix| transform.mul_arr(*pix)).collect();
     Ok(ypbpr_to_ycbcr(&yuv, width, height, config))
 }
 
@@ -228,83 +203,80 @@ pub fn transform_primaries(
     }
 
     let transform = gamut_xyz_to_rgb_matrix(out_primaries)?
-        * white_point_adaptation_matrix(in_primaries, out_primaries)
-        * gamut_rgb_to_xyz_matrix(in_primaries)?;
+        .mul_mat(white_point_adaptation_matrix(in_primaries, out_primaries))
+        .mul_mat(gamut_rgb_to_xyz_matrix(in_primaries)?);
 
     for pix in &mut input {
-        let pix_matrix = Matrix3x1::from_column_slice(pix);
-        let res = transform * pix_matrix;
-        pix[0] = res[0];
-        pix[1] = res[1];
-        pix[2] = res[2];
+        *pix = transform.mul_arr(*pix);
     }
 
     Ok(input)
 }
 
-fn gamut_rgb_to_xyz_matrix(primaries: ColorPrimaries) -> Result<Matrix3<f32>, ConversionError> {
+fn gamut_rgb_to_xyz_matrix(primaries: ColorPrimaries) -> Result<Matrix, ConversionError> {
     if primaries == ColorPrimaries::ST428 {
-        return Ok(Matrix3::identity());
+        return Ok(Matrix::identity());
     }
 
     let xyz_matrix = get_primaries_xyz(primaries)?;
-    let white_xyz = Matrix3x1::from_column_slice(&get_white_point(primaries));
+    let white_xyz = ColVector::from(get_white_point(primaries));
 
-    let s = (xyz_matrix.try_inverse().expect("has an inverse") * white_xyz).transpose();
-    let mut m = [0f32; 9];
-    m[0..3].copy_from_slice((xyz_matrix.row(0).component_mul(&s)).as_slice());
-    m[3..6].copy_from_slice((xyz_matrix.row(1).component_mul(&s)).as_slice());
-    m[6..9].copy_from_slice((xyz_matrix.row(2).component_mul(&s)).as_slice());
-
-    Ok(Matrix3::from_row_slice(&m))
+    let s = xyz_matrix.invert().mul_vec(&white_xyz).transpose();
+    Ok(Matrix::new(
+        xyz_matrix.r1().component_mul(&s),
+        xyz_matrix.r2().component_mul(&s),
+        xyz_matrix.r3().component_mul(&s),
+    ))
 }
 
-fn gamut_xyz_to_rgb_matrix(primaries: ColorPrimaries) -> Result<Matrix3<f32>, ConversionError> {
+fn gamut_xyz_to_rgb_matrix(primaries: ColorPrimaries) -> Result<Matrix, ConversionError> {
     if primaries == ColorPrimaries::ST428 {
-        return Ok(Matrix3::identity());
+        return Ok(Matrix::identity());
     }
 
-    Ok(gamut_rgb_to_xyz_matrix(primaries)?
-        .try_inverse()
-        .expect("has an inverse"))
+    gamut_rgb_to_xyz_matrix(primaries).map(|m| m.invert())
 }
 
-fn get_primaries_xyz(primaries: ColorPrimaries) -> Result<Matrix3<f32>, ConversionError> {
+fn get_primaries_xyz(primaries: ColorPrimaries) -> Result<Matrix, ConversionError> {
     // Columns: R G B
     // Rows: X Y Z
-    let primaries_xy = get_primaries_xy(primaries)?;
 
-    let mut ret = [0f32; 9];
-    ret[0..3].copy_from_slice(&xy_to_xyz(primaries_xy[0][0], primaries_xy[0][1]));
-    ret[3..6].copy_from_slice(&xy_to_xyz(primaries_xy[1][0], primaries_xy[1][1]));
-    ret[6..9].copy_from_slice(&xy_to_xyz(primaries_xy[2][0], primaries_xy[2][1]));
-
-    Ok(Matrix3::from_row_slice(&ret).transpose())
+    get_primaries_xy(primaries)
+        .map(|[r, g, b]| {
+            Matrix::new(
+                RowVector::from(xy_to_xyz(r[0], r[1])),
+                RowVector::from(xy_to_xyz(g[0], g[1])),
+                RowVector::from(xy_to_xyz(b[0], b[1])),
+            )
+        })
+        .map(Matrix::transpose)
 }
 
 fn white_point_adaptation_matrix(
     in_primaries: ColorPrimaries,
     out_primaries: ColorPrimaries,
-) -> Matrix3<f32> {
-    let bradford = Matrix3::from_row_slice(&[
-        0.8951f32, 0.2664f32, -0.1614f32, -0.7502f32, 1.7135f32, 0.0367f32, 0.0389f32, -0.0685f32,
-        1.0296f32,
-    ]);
+) -> Matrix {
+    let bradford = Matrix::new(
+        RowVector::new(0.8951, 0.2664, -0.1614),
+        RowVector::new(-0.7502, 1.7135, 0.0367),
+        RowVector::new(0.0389, -0.0685, 1.0296),
+    );
 
-    let white_in = Matrix3x1::from_column_slice(&get_white_point(in_primaries));
-    let white_out = Matrix3x1::from_column_slice(&get_white_point(out_primaries));
+    let white_in = ColVector::from(get_white_point(in_primaries));
+    let white_out = ColVector::from(get_white_point(out_primaries));
 
     if white_in == white_out {
-        return Matrix3::identity();
+        return Matrix::identity();
     }
 
-    let rgb_in = bradford * white_in;
-    let rgb_out = bradford * white_out;
+    let rgb_in = bradford.mul_vec(&white_in);
+    let rgb_out = bradford.mul_vec(&white_out);
 
-    let mut m: Matrix3<f32> = Matrix3::zeros();
-    m[0] = rgb_out[0] / rgb_in[0];
-    m[4] = rgb_out[1] / rgb_in[1];
-    m[8] = rgb_out[2] / rgb_in[2];
+    let m = Matrix::new(
+        RowVector::new(rgb_out.r() / rgb_in.r(), 0.0, 0.0),
+        RowVector::new(0.0, rgb_out.g() / rgb_in.g(), 0.0),
+        RowVector::new(0.0, 0.0, rgb_out.b() / rgb_in.b()),
+    );
 
-    bradford.try_inverse().expect("has an inverse") * m * bradford
+    bradford.invert().mul_mat(m).mul_mat(bradford)
 }
