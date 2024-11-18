@@ -71,9 +71,9 @@ pub fn get_yuv_constants_from_primaries(
     // ITU-T H.265 Annex E, Eq (E-22) to (E-27).
     let primaries_xy = get_primaries_xy(primaries)?;
 
-    let r_xyz = RowVector::from(xy_to_xyz(primaries_xy[0][0], primaries_xy[0][1]));
-    let g_xyz = RowVector::from(xy_to_xyz(primaries_xy[1][0], primaries_xy[1][1]));
-    let b_xyz = RowVector::from(xy_to_xyz(primaries_xy[2][0], primaries_xy[2][1]));
+    let r_xyz = RowVector::from(xy_to_xyz(primaries_xy[0]));
+    let g_xyz = RowVector::from(xy_to_xyz(primaries_xy[1]));
+    let b_xyz = RowVector::from(xy_to_xyz(primaries_xy[2]));
     let white_xyz = RowVector::from(get_white_point(primaries));
 
     let x_rgb = RowVector::new(r_xyz.x(), g_xyz.x(), b_xyz.x());
@@ -151,16 +151,14 @@ pub fn get_white_point(primaries: ColorPrimaries) -> [f32; 3] {
     const ILLUMINANT_E: [f32; 2] = [1.0 / 3.0, 1.0 / 3.0];
 
     match primaries {
-        ColorPrimaries::BT470M | ColorPrimaries::Film => {
-            xy_to_xyz(ILLUMINANT_C[0], ILLUMINANT_C[1])
-        }
-        ColorPrimaries::ST428 => xy_to_xyz(ILLUMINANT_E[0], ILLUMINANT_E[1]),
-        ColorPrimaries::P3DCI => xy_to_xyz(ILLUMINANT_DCI[0], ILLUMINANT_DCI[1]),
-        _ => xy_to_xyz(ILLUMINANT_D65[0], ILLUMINANT_D65[1]),
+        ColorPrimaries::BT470M | ColorPrimaries::Film => xy_to_xyz(ILLUMINANT_C),
+        ColorPrimaries::ST428 => xy_to_xyz(ILLUMINANT_E),
+        ColorPrimaries::P3DCI => xy_to_xyz(ILLUMINANT_DCI),
+        _ => xy_to_xyz(ILLUMINANT_D65),
     }
 }
 
-fn xy_to_xyz(x: f32, y: f32) -> [f32; 3] {
+fn xy_to_xyz([x, y]: [f32; 2]) -> [f32; 3] {
     [x / y, 1.0, (1.0 - x - y) / y]
 }
 
@@ -244,9 +242,9 @@ fn get_primaries_xyz(primaries: ColorPrimaries) -> Result<Matrix, ConversionErro
     get_primaries_xy(primaries)
         .map(|[r, g, b]| {
             Matrix::new(
-                RowVector::from(xy_to_xyz(r[0], r[1])),
-                RowVector::from(xy_to_xyz(g[0], g[1])),
-                RowVector::from(xy_to_xyz(b[0], b[1])),
+                RowVector::from(xy_to_xyz(r)),
+                RowVector::from(xy_to_xyz(g)),
+                RowVector::from(xy_to_xyz(b)),
             )
         })
         .map(Matrix::transpose)
