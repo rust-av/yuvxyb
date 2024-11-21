@@ -806,7 +806,6 @@ dependencies = [
  "num-traits",
  "paste",
  "rand",
- "thiserror",
  "v_frame",
  "yuvxyb-math",
 ]

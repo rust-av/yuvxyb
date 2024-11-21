@@ -1,7 +1,7 @@
+use std::fmt;
 use std::mem::size_of;
 
 use av_data::pixel::{ColorPrimaries, MatrixCoefficients, TransferCharacteristic};
-use thiserror::Error;
 use v_frame::{frame::Frame, plane::Plane, prelude::Pixel};
 
 use crate::{yuv_rgb::rgb_to_yuv, ConversionError, LinearRgb, Rgb, Xyb};
@@ -36,11 +36,10 @@ pub struct YuvConfig {
 }
 
 /// Error type for when creating a [`Yuv`] struct goes wrong.
-#[derive(Debug, Error, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum YuvError {
     /// The configured subsampling does not match
     /// the actual subsampling in the frame data.
-    #[error("Configured subsampling does not match subsampling of frame data.")]
     SubsamplingMismatch,
 
     /// The width of the luminance plane is not
@@ -48,7 +47,6 @@ pub enum YuvError {
     ///
     /// For example, for 4:2:0 chroma subsampling, the width
     /// of the luminance plane must be divisible by 2.
-    #[error("The frame width does not support the configured subsampling.")]
     InvalidLumaWidth,
 
     /// The height of the luminance plane is not
@@ -56,7 +54,6 @@ pub enum YuvError {
     ///
     /// For example, for 4:2:0 chroma subsampling, the height
     /// of the luminance plane must be divisible by 2.
-    #[error("The frame height does not support the configured subsampling.")]
     InvalidLumaHeight,
 
     /// The supplied data contains values which are outside
@@ -65,8 +62,20 @@ pub enum YuvError {
     /// This error can not occur for bit depths of 8 and 16,
     /// as the valid range of values matches the available
     /// range in the underlying data type exactly.
-    #[error("Data contains values which are not valid for the configured bit depth.")]
     InvalidData,
+}
+
+impl std::error::Error for YuvError {}
+
+impl fmt::Display for YuvError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            Self::SubsamplingMismatch => write!(f, "Configured subsampling does not match subsampling of frame data."),
+            Self::InvalidLumaWidth => write!(f, "The frame width does not support the configured subsampling."),
+            Self::InvalidLumaHeight => write!(f, "The frame height does not support the configured subsampling."),
+            Self::InvalidData => write!(f, "Data contains values which are not valid for the configured bit depth."),
+        }
+    }
 }
 
 impl<T: Pixel> Yuv<T> {
