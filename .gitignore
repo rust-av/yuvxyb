@@ -1,3 +1,7 @@
 /target
 /Cargo.lock
 yuvxyb-dump
+
+# subcrate-specific
+yuvxyb-math/target
+yuvxyb-math/Cargo.lock
