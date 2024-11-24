@@ -49,6 +49,11 @@ impl RowVector {
     pub fn component_mul(&self, other: &Self) -> Self {
         Self(self.0 * other.0, self.1 * other.1, self.2 * other.2)
     }
+
+    pub fn values(self) -> [f32; 3] {
+        let Self(x, y, z) = self;
+        [x, y, z]
+    }
 }
 
 impl From<[f32; 3]> for RowVector {
@@ -81,6 +86,11 @@ impl ColVector {
 
     pub const fn transpose(self) -> RowVector {
         RowVector::new(self.0, self.1, self.2)
+    }
+
+    pub fn values(self) -> [f32; 3] {
+        let Self(r, g, b) = self;
+        [r, g, b]
     }
 }
 
@@ -216,6 +226,14 @@ impl Matrix {
             multiply_add(r1.0, rhs[0], multiply_add(r1.1, rhs[1], r1.2 * rhs[2])),
             multiply_add(r2.0, rhs[0], multiply_add(r2.1, rhs[1], r2.2 * rhs[2])),
             multiply_add(r3.0, rhs[0], multiply_add(r3.1, rhs[1], r3.2 * rhs[2])),
+        ]
+    }
+
+    pub fn values(self) -> [[f32; 3]; 3] {
+        [
+            self.0.values(),
+            self.1.values(),
+            self.2.values(),
         ]
     }
 }
