@@ -1,8 +1,11 @@
 use av_data::pixel::{ColorPrimaries, MatrixCoefficients};
-use yuvxyb_math::{ColVector, Matrix, RowVector};
 
 use super::{ycbcr_to_ypbpr, ypbpr_to_ycbcr};
 use crate::{ConversionError, Pixel, Yuv, YuvConfig};
+
+type ColVector = yuvxyb_math::ColVector<f32>;
+type Matrix = yuvxyb_math::Matrix<f32>;
+type RowVector = yuvxyb_math::RowVector<f32>;
 
 pub fn get_yuv_to_rgb_matrix(config: YuvConfig) -> Result<Matrix, ConversionError> {
     get_rgb_to_yuv_matrix(config).map(|m| m.invert())
