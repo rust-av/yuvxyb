@@ -56,43 +56,41 @@ impl TransferFunction for TransferCharacteristic {
 }
 
 macro_rules! image_transfer_fn {
-    ($name:ident) => {
-        paste::item! {
-            fn [<image_ $name>](mut input: Vec<[f32; 3]>) -> Vec<[f32; 3]> {
-                // SAFETY: Referencing preallocated memory (input)
-                let input_flat = unsafe {
-                    from_raw_parts_mut(input.as_mut_ptr().cast::<f32>(), input.len() * 3)
-                };
+    ($image_name:ident, $name:ident) => {
+        fn $image_name(mut input: Vec<[f32; 3]>) -> Vec<[f32; 3]> {
+            // SAFETY: Referencing preallocated memory (input)
+            let input_flat = unsafe {
+                from_raw_parts_mut(input.as_mut_ptr().cast::<f32>(), input.len() * 3)
+            };
 
-                for val in input_flat {
-                    *val = $name(*val);
-                }
-
-                input
+            for val in input_flat {
+                *val = $name(*val);
             }
+
+            input
         }
     };
 }
 
-image_transfer_fn!(log100_inverse_oetf);
-image_transfer_fn!(log316_inverse_oetf);
-image_transfer_fn!(rec_1886_eotf);
-image_transfer_fn!(rec_470m_oetf);
-image_transfer_fn!(rec_470bg_oetf);
-image_transfer_fn!(xvycc_eotf);
-image_transfer_fn!(srgb_eotf);
-image_transfer_fn!(st_2084_inverse_oetf);
-image_transfer_fn!(arib_b67_inverse_oetf);
+image_transfer_fn!(image_log100_inverse_oetf, log100_inverse_oetf);
+image_transfer_fn!(image_log316_inverse_oetf, log316_inverse_oetf);
+image_transfer_fn!(image_rec_1886_eotf, rec_1886_eotf);
+image_transfer_fn!(image_rec_470m_oetf, rec_470m_oetf);
+image_transfer_fn!(image_rec_470bg_oetf, rec_470bg_oetf);
+image_transfer_fn!(image_xvycc_eotf, xvycc_eotf);
+image_transfer_fn!(image_srgb_eotf, srgb_eotf);
+image_transfer_fn!(image_st_2084_inverse_oetf, st_2084_inverse_oetf);
+image_transfer_fn!(image_arib_b67_inverse_oetf, arib_b67_inverse_oetf);
 
-image_transfer_fn!(log100_oetf);
-image_transfer_fn!(log316_oetf);
-image_transfer_fn!(rec_1886_inverse_eotf);
-image_transfer_fn!(rec_470m_inverse_oetf);
-image_transfer_fn!(rec_470bg_inverse_oetf);
-image_transfer_fn!(xvycc_inverse_eotf);
-image_transfer_fn!(srgb_inverse_eotf);
-image_transfer_fn!(st_2084_oetf);
-image_transfer_fn!(arib_b67_oetf);
+image_transfer_fn!(image_log100_oetf, log100_oetf);
+image_transfer_fn!(image_log316_oetf, log316_oetf);
+image_transfer_fn!(image_rec_1886_inverse_eotf, rec_1886_inverse_eotf);
+image_transfer_fn!(image_rec_470m_inverse_oetf, rec_470m_inverse_oetf);
+image_transfer_fn!(image_rec_470bg_inverse_oetf, rec_470bg_inverse_oetf);
+image_transfer_fn!(image_xvycc_inverse_eotf, xvycc_inverse_eotf);
+image_transfer_fn!(image_srgb_inverse_eotf, srgb_inverse_eotf);
+image_transfer_fn!(image_st_2084_oetf, st_2084_oetf);
+image_transfer_fn!(image_arib_b67_oetf, arib_b67_oetf);
 
 const REC709_ALPHA: f32 = 1.099_296_8;
 const REC709_BETA: f32 = 0.018_053_97;
