@@ -2,44 +2,48 @@ name: Crate
 
 on:
   push:
-    branches: ["main"]
+    branches: [ "main" ]
   pull_request:
-    branches: ["main"]
+    branches: [ "main" ]
 
 env:
   CARGO_INCREMENTAL: 0
   RUSTFLAGS: "-Dwarnings"
 
 jobs:
-  msrv:
-    runs-on: ubuntu-22.04
-
-    steps:
-      - uses: actions/checkout@v4
-      # rust-version from Cargo.toml
-      - name: Install Rust 1.64.0
-        uses: dtolnay/rust-toolchain@1.64.0
-      - name: Use predefined lockfile
-        run: mv Cargo.lock.MSRV Cargo.lock
-      - name: Build
-        run: cargo check --locked
-
-  build:
+  build-and-test:
     runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v4
-      - name: Lint
-        run: cargo clippy
       - name: Build
-        run: cargo build
+        run: cargo clippy
       - name: Run tests
         run: cargo test
+      - name: Install cargo-msrv
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-msrv
+      - name: Validate minimum Rust version
+        run: |
+          cargo msrv verify --path yuvxyb-math
+          cargo msrv verify --path yuvxyb
 
-  lint-math:
+  code-coverage:
+    needs: [ build-and-test ]
     runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v4
-      - name: Lint
-        run: cargo clippy --manifest-path yuvxyb-math/Cargo.toml
+      - name: Install cargo-llvm-cov
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-llvm-cov
+      - name: Generate code coverage
+        run: cargo llvm-cov --lcov --output-path lcov.log
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: lcov.log
+          fail_ci_if_error: true
