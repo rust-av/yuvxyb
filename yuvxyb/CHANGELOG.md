@@ -1,3 +1,7 @@
+## Version 0.4.2
+
+- Fix edge case where division by zero may lead to incorrect results
+
 ## Version 0.4.1
 
 - Improve speed of FP math on platforms without FMA at the cost of precision
