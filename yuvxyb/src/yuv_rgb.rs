@@ -630,7 +630,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "8b tests are failing for unknown reason, need to be fixed, but can't find cause. 10b tests all pass"]
     fn bt601_full_to_rgb_8b() {
         // These values were manually chosen semi-randomly
         let yuv_pixels: Vec<(u8, u8, u8)> =
@@ -697,7 +696,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "8b tests are failing for unknown reason, need to be fixed, but can't find cause. 10b tests all pass"]
     fn bt601_limited_to_rgb_8b() {
         // These values were manually chosen semi-randomly
         let yuv_pixels: Vec<(u8, u8, u8)> =
@@ -904,7 +902,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "8b tests are failing for unknown reason, need to be fixed, but can't find cause. 10b tests all pass"]
     fn bt709_full_to_rgb_8b() {
         // These values were manually chosen semi-randomly
         let yuv_pixels: Vec<(u8, u8, u8)> =
@@ -971,7 +968,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "8b tests are failing for unknown reason, need to be fixed, but can't find cause. 10b tests all pass"]
     fn bt709_limited_to_rgb_8b() {
         // These values were manually chosen semi-randomly
         let yuv_pixels: Vec<(u8, u8, u8)> =
