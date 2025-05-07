@@ -70,10 +70,10 @@ mod tests {
                 ),
             ],
         };
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         for (i, plane) in data.planes.iter_mut().enumerate() {
             for val in plane.data_origin_mut().iter_mut() {
-                *val = rng.gen_range(if full_range {
+                *val = rng.random_range(if full_range {
                     0..=255
                 } else if i == 0 {
                     16..=235
@@ -233,10 +233,10 @@ mod tests {
                 ),
             ],
         };
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         for (i, plane) in data.planes.iter_mut().enumerate() {
             for val in plane.data_origin_mut().iter_mut() {
-                *val = rng.gen_range(if full_range {
+                *val = rng.random_range(if full_range {
                     0..=1023
                 } else if i == 0 {
                     64..=940

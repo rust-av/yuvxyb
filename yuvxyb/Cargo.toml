@@ -26,7 +26,7 @@ v_frame = "0.3.8"
 criterion = { version = "0.5", default-features = false }
 image = { version = "0.25", default-features = false, features = ["png"] }
 interpolate_name = "0.2.3"
-rand = "0.8.5"
+rand = "0.9.1"
 
 [[bench]]
 name = "benches"
