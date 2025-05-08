@@ -59,9 +59,8 @@ macro_rules! image_transfer_fn {
     ($image_name:ident, $name:ident) => {
         fn $image_name(mut input: Vec<[f32; 3]>) -> Vec<[f32; 3]> {
             // SAFETY: Referencing preallocated memory (input)
-            let input_flat = unsafe {
-                from_raw_parts_mut(input.as_mut_ptr().cast::<f32>(), input.len() * 3)
-            };
+            let input_flat =
+                unsafe { from_raw_parts_mut(input.as_mut_ptr().cast::<f32>(), input.len() * 3) };
 
             for val in input_flat {
                 *val = $name(*val);

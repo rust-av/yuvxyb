@@ -20,12 +20,25 @@ impl std::error::Error for ConversionError {}
 impl fmt::Display for ConversionError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
-            Self::UnsupportedMatrixCoefficients => write!(f, "Cannot convert between YUV and RGB using these matrix coefficients."),
-            Self::UnspecifiedMatrixCoefficients => write!(f, "No matrix coefficients were specified."),
-            Self::UnsupportedColorPrimaries => write!(f, "Cannot convert between YUV and RGB using these primaries."),
+            Self::UnsupportedMatrixCoefficients => write!(
+                f,
+                "Cannot convert between YUV and RGB using these matrix coefficients."
+            ),
+            Self::UnspecifiedMatrixCoefficients => {
+                write!(f, "No matrix coefficients were specified.")
+            }
+            Self::UnsupportedColorPrimaries => write!(
+                f,
+                "Cannot convert between YUV and RGB using these primaries."
+            ),
             Self::UnspecifiedColorPrimaries => write!(f, "No primaries were specified."),
-            Self::UnsupportedTransferCharacteristic => write!(f, "Cannot convert between YUV and RGB using this transfer function."),
-            Self::UnspecifiedTransferCharacteristic => write!(f, "No transfer function was specified."),
+            Self::UnsupportedTransferCharacteristic => write!(
+                f,
+                "Cannot convert between YUV and RGB using this transfer function."
+            ),
+            Self::UnspecifiedTransferCharacteristic => {
+                write!(f, "No transfer function was specified.")
+            }
         }
     }
 }
@@ -61,7 +74,9 @@ impl std::error::Error for CreationError {}
 impl fmt::Display for CreationError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
-            Self::ResolutionMismatch => write!(f, "Data length does not match the specified dimensions."),
+            Self::ResolutionMismatch => {
+                write!(f, "Data length does not match the specified dimensions.")
+            }
         }
     }
 }
