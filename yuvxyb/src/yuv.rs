@@ -70,10 +70,22 @@ impl std::error::Error for YuvError {}
 impl fmt::Display for YuvError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
-            Self::SubsamplingMismatch => write!(f, "Configured subsampling does not match subsampling of frame data."),
-            Self::InvalidLumaWidth => write!(f, "The frame width does not support the configured subsampling."),
-            Self::InvalidLumaHeight => write!(f, "The frame height does not support the configured subsampling."),
-            Self::InvalidData => write!(f, "Data contains values which are not valid for the configured bit depth."),
+            Self::SubsamplingMismatch => write!(
+                f,
+                "Configured subsampling does not match subsampling of frame data."
+            ),
+            Self::InvalidLumaWidth => write!(
+                f,
+                "The frame width does not support the configured subsampling."
+            ),
+            Self::InvalidLumaHeight => write!(
+                f,
+                "The frame height does not support the configured subsampling."
+            ),
+            Self::InvalidData => write!(
+                f,
+                "Data contains values which are not valid for the configured bit depth."
+            ),
         }
     }
 }
