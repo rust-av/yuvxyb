@@ -111,7 +111,6 @@ const ST2084_OOTF_SCALE: f32 = 59.490_803;
 const ARIB_B67_A: f32 = 0.178_832_77;
 const ARIB_B67_B: f32 = 0.284_668_92;
 const ARIB_B67_C: f32 = 0.559_910_7;
-#[inline(always)]
 fn log100_oetf(x: f32) -> f32 {
     if x <= 0.01 {
         0.0
@@ -120,7 +119,6 @@ fn log100_oetf(x: f32) -> f32 {
     }
 }
 
-#[inline(always)]
 fn log100_inverse_oetf(x: f32) -> f32 {
     if x <= 0.0 {
         0.01
@@ -129,7 +127,6 @@ fn log100_inverse_oetf(x: f32) -> f32 {
     }
 }
 
-#[inline(always)]
 fn log316_oetf(x: f32) -> f32 {
     if x <= 0.003_162_277_6 {
         0.0
@@ -138,7 +135,6 @@ fn log316_oetf(x: f32) -> f32 {
     }
 }
 
-#[inline(always)]
 fn log316_inverse_oetf(x: f32) -> f32 {
     if x <= 0.0 {
         0.003_162_277_6
@@ -148,7 +144,6 @@ fn log316_inverse_oetf(x: f32) -> f32 {
 }
 
 // Ignore the BT.1886 provisions for limited contrast and assume an ideal CRT.
-#[inline(always)]
 fn rec_1886_eotf(x: f32) -> f32 {
     if x <= 0.0 {
         0.0
@@ -157,7 +152,6 @@ fn rec_1886_eotf(x: f32) -> f32 {
     }
 }
 
-#[inline(always)]
 fn rec_1886_inverse_eotf(x: f32) -> f32 {
     if x <= 0.0 {
         0.0
@@ -166,7 +160,6 @@ fn rec_1886_inverse_eotf(x: f32) -> f32 {
     }
 }
 
-#[inline(always)]
 fn rec_470m_oetf(x: f32) -> f32 {
     if x <= 0.0 {
         0.0
@@ -175,7 +168,6 @@ fn rec_470m_oetf(x: f32) -> f32 {
     }
 }
 
-#[inline(always)]
 fn rec_470m_inverse_oetf(x: f32) -> f32 {
     if x <= 0.0 {
         0.0
@@ -184,7 +176,6 @@ fn rec_470m_inverse_oetf(x: f32) -> f32 {
     }
 }
 
-#[inline(always)]
 fn rec_470bg_oetf(x: f32) -> f32 {
     if x <= 0.0 {
         0.0
@@ -193,7 +184,6 @@ fn rec_470bg_oetf(x: f32) -> f32 {
     }
 }
 
-#[inline(always)]
 fn rec_470bg_inverse_oetf(x: f32) -> f32 {
     if x <= 0.0 {
         0.0
@@ -202,7 +192,6 @@ fn rec_470bg_inverse_oetf(x: f32) -> f32 {
     }
 }
 
-#[inline(always)]
 fn rec_709_oetf(x: f32) -> f32 {
     let x = x.max(0.0);
 
@@ -214,7 +203,6 @@ fn rec_709_oetf(x: f32) -> f32 {
     }
 }
 
-#[inline(always)]
 fn rec_709_inverse_oetf(x: f32) -> f32 {
     let x = x.max(0.0);
 
@@ -225,7 +213,6 @@ fn rec_709_inverse_oetf(x: f32) -> f32 {
     }
 }
 
-#[inline(always)]
 fn xvycc_eotf(x: f32) -> f32 {
     if (0.0..=1.0).contains(&x) {
         rec_1886_eotf(x.abs()).copysign(x)
@@ -234,7 +221,6 @@ fn xvycc_eotf(x: f32) -> f32 {
     }
 }
 
-#[inline(always)]
 fn xvycc_inverse_eotf(x: f32) -> f32 {
     if (0.0..=1.0).contains(&x) {
         rec_1886_inverse_eotf(x.abs()).copysign(x)
@@ -243,7 +229,6 @@ fn xvycc_inverse_eotf(x: f32) -> f32 {
     }
 }
 
-#[inline(always)]
 fn srgb_eotf(x: f32) -> f32 {
     let x = x.max(0.0);
 
@@ -254,7 +239,6 @@ fn srgb_eotf(x: f32) -> f32 {
     }
 }
 
-#[inline(always)]
 fn srgb_inverse_eotf(x: f32) -> f32 {
     let x = x.max(0.0);
 
@@ -266,7 +250,6 @@ fn srgb_inverse_eotf(x: f32) -> f32 {
     }
 }
 
-#[inline(always)]
 fn st_2084_inverse_eotf(x: f32) -> f32 {
     // Filter negative values to avoid NAN, and also special-case 0 so that (f(g(0))
     // == 0).
@@ -285,17 +268,14 @@ fn st_2084_inverse_eotf(x: f32) -> f32 {
     }
 }
 
-#[inline(always)]
 fn inverse_ootf_st2084(x: f32) -> f32 {
     rec_709_inverse_oetf(rec_1886_inverse_eotf(x * 100.0)) / ST2084_OOTF_SCALE
 }
 
-#[inline(always)]
 fn ootf_st2084(x: f32) -> f32 {
     rec_1886_eotf(rec_709_oetf(x * ST2084_OOTF_SCALE)) / 100.0
 }
 
-#[inline(always)]
 fn st_2084_eotf(x: f32) -> f32 {
     if x > 0.0 {
         let xpow = powf(x, 1.0 / ST2084_M2);
@@ -307,17 +287,14 @@ fn st_2084_eotf(x: f32) -> f32 {
     }
 }
 
-#[inline(always)]
 fn st_2084_inverse_oetf(x: f32) -> f32 {
     inverse_ootf_st2084(st_2084_eotf(x))
 }
 
-#[inline(always)]
 fn st_2084_oetf(x: f32) -> f32 {
     st_2084_inverse_eotf(ootf_st2084(x))
 }
 
-#[inline(always)]
 fn arib_b67_inverse_oetf(x: f32) -> f32 {
     let x = x.max(0.0);
 
@@ -328,7 +305,6 @@ fn arib_b67_inverse_oetf(x: f32) -> f32 {
     }
 }
 
-#[inline(always)]
 fn arib_b67_oetf(x: f32) -> f32 {
     let x = x.max(0.0);
 
