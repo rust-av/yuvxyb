@@ -122,7 +122,7 @@ fn log100_oetf(x: f32) -> f32 {
 
 #[inline(always)]
 fn log100_inverse_oetf(x: f32) -> f32 {
-    if x <= f32::EPSILON {
+    if x <= 0.0 {
         0.01
     } else {
         powf(10.0, 2.0 * (x - 1.0))
@@ -140,7 +140,7 @@ fn log316_oetf(x: f32) -> f32 {
 
 #[inline(always)]
 fn log316_inverse_oetf(x: f32) -> f32 {
-    if x <= f32::EPSILON {
+    if x <= 0.0 {
         0.003_162_277_6
     } else {
         powf(10.0, 2.5 * (x - 1.0))
@@ -150,7 +150,7 @@ fn log316_inverse_oetf(x: f32) -> f32 {
 // Ignore the BT.1886 provisions for limited contrast and assume an ideal CRT.
 #[inline(always)]
 fn rec_1886_eotf(x: f32) -> f32 {
-    if x < f32::EPSILON {
+    if x <= 0.0 {
         0.0
     } else {
         powf(x, 2.4)
@@ -159,7 +159,7 @@ fn rec_1886_eotf(x: f32) -> f32 {
 
 #[inline(always)]
 fn rec_1886_inverse_eotf(x: f32) -> f32 {
-    if x < f32::EPSILON {
+    if x <= 0.0 {
         0.0
     } else {
         powf(x, 1.0 / 2.4)
@@ -168,7 +168,7 @@ fn rec_1886_inverse_eotf(x: f32) -> f32 {
 
 #[inline(always)]
 fn rec_470m_oetf(x: f32) -> f32 {
-    if x < f32::EPSILON {
+    if x <= 0.0 {
         0.0
     } else {
         powf(x, 2.2)
@@ -177,7 +177,7 @@ fn rec_470m_oetf(x: f32) -> f32 {
 
 #[inline(always)]
 fn rec_470m_inverse_oetf(x: f32) -> f32 {
-    if x < f32::EPSILON {
+    if x <= 0.0 {
         0.0
     } else {
         powf(x, 1.0 / 2.2)
@@ -186,7 +186,7 @@ fn rec_470m_inverse_oetf(x: f32) -> f32 {
 
 #[inline(always)]
 fn rec_470bg_oetf(x: f32) -> f32 {
-    if x < f32::EPSILON {
+    if x <= 0.0 {
         0.0
     } else {
         powf(x, 2.8)
@@ -195,7 +195,7 @@ fn rec_470bg_oetf(x: f32) -> f32 {
 
 #[inline(always)]
 fn rec_470bg_inverse_oetf(x: f32) -> f32 {
-    if x < f32::EPSILON {
+    if x <= 0.0 {
         0.0
     } else {
         powf(x, 1.0 / 2.8)
