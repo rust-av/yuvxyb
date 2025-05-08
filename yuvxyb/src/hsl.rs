@@ -1,3 +1,6 @@
+#[cfg(test)]
+mod tests;
+
 use crate::{CreationError, LinearRgb};
 
 /// Contains an HSL image.
