@@ -138,21 +138,18 @@ fn ypbpr_to_ycbcr<T: Pixel>(
     Yuv::new(output, config).unwrap()
 }
 
-#[inline(always)]
 fn to_f32_luma<T: Pixel>(val: T, scale: f32, offset: f32) -> f32 {
     // Converts to a float value in the range 0.0..=1.0
     let val = f32::from(u16::cast_from(val));
     clamp(val.mul_add(scale, offset), 0.0, 1.0)
 }
 
-#[inline(always)]
 fn to_f32_chroma<T: Pixel>(val: T, scale: f32, offset: f32) -> f32 {
     // Converts to a float value in the range -0.5..=0.5
     let val = f32::from(u16::cast_from(val));
     clamp(val.mul_add(scale, offset), -0.5, 0.5)
 }
 
-#[inline(always)]
 fn from_f32_luma<T: Pixel>(val: f32, scale: f32, offset: f32, bd: u8) -> T {
     // Converts to a float value in the range 0.0..=1.0
     T::cast_from(clamp(
@@ -162,7 +159,6 @@ fn from_f32_luma<T: Pixel>(val: f32, scale: f32, offset: f32, bd: u8) -> T {
     ))
 }
 
-#[inline(always)]
 fn from_f32_chroma<T: Pixel>(val: f32, scale: f32, offset: f32, bd: u8, full_range: bool) -> T {
     // Accounts for rounding issues
     if full_range && (val + 0.5).abs() < f32::EPSILON {

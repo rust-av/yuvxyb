@@ -92,7 +92,6 @@ impl From<LinearRgb> for Hsl {
     }
 }
 
-#[inline(always)]
 #[allow(clippy::many_single_char_names)]
 fn lrgb_to_hsl(rgb: [f32; 3]) -> [f32; 3] {
     let x_max = rgb[0].max(rgb[1]).max(rgb[2]);

@@ -102,7 +102,6 @@ pub fn xyb_to_linear_rgb(mut input: Vec<[f32; 3]>) -> Vec<[f32; 3]> {
     input
 }
 
-#[inline]
 fn opsin_absorbance(rgb: &[f32; 3]) -> [f32; 3] {
     let mut out = [0.0f32; 3];
     out[0] = OPSIN_ABSORBANCE_MATRIX[0].mul_add(
@@ -129,7 +128,6 @@ fn opsin_absorbance(rgb: &[f32; 3]) -> [f32; 3] {
     out
 }
 
-#[inline]
 fn mixed_to_xyb(mixed: &[f32; 3]) -> [f32; 3] {
     let mut out = [0.0f32; 3];
     out[0] = 0.5f32 * (mixed[0] - mixed[1]);

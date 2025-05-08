@@ -137,7 +137,6 @@ impl From<Hsl> for LinearRgb {
     }
 }
 
-#[inline(always)]
 fn hsl_to_lrgb(hsl: [f32; 3]) -> [f32; 3] {
     let c = (1.0 - 2.0f32.mul_add(hsl[2], -1.0).abs()) * hsl[1];
     let h_prime = hsl[0] / 60.0;
