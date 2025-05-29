@@ -1,3 +1,6 @@
+#[cfg(test)]
+mod tests;
+
 use av_data::pixel::TransferCharacteristic;
 use std::slice::from_raw_parts_mut;
 
