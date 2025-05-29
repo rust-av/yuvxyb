@@ -1,3 +1,6 @@
+#[cfg(test)]
+mod tests;
+
 use av_data::pixel::ColorPrimaries;
 use v_frame::prelude::Pixel;
 
