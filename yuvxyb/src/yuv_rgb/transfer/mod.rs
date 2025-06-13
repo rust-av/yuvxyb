@@ -15,17 +15,17 @@ pub trait TransferFunction {
 impl TransferFunction for TransferCharacteristic {
     fn to_linear(&self, input: Vec<[f32; 3]>) -> Result<Vec<[f32; 3]>, ConversionError> {
         Ok(match *self {
-            Self::Logarithmic100 => image_log100_inverse_oetf(input),
-            Self::Logarithmic316 => image_log316_inverse_oetf(input),
+            Self::Logarithmic100 => image_log100_gamma_to_lin(input),
+            Self::Logarithmic316 => image_log316_gamma_to_lin(input),
             Self::BT1886 | Self::ST170M | Self::ST240M | Self::BT2020Ten | Self::BT2020Twelve => {
-                image_rec_1886_eotf(input)
+                image_rec_1886_gamma_to_lin(input)
             }
-            Self::BT470M => image_rec_470m_oetf(input),
-            Self::BT470BG => image_rec_470bg_oetf(input),
-            Self::XVYCC => image_xvycc_eotf(input),
-            Self::SRGB => image_srgb_eotf(input),
-            Self::PerceptualQuantizer => image_st_2084_inverse_oetf(input),
-            Self::HybridLogGamma => image_arib_b67_inverse_oetf(input),
+            Self::BT470M => image_rec_470m_gamma_to_lin(input),
+            Self::BT470BG => image_rec_470bg_gamma_to_lin(input),
+            Self::XVYCC => image_xvycc_gamma_to_lin(input),
+            Self::SRGB => image_srgb_gamma_to_lin(input),
+            Self::PerceptualQuantizer => image_st_2084_gamma_to_lin(input),
+            Self::HybridLogGamma => image_arib_b67_gamma_to_lin(input),
             Self::Linear => input,
             Self::Reserved0 | Self::Reserved | Self::BT1361E | Self::ST428 => {
                 return Err(ConversionError::UnsupportedTransferCharacteristic)
@@ -37,17 +37,17 @@ impl TransferFunction for TransferCharacteristic {
     #[allow(clippy::too_many_lines)]
     fn to_gamma(&self, input: Vec<[f32; 3]>) -> Result<Vec<[f32; 3]>, ConversionError> {
         Ok(match *self {
-            Self::Logarithmic100 => image_log100_oetf(input),
-            Self::Logarithmic316 => image_log316_oetf(input),
+            Self::Logarithmic100 => image_log100_lin_to_gamma(input),
+            Self::Logarithmic316 => image_log316_lin_to_gamma(input),
             Self::BT1886 | Self::ST170M | Self::ST240M | Self::BT2020Ten | Self::BT2020Twelve => {
-                image_rec_1886_inverse_eotf(input)
+                image_rec_1886_lin_to_gamma(input)
             }
-            Self::BT470M => image_rec_470m_inverse_oetf(input),
-            Self::BT470BG => image_rec_470bg_inverse_oetf(input),
-            Self::XVYCC => image_xvycc_inverse_eotf(input),
-            Self::SRGB => image_srgb_inverse_eotf(input),
-            Self::PerceptualQuantizer => image_st_2084_oetf(input),
-            Self::HybridLogGamma => image_arib_b67_oetf(input),
+            Self::BT470M => image_rec_470m_lin_to_gamma(input),
+            Self::BT470BG => image_rec_470bg_lin_to_gamma(input),
+            Self::XVYCC => image_xvycc_lin_to_gamma(input),
+            Self::SRGB => image_srgb_lin_to_gamma(input),
+            Self::PerceptualQuantizer => image_st_2084_lin_to_gamma(input),
+            Self::HybridLogGamma => image_arib_b67_lin_to_gamma(input),
             Self::Linear => input,
             // Unsupported
             Self::Reserved0 | Self::Reserved | Self::BT1361E | Self::ST428 => {
@@ -74,25 +74,25 @@ macro_rules! image_transfer_fn {
     };
 }
 
-image_transfer_fn!(image_log100_inverse_oetf, log100_inverse_oetf);
-image_transfer_fn!(image_log316_inverse_oetf, log316_inverse_oetf);
-image_transfer_fn!(image_rec_1886_eotf, rec_1886_eotf);
-image_transfer_fn!(image_rec_470m_oetf, rec_470m_oetf);
-image_transfer_fn!(image_rec_470bg_oetf, rec_470bg_oetf);
-image_transfer_fn!(image_xvycc_eotf, xvycc_eotf);
-image_transfer_fn!(image_srgb_eotf, srgb_eotf);
-image_transfer_fn!(image_st_2084_inverse_oetf, st_2084_inverse_oetf);
-image_transfer_fn!(image_arib_b67_inverse_oetf, arib_b67_inverse_oetf);
+image_transfer_fn!(image_log100_gamma_to_lin, log100_gamma_to_lin);
+image_transfer_fn!(image_log316_gamma_to_lin, log316_gamma_to_lin);
+image_transfer_fn!(image_rec_1886_gamma_to_lin, rec_1886_gamma_to_lin);
+image_transfer_fn!(image_rec_470m_gamma_to_lin, rec_470m_gamma_to_lin);
+image_transfer_fn!(image_rec_470bg_gamma_to_lin, rec_470bg_gamma_to_lin);
+image_transfer_fn!(image_xvycc_gamma_to_lin, xvycc_gamma_to_lin);
+image_transfer_fn!(image_srgb_gamma_to_lin, srgb_gamma_to_lin);
+image_transfer_fn!(image_st_2084_gamma_to_lin, st_2084_gamma_to_lin);
+image_transfer_fn!(image_arib_b67_gamma_to_lin, arib_b67_gamma_to_lin);
 
-image_transfer_fn!(image_log100_oetf, log100_oetf);
-image_transfer_fn!(image_log316_oetf, log316_oetf);
-image_transfer_fn!(image_rec_1886_inverse_eotf, rec_1886_inverse_eotf);
-image_transfer_fn!(image_rec_470m_inverse_oetf, rec_470m_inverse_oetf);
-image_transfer_fn!(image_rec_470bg_inverse_oetf, rec_470bg_inverse_oetf);
-image_transfer_fn!(image_xvycc_inverse_eotf, xvycc_inverse_eotf);
-image_transfer_fn!(image_srgb_inverse_eotf, srgb_inverse_eotf);
-image_transfer_fn!(image_st_2084_oetf, st_2084_oetf);
-image_transfer_fn!(image_arib_b67_oetf, arib_b67_oetf);
+image_transfer_fn!(image_log100_lin_to_gamma, log100_lin_to_gamma);
+image_transfer_fn!(image_log316_lin_to_gamma, log316_lin_to_gamma);
+image_transfer_fn!(image_rec_1886_lin_to_gamma, rec_1886_lin_to_gamma);
+image_transfer_fn!(image_rec_470m_lin_to_gamma, rec_470m_lin_to_gamma);
+image_transfer_fn!(image_rec_470bg_lin_to_gamma, rec_470bg_lin_to_gamma);
+image_transfer_fn!(image_xvycc_lin_to_gamma, xvycc_lin_to_gamma);
+image_transfer_fn!(image_srgb_lin_to_gamma, srgb_lin_to_gamma);
+image_transfer_fn!(image_st_2084_lin_to_gamma, st_2084_lin_to_gamma);
+image_transfer_fn!(image_arib_b67_lin_to_gamma, arib_b67_lin_to_gamma);
 
 const REC709_ALPHA: f32 = 1.099_296_8;
 const REC709_BETA: f32 = 0.018_053_97;
@@ -114,7 +114,7 @@ const ST2084_OOTF_SCALE: f32 = 59.490_803;
 const ARIB_B67_A: f32 = 0.178_832_77;
 const ARIB_B67_B: f32 = 0.284_668_92;
 const ARIB_B67_C: f32 = 0.559_910_7;
-fn log100_oetf(x: f32) -> f32 {
+fn log100_lin_to_gamma(x: f32) -> f32 {
     if x <= 0.01 {
         0.0
     } else {
@@ -122,7 +122,7 @@ fn log100_oetf(x: f32) -> f32 {
     }
 }
 
-fn log100_inverse_oetf(x: f32) -> f32 {
+fn log100_gamma_to_lin(x: f32) -> f32 {
     if x <= 0.0 {
         0.01
     } else {
@@ -130,7 +130,7 @@ fn log100_inverse_oetf(x: f32) -> f32 {
     }
 }
 
-fn log316_oetf(x: f32) -> f32 {
+fn log316_lin_to_gamma(x: f32) -> f32 {
     if x <= 0.003_162_277_6 {
         0.0
     } else {
@@ -138,7 +138,7 @@ fn log316_oetf(x: f32) -> f32 {
     }
 }
 
-fn log316_inverse_oetf(x: f32) -> f32 {
+fn log316_gamma_to_lin(x: f32) -> f32 {
     if x <= 0.0 {
         0.003_162_277_6
     } else {
@@ -147,7 +147,7 @@ fn log316_inverse_oetf(x: f32) -> f32 {
 }
 
 // Ignore the BT.1886 provisions for limited contrast and assume an ideal CRT.
-fn rec_1886_eotf(x: f32) -> f32 {
+fn rec_1886_gamma_to_lin(x: f32) -> f32 {
     if x <= 0.0 {
         0.0
     } else {
@@ -155,7 +155,7 @@ fn rec_1886_eotf(x: f32) -> f32 {
     }
 }
 
-fn rec_1886_inverse_eotf(x: f32) -> f32 {
+fn rec_1886_lin_to_gamma(x: f32) -> f32 {
     if x <= 0.0 {
         0.0
     } else {
@@ -163,7 +163,7 @@ fn rec_1886_inverse_eotf(x: f32) -> f32 {
     }
 }
 
-fn rec_470m_oetf(x: f32) -> f32 {
+fn rec_470m_gamma_to_lin(x: f32) -> f32 {
     if x <= 0.0 {
         0.0
     } else {
@@ -171,7 +171,7 @@ fn rec_470m_oetf(x: f32) -> f32 {
     }
 }
 
-fn rec_470m_inverse_oetf(x: f32) -> f32 {
+fn rec_470m_lin_to_gamma(x: f32) -> f32 {
     if x <= 0.0 {
         0.0
     } else {
@@ -179,7 +179,7 @@ fn rec_470m_inverse_oetf(x: f32) -> f32 {
     }
 }
 
-fn rec_470bg_oetf(x: f32) -> f32 {
+fn rec_470bg_gamma_to_lin(x: f32) -> f32 {
     if x <= 0.0 {
         0.0
     } else {
@@ -187,7 +187,7 @@ fn rec_470bg_oetf(x: f32) -> f32 {
     }
 }
 
-fn rec_470bg_inverse_oetf(x: f32) -> f32 {
+fn rec_470bg_lin_to_gamma(x: f32) -> f32 {
     if x <= 0.0 {
         0.0
     } else {
@@ -216,23 +216,23 @@ fn rec_709_inverse_oetf(x: f32) -> f32 {
     }
 }
 
-fn xvycc_eotf(x: f32) -> f32 {
+fn xvycc_gamma_to_lin(x: f32) -> f32 {
     if (0.0..=1.0).contains(&x) {
-        rec_1886_eotf(x.abs()).copysign(x)
+        rec_1886_gamma_to_lin(x.abs()).copysign(x)
     } else {
         rec_709_inverse_oetf(x.abs()).copysign(x)
     }
 }
 
-fn xvycc_inverse_eotf(x: f32) -> f32 {
+fn xvycc_lin_to_gamma(x: f32) -> f32 {
     if (0.0..=1.0).contains(&x) {
-        rec_1886_inverse_eotf(x.abs()).copysign(x)
+        rec_1886_lin_to_gamma(x.abs()).copysign(x)
     } else {
         rec_709_oetf(x.abs()).copysign(x)
     }
 }
 
-fn srgb_eotf(x: f32) -> f32 {
+fn srgb_gamma_to_lin(x: f32) -> f32 {
     let x = x.max(0.0);
 
     if x < 12.92 * SRGB_BETA {
@@ -242,7 +242,7 @@ fn srgb_eotf(x: f32) -> f32 {
     }
 }
 
-fn srgb_inverse_eotf(x: f32) -> f32 {
+fn srgb_lin_to_gamma(x: f32) -> f32 {
     let x = x.max(0.0);
 
     if x < SRGB_BETA {
@@ -272,11 +272,11 @@ fn st_2084_inverse_eotf(x: f32) -> f32 {
 }
 
 fn inverse_ootf_st2084(x: f32) -> f32 {
-    rec_709_inverse_oetf(rec_1886_inverse_eotf(x * 100.0)) / ST2084_OOTF_SCALE
+    rec_709_inverse_oetf(rec_1886_lin_to_gamma(x * 100.0)) / ST2084_OOTF_SCALE
 }
 
 fn ootf_st2084(x: f32) -> f32 {
-    rec_1886_eotf(rec_709_oetf(x * ST2084_OOTF_SCALE)) / 100.0
+    rec_1886_gamma_to_lin(rec_709_oetf(x * ST2084_OOTF_SCALE)) / 100.0
 }
 
 fn st_2084_eotf(x: f32) -> f32 {
@@ -290,15 +290,15 @@ fn st_2084_eotf(x: f32) -> f32 {
     }
 }
 
-fn st_2084_inverse_oetf(x: f32) -> f32 {
+fn st_2084_gamma_to_lin(x: f32) -> f32 {
     inverse_ootf_st2084(st_2084_eotf(x))
 }
 
-fn st_2084_oetf(x: f32) -> f32 {
+fn st_2084_lin_to_gamma(x: f32) -> f32 {
     st_2084_inverse_eotf(ootf_st2084(x))
 }
 
-fn arib_b67_inverse_oetf(x: f32) -> f32 {
+fn arib_b67_gamma_to_lin(x: f32) -> f32 {
     let x = x.max(0.0);
 
     if x <= 0.5 {
@@ -308,7 +308,7 @@ fn arib_b67_inverse_oetf(x: f32) -> f32 {
     }
 }
 
-fn arib_b67_oetf(x: f32) -> f32 {
+fn arib_b67_lin_to_gamma(x: f32) -> f32 {
     let x = x.max(0.0);
 
     if x <= 1.0 / 12.0 {

@@ -75,193 +75,193 @@ where
 #[test]
 fn test_log100_oetf_branches() {
     // Test x <= 0.01 branch
-    assert_eq!(log100_oetf(0.0), 0.0);
-    assert_eq!(log100_oetf(0.005), 0.0);
-    assert_eq!(log100_oetf(0.01), 0.0);
-    assert_eq!(log100_oetf(-0.1), 0.0);
+    assert_eq!(log100_lin_to_gamma(0.0), 0.0);
+    assert_eq!(log100_lin_to_gamma(0.005), 0.0);
+    assert_eq!(log100_lin_to_gamma(0.01), 0.0);
+    assert_eq!(log100_lin_to_gamma(-0.1), 0.0);
 
     // Test x > 0.01 branch
-    let result = log100_oetf(0.1);
+    let result = log100_lin_to_gamma(0.1);
     let expected = 1.0 + 0.1_f32.log10() / 2.0;
     assert!((result - expected).abs() < f32::EPSILON);
 
-    let result = log100_oetf(1.0);
+    let result = log100_lin_to_gamma(1.0);
     let expected = 1.0 + 1.0_f32.log10() / 2.0;
     assert!((result - expected).abs() < f32::EPSILON);
 
-    assert_handles_edge_cases(log100_oetf, "log100_oetf");
+    assert_handles_edge_cases(log100_lin_to_gamma, "log100_oetf");
 }
 
 #[test]
 fn test_log100_inverse_oetf_branches() {
     // Test x <= 0.0 branch
-    assert_eq!(log100_inverse_oetf(0.0), 0.01);
-    assert_eq!(log100_inverse_oetf(-0.1), 0.01);
-    assert_eq!(log100_inverse_oetf(-1.0), 0.01);
+    assert_eq!(log100_gamma_to_lin(0.0), 0.01);
+    assert_eq!(log100_gamma_to_lin(-0.1), 0.01);
+    assert_eq!(log100_gamma_to_lin(-1.0), 0.01);
 
     // Test x > 0.0 branch
-    let result = log100_inverse_oetf(0.5);
+    let result = log100_gamma_to_lin(0.5);
     let expected = powf(10.0, 2.0 * (0.5 - 1.0));
     assert!((result - expected).abs() < f32::EPSILON);
 
-    let result = log100_inverse_oetf(1.5);
+    let result = log100_gamma_to_lin(1.5);
     let expected = powf(10.0, 2.0 * (1.5 - 1.0));
     assert!((result - expected).abs() < f32::EPSILON);
 
-    assert_handles_edge_cases(log100_inverse_oetf, "log100_inverse_oetf");
+    assert_handles_edge_cases(log100_gamma_to_lin, "log100_inverse_oetf");
 }
 
 #[test]
 fn test_log316_oetf_branches() {
     // Test x <= 0.003162276 branch
-    assert_eq!(log316_oetf(0.0), 0.0);
-    assert_eq!(log316_oetf(0.001), 0.0);
-    assert_eq!(log316_oetf(0.003_162_277_6), 0.0);
-    assert_eq!(log316_oetf(-0.1), 0.0);
+    assert_eq!(log316_lin_to_gamma(0.0), 0.0);
+    assert_eq!(log316_lin_to_gamma(0.001), 0.0);
+    assert_eq!(log316_lin_to_gamma(0.003_162_277_6), 0.0);
+    assert_eq!(log316_lin_to_gamma(-0.1), 0.0);
 
     // Test x > 0.003162276 branch
-    let result = log316_oetf(0.1);
+    let result = log316_lin_to_gamma(0.1);
     let expected = 1.0 + 0.1_f32.log10() / 2.5;
     assert!((result - expected).abs() < f32::EPSILON);
 
-    let result = log316_oetf(1.0);
+    let result = log316_lin_to_gamma(1.0);
     let expected = 1.0 + 1.0_f32.log10() / 2.5;
     assert!((result - expected).abs() < f32::EPSILON);
 
-    assert_handles_edge_cases(log316_oetf, "log316_oetf");
+    assert_handles_edge_cases(log316_lin_to_gamma, "log316_oetf");
 }
 
 #[test]
 fn test_log316_inverse_oetf_branches() {
     // Test x <= 0.0 branch
-    assert_eq!(log316_inverse_oetf(0.0), 0.003_162_277_6);
-    assert_eq!(log316_inverse_oetf(-0.1), 0.003_162_277_6);
-    assert_eq!(log316_inverse_oetf(-1.0), 0.003_162_277_6);
+    assert_eq!(log316_gamma_to_lin(0.0), 0.003_162_277_6);
+    assert_eq!(log316_gamma_to_lin(-0.1), 0.003_162_277_6);
+    assert_eq!(log316_gamma_to_lin(-1.0), 0.003_162_277_6);
 
     // Test x > 0.0 branch
-    let result = log316_inverse_oetf(0.5);
+    let result = log316_gamma_to_lin(0.5);
     let expected = powf(10.0, 2.5 * (0.5 - 1.0));
     assert!((result - expected).abs() < f32::EPSILON);
 
-    let result = log316_inverse_oetf(1.5);
+    let result = log316_gamma_to_lin(1.5);
     let expected = powf(10.0, 2.5 * (1.5 - 1.0));
     assert!((result - expected).abs() < f32::EPSILON);
 
-    assert_handles_edge_cases(log316_inverse_oetf, "log316_inverse_oetf");
+    assert_handles_edge_cases(log316_gamma_to_lin, "log316_inverse_oetf");
 }
 
 #[test]
 fn test_rec_1886_eotf_branches() {
     // Test x <= 0.0 branch
-    assert_eq!(rec_1886_eotf(0.0), 0.0);
-    assert_eq!(rec_1886_eotf(-0.1), 0.0);
-    assert_eq!(rec_1886_eotf(-1.0), 0.0);
+    assert_eq!(rec_1886_gamma_to_lin(0.0), 0.0);
+    assert_eq!(rec_1886_gamma_to_lin(-0.1), 0.0);
+    assert_eq!(rec_1886_gamma_to_lin(-1.0), 0.0);
 
     // Test x > 0.0 branch
-    let result = rec_1886_eotf(0.5);
+    let result = rec_1886_gamma_to_lin(0.5);
     let expected = powf(0.5, 2.4);
     assert!((result - expected).abs() < f32::EPSILON);
 
-    let result = rec_1886_eotf(1.0);
+    let result = rec_1886_gamma_to_lin(1.0);
     let expected = powf(1.0, 2.4);
     assert!((result - expected).abs() < f32::EPSILON);
 
-    assert_handles_edge_cases(rec_1886_eotf, "rec_1886_eotf");
+    assert_handles_edge_cases(rec_1886_gamma_to_lin, "rec_1886_eotf");
 }
 
 #[test]
 fn test_rec_1886_inverse_eotf_branches() {
     // Test x <= 0.0 branch
-    assert_eq!(rec_1886_inverse_eotf(0.0), 0.0);
-    assert_eq!(rec_1886_inverse_eotf(-0.1), 0.0);
-    assert_eq!(rec_1886_inverse_eotf(-1.0), 0.0);
+    assert_eq!(rec_1886_lin_to_gamma(0.0), 0.0);
+    assert_eq!(rec_1886_lin_to_gamma(-0.1), 0.0);
+    assert_eq!(rec_1886_lin_to_gamma(-1.0), 0.0);
 
     // Test x > 0.0 branch
-    let result = rec_1886_inverse_eotf(0.5);
+    let result = rec_1886_lin_to_gamma(0.5);
     let expected = powf(0.5, 1.0 / 2.4);
     assert!((result - expected).abs() < f32::EPSILON);
 
-    let result = rec_1886_inverse_eotf(1.0);
+    let result = rec_1886_lin_to_gamma(1.0);
     let expected = powf(1.0, 1.0 / 2.4);
     assert!((result - expected).abs() < f32::EPSILON);
 
-    assert_handles_edge_cases(rec_1886_inverse_eotf, "rec_1886_inverse_eotf");
+    assert_handles_edge_cases(rec_1886_lin_to_gamma, "rec_1886_inverse_eotf");
 }
 
 #[test]
 fn test_rec_470m_oetf_branches() {
     // Test x <= 0.0 branch
-    assert_eq!(rec_470m_oetf(0.0), 0.0);
-    assert_eq!(rec_470m_oetf(-0.1), 0.0);
-    assert_eq!(rec_470m_oetf(-1.0), 0.0);
+    assert_eq!(rec_470m_gamma_to_lin(0.0), 0.0);
+    assert_eq!(rec_470m_gamma_to_lin(-0.1), 0.0);
+    assert_eq!(rec_470m_gamma_to_lin(-1.0), 0.0);
 
     // Test x > 0.0 branch
-    let result = rec_470m_oetf(0.5);
+    let result = rec_470m_gamma_to_lin(0.5);
     let expected = powf(0.5, 2.2);
     assert!((result - expected).abs() < f32::EPSILON);
 
-    let result = rec_470m_oetf(1.0);
+    let result = rec_470m_gamma_to_lin(1.0);
     let expected = powf(1.0, 2.2);
     assert!((result - expected).abs() < f32::EPSILON);
 
-    assert_handles_edge_cases(rec_470m_oetf, "rec_470m_oetf");
+    assert_handles_edge_cases(rec_470m_gamma_to_lin, "rec_470m_oetf");
 }
 
 #[test]
 fn test_rec_470m_inverse_oetf_branches() {
     // Test x <= 0.0 branch
-    assert_eq!(rec_470m_inverse_oetf(0.0), 0.0);
-    assert_eq!(rec_470m_inverse_oetf(-0.1), 0.0);
-    assert_eq!(rec_470m_inverse_oetf(-1.0), 0.0);
+    assert_eq!(rec_470m_lin_to_gamma(0.0), 0.0);
+    assert_eq!(rec_470m_lin_to_gamma(-0.1), 0.0);
+    assert_eq!(rec_470m_lin_to_gamma(-1.0), 0.0);
 
     // Test x > 0.0 branch
-    let result = rec_470m_inverse_oetf(0.5);
+    let result = rec_470m_lin_to_gamma(0.5);
     let expected = powf(0.5, 1.0 / 2.2);
     assert!((result - expected).abs() < f32::EPSILON);
 
-    let result = rec_470m_inverse_oetf(1.0);
+    let result = rec_470m_lin_to_gamma(1.0);
     let expected = powf(1.0, 1.0 / 2.2);
     assert!((result - expected).abs() < f32::EPSILON);
 
-    assert_handles_edge_cases(rec_470m_inverse_oetf, "rec_470m_inverse_oetf");
+    assert_handles_edge_cases(rec_470m_lin_to_gamma, "rec_470m_inverse_oetf");
 }
 
 #[test]
 fn test_rec_470bg_oetf_branches() {
     // Test x <= 0.0 branch
-    assert_eq!(rec_470bg_oetf(0.0), 0.0);
-    assert_eq!(rec_470bg_oetf(-0.1), 0.0);
-    assert_eq!(rec_470bg_oetf(-1.0), 0.0);
+    assert_eq!(rec_470bg_gamma_to_lin(0.0), 0.0);
+    assert_eq!(rec_470bg_gamma_to_lin(-0.1), 0.0);
+    assert_eq!(rec_470bg_gamma_to_lin(-1.0), 0.0);
 
     // Test x > 0.0 branch
-    let result = rec_470bg_oetf(0.5);
+    let result = rec_470bg_gamma_to_lin(0.5);
     let expected = powf(0.5, 2.8);
     assert!((result - expected).abs() < f32::EPSILON);
 
-    let result = rec_470bg_oetf(1.0);
+    let result = rec_470bg_gamma_to_lin(1.0);
     let expected = powf(1.0, 2.8);
     assert!((result - expected).abs() < f32::EPSILON);
 
-    assert_handles_edge_cases(rec_470bg_oetf, "rec_470bg_oetf");
+    assert_handles_edge_cases(rec_470bg_gamma_to_lin, "rec_470bg_oetf");
 }
 
 #[test]
 fn test_rec_470bg_inverse_oetf_branches() {
     // Test x <= 0.0 branch
-    assert_eq!(rec_470bg_inverse_oetf(0.0), 0.0);
-    assert_eq!(rec_470bg_inverse_oetf(-0.1), 0.0);
-    assert_eq!(rec_470bg_inverse_oetf(-1.0), 0.0);
+    assert_eq!(rec_470bg_lin_to_gamma(0.0), 0.0);
+    assert_eq!(rec_470bg_lin_to_gamma(-0.1), 0.0);
+    assert_eq!(rec_470bg_lin_to_gamma(-1.0), 0.0);
 
     // Test x > 0.0 branch
-    let result = rec_470bg_inverse_oetf(0.5);
+    let result = rec_470bg_lin_to_gamma(0.5);
     let expected = powf(0.5, 1.0 / 2.8);
     assert!((result - expected).abs() < f32::EPSILON);
 
-    let result = rec_470bg_inverse_oetf(1.0);
+    let result = rec_470bg_lin_to_gamma(1.0);
     let expected = powf(1.0, 1.0 / 2.8);
     assert!((result - expected).abs() < f32::EPSILON);
 
-    assert_handles_edge_cases(rec_470bg_inverse_oetf, "rec_470bg_inverse_oetf");
+    assert_handles_edge_cases(rec_470bg_lin_to_gamma, "rec_470bg_inverse_oetf");
 }
 
 #[test]
@@ -318,8 +318,8 @@ fn test_rec_709_inverse_oetf_branches() {
 #[test]
 fn test_xvycc_eotf_branches() {
     // Test (0.0..=1.0).contains(&x) branch - positive values within range
-    let result = xvycc_eotf(0.5);
-    let expected = rec_1886_eotf(0.5_f32.abs()).copysign(0.5);
+    let result = xvycc_gamma_to_lin(0.5);
+    let expected = rec_1886_gamma_to_lin(0.5_f32.abs()).copysign(0.5);
     assert!(
         (result - expected).abs() < 1e-6,
         "Expected {}, got {}",
@@ -328,11 +328,11 @@ fn test_xvycc_eotf_branches() {
     );
 
     // Test (0.0..=1.0).contains(&x) branch - boundary values
-    assert_eq!(xvycc_eotf(0.0), rec_1886_eotf(0.0));
-    assert_eq!(xvycc_eotf(1.0), rec_1886_eotf(1.0));
+    assert_eq!(xvycc_gamma_to_lin(0.0), rec_1886_gamma_to_lin(0.0));
+    assert_eq!(xvycc_gamma_to_lin(1.0), rec_1886_gamma_to_lin(1.0));
 
     // Test outside (0.0..=1.0) range - negative values (should use rec_709_inverse_oetf)
-    let result = xvycc_eotf(-0.5);
+    let result = xvycc_gamma_to_lin(-0.5);
     let expected = rec_709_inverse_oetf((-0.5_f32).abs()).copysign(-0.5);
     assert!(
         (result - expected).abs() < 1e-6,
@@ -342,7 +342,7 @@ fn test_xvycc_eotf_branches() {
     );
 
     // Test outside (0.0..=1.0) range - positive values > 1.0
-    let result = xvycc_eotf(1.5);
+    let result = xvycc_gamma_to_lin(1.5);
     let expected = rec_709_inverse_oetf(1.5_f32.abs()).copysign(1.5);
     assert!(
         (result - expected).abs() < 1e-6,
@@ -352,7 +352,7 @@ fn test_xvycc_eotf_branches() {
     );
 
     // Test outside (0.0..=1.0) range - negative values < -1.0
-    let result = xvycc_eotf(-1.5);
+    let result = xvycc_gamma_to_lin(-1.5);
     let expected = rec_709_inverse_oetf((-1.5_f32).abs()).copysign(-1.5);
     assert!(
         (result - expected).abs() < 1e-6,
@@ -361,14 +361,14 @@ fn test_xvycc_eotf_branches() {
         result
     );
 
-    assert_handles_edge_cases(xvycc_eotf, "xvycc_eotf");
+    assert_handles_edge_cases(xvycc_gamma_to_lin, "xvycc_eotf");
 }
 
 #[test]
 fn test_xvycc_inverse_eotf_branches() {
     // Test (0.0..=1.0).contains(&x) branch - positive values within range
-    let result = xvycc_inverse_eotf(0.5);
-    let expected = rec_1886_inverse_eotf(0.5_f32.abs()).copysign(0.5);
+    let result = xvycc_lin_to_gamma(0.5);
+    let expected = rec_1886_lin_to_gamma(0.5_f32.abs()).copysign(0.5);
     assert!(
         (result - expected).abs() < 1e-6,
         "Expected {}, got {}",
@@ -377,9 +377,9 @@ fn test_xvycc_inverse_eotf_branches() {
     );
 
     // Test boundary values
-    assert_eq!(xvycc_inverse_eotf(0.0), rec_1886_inverse_eotf(0.0));
-    let result = xvycc_inverse_eotf(1.0);
-    let expected = rec_1886_inverse_eotf(1.0);
+    assert_eq!(xvycc_lin_to_gamma(0.0), rec_1886_lin_to_gamma(0.0));
+    let result = xvycc_lin_to_gamma(1.0);
+    let expected = rec_1886_lin_to_gamma(1.0);
     assert!(
         (result - expected).abs() < 1e-6,
         "Expected {}, got {}",
@@ -388,7 +388,7 @@ fn test_xvycc_inverse_eotf_branches() {
     );
 
     // Test outside (0.0..=1.0) range - negative values (should use rec_709_oetf)
-    let result = xvycc_inverse_eotf(-0.5);
+    let result = xvycc_lin_to_gamma(-0.5);
     let expected = rec_709_oetf((-0.5_f32).abs()).copysign(-0.5);
     assert!(
         (result - expected).abs() < 1e-6,
@@ -398,7 +398,7 @@ fn test_xvycc_inverse_eotf_branches() {
     );
 
     // Test outside (0.0..=1.0) range - positive values > 1.0
-    let result = xvycc_inverse_eotf(1.5);
+    let result = xvycc_lin_to_gamma(1.5);
     let expected = rec_709_oetf(1.5_f32.abs()).copysign(1.5);
     assert!(
         (result - expected).abs() < 1e-6,
@@ -408,7 +408,7 @@ fn test_xvycc_inverse_eotf_branches() {
     );
 
     // Test outside (0.0..=1.0) range - negative values < -1.0
-    let result = xvycc_inverse_eotf(-1.5);
+    let result = xvycc_lin_to_gamma(-1.5);
     let expected = rec_709_oetf((-1.5_f32).abs()).copysign(-1.5);
     assert!(
         (result - expected).abs() < 1e-6,
@@ -417,55 +417,55 @@ fn test_xvycc_inverse_eotf_branches() {
         result
     );
 
-    assert_handles_edge_cases(xvycc_inverse_eotf, "xvycc_inverse_eotf");
+    assert_handles_edge_cases(xvycc_lin_to_gamma, "xvycc_inverse_eotf");
 }
 
 #[test]
 fn test_srgb_eotf_branches() {
     // Test x < 12.92 * SRGB_BETA branch
     let small_val = 12.92 * SRGB_BETA * 0.5;
-    let result = srgb_eotf(small_val);
+    let result = srgb_gamma_to_lin(small_val);
     let expected = small_val / 12.92;
     assert!((result - expected).abs() < f32::EPSILON);
 
     // Test boundary case
-    let result = srgb_eotf(12.92 * SRGB_BETA);
+    let result = srgb_gamma_to_lin(12.92 * SRGB_BETA);
     assert!(result.is_finite());
 
     // Test x >= 12.92 * SRGB_BETA branch
     let large_val = 12.92 * SRGB_BETA * 2.0;
-    let result = srgb_eotf(large_val);
+    let result = srgb_gamma_to_lin(large_val);
     let expected = powf((large_val + (SRGB_ALPHA - 1.0)) / SRGB_ALPHA, 2.4);
     assert!((result - expected).abs() < f32::EPSILON);
 
     // Test negative values (should be clamped to 0)
-    assert_eq!(srgb_eotf(-0.1), srgb_eotf(0.0));
+    assert_eq!(srgb_gamma_to_lin(-0.1), srgb_gamma_to_lin(0.0));
 
-    assert_handles_edge_cases(srgb_eotf, "srgb_eotf");
+    assert_handles_edge_cases(srgb_gamma_to_lin, "srgb_eotf");
 }
 
 #[test]
 fn test_srgb_inverse_eotf_branches() {
     // Test x < SRGB_BETA branch
     let small_val = SRGB_BETA * 0.5;
-    let result = srgb_inverse_eotf(small_val);
+    let result = srgb_lin_to_gamma(small_val);
     let expected = small_val * 12.92;
     assert!((result - expected).abs() < f32::EPSILON);
 
     // Test boundary case
-    let result = srgb_inverse_eotf(SRGB_BETA);
+    let result = srgb_lin_to_gamma(SRGB_BETA);
     assert!(result.is_finite());
 
     // Test x >= SRGB_BETA branch
     let large_val = SRGB_BETA * 2.0;
-    let result = srgb_inverse_eotf(large_val);
+    let result = srgb_lin_to_gamma(large_val);
     let expected = SRGB_ALPHA.mul_add(powf(large_val, 1.0 / 2.4), -(SRGB_ALPHA - 1.0));
     assert!((result - expected).abs() < f32::EPSILON);
 
     // Test negative values (should be clamped to 0)
-    assert_eq!(srgb_inverse_eotf(-0.1), srgb_inverse_eotf(0.0));
+    assert_eq!(srgb_lin_to_gamma(-0.1), srgb_lin_to_gamma(0.0));
 
-    assert_handles_edge_cases(srgb_inverse_eotf, "srgb_inverse_eotf");
+    assert_handles_edge_cases(srgb_lin_to_gamma, "srgb_inverse_eotf");
 }
 
 #[test]
@@ -514,48 +514,48 @@ fn test_st_2084_inverse_eotf_branches() {
 fn test_arib_b67_oetf_branches() {
     // Test x <= 1.0 / 12.0 branch
     let small_val = 1.0 / 12.0 * 0.5;
-    let result = arib_b67_oetf(small_val);
+    let result = arib_b67_lin_to_gamma(small_val);
     let expected = (3.0 * small_val).sqrt();
     assert!((result - expected).abs() < f32::EPSILON);
 
     // Test boundary case
-    let result = arib_b67_oetf(1.0 / 12.0);
+    let result = arib_b67_lin_to_gamma(1.0 / 12.0);
     assert!(result.is_finite());
 
     // Test x > 1.0 / 12.0 branch
     let large_val = 1.0 / 12.0 * 2.0;
-    let result = arib_b67_oetf(large_val);
+    let result = arib_b67_lin_to_gamma(large_val);
     let expected = ARIB_B67_A.mul_add((12.0f32.mul_add(large_val, -ARIB_B67_B)).ln(), ARIB_B67_C);
     assert!((result - expected).abs() < f32::EPSILON);
 
     // Test negative values (should be clamped to 0)
-    assert_eq!(arib_b67_oetf(-0.1), arib_b67_oetf(0.0));
+    assert_eq!(arib_b67_lin_to_gamma(-0.1), arib_b67_lin_to_gamma(0.0));
 
-    assert_handles_edge_cases(arib_b67_oetf, "arib_b67_oetf");
+    assert_handles_edge_cases(arib_b67_lin_to_gamma, "arib_b67_oetf");
 }
 
 #[test]
 fn test_arib_b67_inverse_oetf_branches() {
     // Test x <= 0.5 branch
     let small_val = 0.25;
-    let result = arib_b67_inverse_oetf(small_val);
+    let result = arib_b67_gamma_to_lin(small_val);
     let expected = (small_val * small_val) * (1.0 / 3.0);
     assert!((result - expected).abs() < f32::EPSILON);
 
     // Test boundary case
-    let result = arib_b67_inverse_oetf(0.5);
+    let result = arib_b67_gamma_to_lin(0.5);
     assert!(result.is_finite());
 
     // Test x > 0.5 branch
     let large_val = 0.75;
-    let result = arib_b67_inverse_oetf(large_val);
+    let result = arib_b67_gamma_to_lin(large_val);
     let expected = (expf((large_val - ARIB_B67_C) / ARIB_B67_A) + ARIB_B67_B) / 12.0;
     assert!((result - expected).abs() < f32::EPSILON);
 
     // Test negative values (should be clamped to 0)
-    assert_eq!(arib_b67_inverse_oetf(-0.1), arib_b67_inverse_oetf(0.0));
+    assert_eq!(arib_b67_gamma_to_lin(-0.1), arib_b67_gamma_to_lin(0.0));
 
-    assert_handles_edge_cases(arib_b67_inverse_oetf, "arib_b67_inverse_oetf");
+    assert_handles_edge_cases(arib_b67_gamma_to_lin, "arib_b67_inverse_oetf");
 }
 
 // Roundtrip tests to ensure forward/inverse function pairs work correctly
@@ -565,31 +565,56 @@ fn test_roundtrip_functions() {
     // Note: log functions have special handling for small values that breaks roundtrip
     // Use values above the thresholds: log100 threshold = 0.01, log316 threshold = 0.003162276
     let log_test_values = [0.02, 0.1, 0.5, 1.0];
-    test_function_roundtrip(log100_oetf, log100_inverse_oetf, &log_test_values, 1e-5);
-    test_function_roundtrip(log316_oetf, log316_inverse_oetf, &log_test_values, 1e-5);
+    test_function_roundtrip(
+        log100_lin_to_gamma,
+        log100_gamma_to_lin,
+        &log_test_values,
+        1e-5,
+    );
+    test_function_roundtrip(
+        log316_lin_to_gamma,
+        log316_gamma_to_lin,
+        &log_test_values,
+        1e-5,
+    );
 
     // Test rec functions
     let all_test_values = [0.0, 0.001, 0.01, 0.1, 0.5, 0.9, 1.0];
-    test_function_roundtrip(rec_1886_inverse_eotf, rec_1886_eotf, &all_test_values, 2e-4);
-    test_function_roundtrip(rec_470m_inverse_oetf, rec_470m_oetf, &all_test_values, 2e-4);
     test_function_roundtrip(
-        rec_470bg_inverse_oetf,
-        rec_470bg_oetf,
+        rec_1886_lin_to_gamma,
+        rec_1886_gamma_to_lin,
+        &all_test_values,
+        2e-4,
+    );
+    test_function_roundtrip(
+        rec_470m_lin_to_gamma,
+        rec_470m_gamma_to_lin,
+        &all_test_values,
+        2e-4,
+    );
+    test_function_roundtrip(
+        rec_470bg_lin_to_gamma,
+        rec_470bg_gamma_to_lin,
         &all_test_values,
         2e-4,
     );
     test_function_roundtrip(rec_709_inverse_oetf, rec_709_oetf, &all_test_values, 2e-4);
 
     // Test sRGB functions
-    test_function_roundtrip(srgb_inverse_eotf, srgb_eotf, &all_test_values, 1.1e-4);
+    test_function_roundtrip(
+        srgb_lin_to_gamma,
+        srgb_gamma_to_lin,
+        &all_test_values,
+        1.1e-4,
+    );
 
     // Note: ST 2084 functions have complex precision issues due to their mathematical nature
     // and the use of multiple nested transformations. They are tested individually but not in roundtrip.
 
     // Test ARIB B67 functions
     test_function_roundtrip(
-        arib_b67_oetf,
-        arib_b67_inverse_oetf,
+        arib_b67_lin_to_gamma,
+        arib_b67_gamma_to_lin,
         &all_test_values,
         1.1e-4,
     );
