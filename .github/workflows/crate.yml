@@ -26,6 +26,7 @@ jobs:
           tool: cargo-msrv
       - name: Validate minimum Rust version
         run: |
+          mv Cargo.lock.MSRV Cargo.lock
           cargo msrv verify --path yuvxyb-math
           cargo msrv verify --path yuvxyb
 
