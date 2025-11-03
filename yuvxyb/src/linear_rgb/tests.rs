@@ -245,7 +245,7 @@ fn test_hsl_to_linear_rgb_multiple_pixels() {
     let hsl = Hsl::new(hsl_data, 5, 1).unwrap();
     let linear_rgb = LinearRgb::from(hsl);
 
-    let expected_results = vec![
+    let expected_results = [
         [0.0, 0.0, 0.0], // Black
         [1.0, 1.0, 1.0], // White
         [1.0, 0.0, 0.0], // Red

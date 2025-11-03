@@ -9,7 +9,7 @@ homepage = "https://github.com/rust-av/yuvxyb"
 repository = "https://github.com/rust-av/yuvxyb"
 exclude = ["test_data", "yuvxyb-dump"]
 
-rust-version = "1.64.0"
+rust-version = "1.66.0"
 
 [features]
 default = ["fastmath"]
@@ -23,7 +23,7 @@ num-traits = "0.2.15"
 v_frame = "0.3.8"
 
 [dev-dependencies]
-criterion = { version = "0.5", default-features = false }
+criterion = { version = "0.7", default-features = false }
 image = { version = "0.25", default-features = false, features = ["png"] }
 interpolate_name = "0.2.3"
 rand = "0.9.1"

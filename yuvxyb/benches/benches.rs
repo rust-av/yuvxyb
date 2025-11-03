@@ -1,5 +1,6 @@
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use criterion::{criterion_group, criterion_main, Criterion};
 use rand::Rng;
+use std::hint::black_box;
 use yuvxyb::*;
 
 fn make_yuv_8b(
