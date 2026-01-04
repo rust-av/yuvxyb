@@ -269,111 +269,119 @@ fn initial_approx(x: f32) -> f32 {
 mod tests {
     use super::*;
 
-    fn scalar_cbrtf(x: f32) -> f32 {
-        const B1: u32 = 709_958_130;
+    // Reference scalar implementation - the FreeBSD algorithm with 2 Newton iterations.
+    // This is identical to cbrtf_fast in cbrtf.rs. SIMD versions must match this exactly.
+    fn scalar_cbrtf_fast(x: f32) -> f32 {
+        const B1: u32 = 709_958_130; // (127 - 127.0/3 - 0.03306235651) * 2^23
 
         let mut ui: u32 = x.to_bits();
         let mut hx: u32 = ui & 0x7FFF_FFFF;
-
         hx = hx / 3 + B1;
         ui &= 0x8000_0000;
         ui |= hx;
 
         let mut t: f64 = f64::from(f32::from_bits(ui));
         let xf64 = f64::from(x);
+
+        // Newton iteration 1
         let mut r = t * t * t;
         t = t * (xf64 + xf64 + r) / (xf64 + r + r);
 
+        // Newton iteration 2
         r = t * t * t;
         t = t * (xf64 + xf64 + r) / (xf64 + r + r);
 
         t as f32
     }
 
+    /// SIMD must produce bit-identical results to scalar_cbrtf_fast.
+    /// Tests ~16M values (every 128th bit pattern) across all f32 exponents.
     #[test]
-    fn test_cbrtf_x4_matches_scalar() {
-        let test_values = [0.5f32, 1.0, 2.0, 8.0];
-        let input = f32x4::new(test_values);
-        let result = cbrtf_x4(input);
-        let result_arr: [f32; 4] = result.into();
+    fn test_simd_matches_scalar_cbrtf_fast() {
+        const STEP: u32 = 128;
 
-        for (i, &val) in test_values.iter().enumerate() {
-            let expected = scalar_cbrtf(val);
-            let diff = (result_arr[i] - expected).abs();
-            assert!(
-                diff < 1e-6,
-                "cbrtf_x4 mismatch at index {}: got {}, expected {}, diff {}",
-                i,
-                result_arr[i],
-                expected,
-                diff
+        // Positive normals: 0x00800000 to 0x7F7FFFFF
+        let mut bits = 0x0080_0000u32;
+        while bits < 0x7F80_0000 {
+            let x = f32::from_bits(bits);
+            let scalar = scalar_cbrtf_fast(x);
+
+            let r4: [f32; 4] = cbrtf_x4(f32x4::splat(x)).into();
+            let r8: [f32; 8] = cbrtf_x8(f32x8::splat(x)).into();
+            let r16: [f32; 16] = cbrtf_x16(f32x16::splat(x)).into();
+
+            assert_eq!(
+                r4[0].to_bits(),
+                scalar.to_bits(),
+                "cbrtf_x4 mismatch at x={x:e}: got {}, expected {}",
+                r4[0],
+                scalar
             );
+            assert_eq!(
+                r8[0].to_bits(),
+                scalar.to_bits(),
+                "cbrtf_x8 mismatch at x={x:e}: got {}, expected {}",
+                r8[0],
+                scalar
+            );
+            assert_eq!(
+                r16[0].to_bits(),
+                scalar.to_bits(),
+                "cbrtf_x16 mismatch at x={x:e}: got {}, expected {}",
+                r16[0],
+                scalar
+            );
+
+            bits = bits.saturating_add(STEP);
+        }
+
+        // Negative values
+        let mut bits = 0x8080_0000u32;
+        while bits < 0xFF80_0000 {
+            let x = f32::from_bits(bits);
+            let scalar = scalar_cbrtf_fast(x);
+
+            let r4: [f32; 4] = cbrtf_x4(f32x4::splat(x)).into();
+            assert_eq!(
+                r4[0].to_bits(),
+                scalar.to_bits(),
+                "cbrtf_x4 mismatch at x={x:e}: got {}, expected {}",
+                r4[0],
+                scalar
+            );
+
+            bits = bits.saturating_add(STEP);
         }
     }
 
+    /// Verify scalar_cbrtf_fast accuracy vs std::cbrt (the "gold standard").
+    /// This documents the algorithm's accuracy, not SIMD-specific behavior.
     #[test]
-    fn test_cbrtf_x8_matches_scalar() {
-        let test_values = [0.1f32, 0.5, 1.0, 2.0, 4.0, 8.0, 27.0, 64.0];
-        let input = f32x8::new(test_values);
-        let result = cbrtf_x8(input);
-        let result_arr: [f32; 8] = result.into();
+    fn test_scalar_cbrtf_fast_accuracy_vs_std() {
+        const STEP: u32 = 128;
+        let mut max_ulp = 0i32;
+        let mut worst_x = 0.0f32;
 
-        for (i, &val) in test_values.iter().enumerate() {
-            let expected = scalar_cbrtf(val);
-            let diff = (result_arr[i] - expected).abs();
-            assert!(
-                diff < 1e-6,
-                "cbrtf_x8 mismatch at index {}: got {}, expected {}, diff {}",
-                i,
-                result_arr[i],
-                expected,
-                diff
-            );
+        let mut bits = 0x0080_0000u32;
+        while bits < 0x7F80_0000 {
+            let x = f32::from_bits(bits);
+            let fast = scalar_cbrtf_fast(x);
+            let std = x.cbrt();
+
+            let ulp = (fast.to_bits() as i32 - std.to_bits() as i32).abs();
+            if ulp > max_ulp {
+                max_ulp = ulp;
+                worst_x = x;
+            }
+
+            bits = bits.saturating_add(STEP);
         }
-    }
 
-    #[test]
-    fn test_cbrtf_accuracy() {
-        let test_values = [0.001f32, 0.01, 0.1, 0.5, 1.0, 2.0, 8.0, 27.0];
-        let input = f32x8::new(test_values);
-        let result = cbrtf_x8(input);
-        let result_arr: [f32; 8] = result.into();
-
-        for (i, &val) in test_values.iter().enumerate() {
-            let expected = val.cbrt();
-            let diff = (result_arr[i] - expected).abs();
-            let rel_diff = diff / expected.abs();
-            assert!(
-                rel_diff < 1e-5,
-                "cbrtf_x8 accuracy issue at index {}: got {}, expected {}, rel_diff {}",
-                i,
-                result_arr[i],
-                expected,
-                rel_diff
-            );
-        }
-    }
-
-    #[test]
-    fn test_cbrtf_x16_matches_scalar() {
-        let test_values: [f32; 16] = [
-            0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 1.0, 2.0, 4.0, 8.0, 16.0, 27.0, 64.0, 125.0,
-        ];
-        let input = f32x16::new(test_values);
-        let result = cbrtf_x16(input);
-        let result_arr: [f32; 16] = result.into();
-
-        for (i, &val) in test_values.iter().enumerate() {
-            let expected = scalar_cbrtf(val);
-            let diff = (result_arr[i] - expected).abs();
-            assert!(
-                diff < 1e-6,
-                "cbrtf_x16 mismatch at index {}: got {}, expected {}, diff {}",
-                i,
-                result_arr[i],
-                expected,
-                diff
-            );
-        }
+        // Document actual accuracy. On glibc/Linux this is typically 0 ULP
+        // because glibc uses the same FreeBSD algorithm.
+        assert!(
+            max_ulp <= 1,
+            "scalar_cbrtf_fast vs std::cbrt: max {max_ulp} ULP at x={worst_x:e}"
+        );
     }
 }

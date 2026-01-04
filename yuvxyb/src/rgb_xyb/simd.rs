@@ -61,9 +61,10 @@ pub fn linear_rgb_to_xyb_simd(input: &mut [[f32; 3]]) {
         let bias1 = f32x16::splat(OPSIN_ABSORBANCE_BIAS[1]);
         let bias2 = f32x16::splat(OPSIN_ABSORBANCE_BIAS[2]);
 
-        let mut mixed0 = m00 * r + m01 * g + m02 * b + bias0;
-        let mut mixed1 = m10 * r + m11 * g + m12 * b + bias1;
-        let mut mixed2 = m20 * r + m21 * g + m22 * b + bias2;
+        // Use mul_add chain to match scalar FMA precision
+        let mut mixed0 = m00.mul_add(r, m01.mul_add(g, m02.mul_add(b, bias0)));
+        let mut mixed1 = m10.mul_add(r, m11.mul_add(g, m12.mul_add(b, bias1)));
+        let mut mixed2 = m20.mul_add(r, m21.mul_add(g, m22.mul_add(b, bias2)));
 
         // Clamp negative values to zero
         let zero = f32x16::splat(0.0);
@@ -159,14 +160,17 @@ pub fn xyb_to_linear_rgb_simd(input: &mut [[f32; 3]]) {
         gamma_g -= bias1;
         gamma_b -= bias2;
 
-        // Cube: x^3 = x * x * x, then subtract neg_bias
+        // Cube: x^3 = x * x * x, then add neg_bias using mul_add to match scalar
         let neg_bias0 = f32x16::splat(NEG_OPSIN_ABSORBANCE_BIAS[0]);
         let neg_bias1 = f32x16::splat(NEG_OPSIN_ABSORBANCE_BIAS[1]);
         let neg_bias2 = f32x16::splat(NEG_OPSIN_ABSORBANCE_BIAS[2]);
 
-        let mixed_r = gamma_r * gamma_r * gamma_r + neg_bias0;
-        let mixed_g = gamma_g * gamma_g * gamma_g + neg_bias1;
-        let mixed_b = gamma_b * gamma_b * gamma_b + neg_bias2;
+        let tmp_r = gamma_r * gamma_r;
+        let tmp_g = gamma_g * gamma_g;
+        let tmp_b = gamma_b * gamma_b;
+        let mixed_r = tmp_r.mul_add(gamma_r, neg_bias0);
+        let mixed_g = tmp_g.mul_add(gamma_g, neg_bias1);
+        let mixed_b = tmp_b.mul_add(gamma_b, neg_bias2);
 
         // Matrix multiply by inverse matrix
         let im00 = f32x16::splat(INVERSE_OPSIN_ABSORBANCE_MATRIX[0]);
@@ -179,9 +183,10 @@ pub fn xyb_to_linear_rgb_simd(input: &mut [[f32; 3]]) {
         let im21 = f32x16::splat(INVERSE_OPSIN_ABSORBANCE_MATRIX[7]);
         let im22 = f32x16::splat(INVERSE_OPSIN_ABSORBANCE_MATRIX[8]);
 
-        let out_r = im00 * mixed_r + im01 * mixed_g + im02 * mixed_b;
-        let out_g = im10 * mixed_r + im11 * mixed_g + im12 * mixed_b;
-        let out_b = im20 * mixed_r + im21 * mixed_g + im22 * mixed_b;
+        // Use mul_add chain to match scalar FMA precision
+        let out_r = im02.mul_add(mixed_b, im01.mul_add(mixed_g, im00 * mixed_r));
+        let out_g = im12.mul_add(mixed_b, im11.mul_add(mixed_g, im10 * mixed_r));
+        let out_b = im22.mul_add(mixed_b, im21.mul_add(mixed_g, im20 * mixed_r));
 
         // Transpose back to AoS and store
         let r_arr: [f32; 16] = out_r.into();
@@ -193,7 +198,7 @@ pub fn xyb_to_linear_rgb_simd(input: &mut [[f32; 3]]) {
         }
     }
 
-    // Process remaining pixels with scalar code
+    // Process remaining pixels with scalar code (using mul_add to match main scalar)
     let start = chunks_16 * 16;
     for pix in &mut input[start..] {
         let mut gamma_rgb = [pix[1] + pix[0], pix[1] - pix[0], pix[2]];
@@ -204,18 +209,20 @@ pub fn xyb_to_linear_rgb_simd(input: &mut [[f32; 3]]) {
         {
             *rgb -= *bias_cbrt;
             let tmp = (*rgb) * (*rgb);
-            *rgb = tmp * (*rgb) + *neg_bias;
+            *rgb = tmp.mul_add(*rgb, *neg_bias);
         }
 
-        pix[0] = INVERSE_OPSIN_ABSORBANCE_MATRIX[0] * gamma_rgb[0]
-            + INVERSE_OPSIN_ABSORBANCE_MATRIX[1] * gamma_rgb[1]
-            + INVERSE_OPSIN_ABSORBANCE_MATRIX[2] * gamma_rgb[2];
-        pix[1] = INVERSE_OPSIN_ABSORBANCE_MATRIX[3] * gamma_rgb[0]
-            + INVERSE_OPSIN_ABSORBANCE_MATRIX[4] * gamma_rgb[1]
-            + INVERSE_OPSIN_ABSORBANCE_MATRIX[5] * gamma_rgb[2];
-        pix[2] = INVERSE_OPSIN_ABSORBANCE_MATRIX[6] * gamma_rgb[0]
-            + INVERSE_OPSIN_ABSORBANCE_MATRIX[7] * gamma_rgb[1]
-            + INVERSE_OPSIN_ABSORBANCE_MATRIX[8] * gamma_rgb[2];
+        pix[0] = INVERSE_OPSIN_ABSORBANCE_MATRIX[0] * gamma_rgb[0];
+        pix[0] = INVERSE_OPSIN_ABSORBANCE_MATRIX[1].mul_add(gamma_rgb[1], pix[0]);
+        pix[0] = INVERSE_OPSIN_ABSORBANCE_MATRIX[2].mul_add(gamma_rgb[2], pix[0]);
+
+        pix[1] = INVERSE_OPSIN_ABSORBANCE_MATRIX[3] * gamma_rgb[0];
+        pix[1] = INVERSE_OPSIN_ABSORBANCE_MATRIX[4].mul_add(gamma_rgb[1], pix[1]);
+        pix[1] = INVERSE_OPSIN_ABSORBANCE_MATRIX[5].mul_add(gamma_rgb[2], pix[1]);
+
+        pix[2] = INVERSE_OPSIN_ABSORBANCE_MATRIX[6] * gamma_rgb[0];
+        pix[2] = INVERSE_OPSIN_ABSORBANCE_MATRIX[7].mul_add(gamma_rgb[1], pix[2]);
+        pix[2] = INVERSE_OPSIN_ABSORBANCE_MATRIX[8].mul_add(gamma_rgb[2], pix[2]);
     }
 }
 
@@ -266,9 +273,10 @@ pub fn linear_rgb_to_xyb_simd_x8(input: &mut [[f32; 3]]) {
         let bias1 = f32x8::splat(OPSIN_ABSORBANCE_BIAS[1]);
         let bias2 = f32x8::splat(OPSIN_ABSORBANCE_BIAS[2]);
 
-        let mut mixed0 = m00 * r + m01 * g + m02 * b + bias0;
-        let mut mixed1 = m10 * r + m11 * g + m12 * b + bias1;
-        let mut mixed2 = m20 * r + m21 * g + m22 * b + bias2;
+        // Use mul_add chain to match scalar FMA precision
+        let mut mixed0 = m00.mul_add(r, m01.mul_add(g, m02.mul_add(b, bias0)));
+        let mut mixed1 = m10.mul_add(r, m11.mul_add(g, m12.mul_add(b, bias1)));
+        let mut mixed2 = m20.mul_add(r, m21.mul_add(g, m22.mul_add(b, bias2)));
 
         // Clamp negative values to zero
         let zero = f32x8::splat(0.0);
@@ -361,14 +369,17 @@ pub fn xyb_to_linear_rgb_simd_x8(input: &mut [[f32; 3]]) {
         gamma_g -= bias1;
         gamma_b -= bias2;
 
-        // Cube: x^3 = x * x * x, then subtract neg_bias
+        // Cube: x^3 = x * x * x, then add neg_bias using mul_add to match scalar
         let neg_bias0 = f32x8::splat(NEG_OPSIN_ABSORBANCE_BIAS[0]);
         let neg_bias1 = f32x8::splat(NEG_OPSIN_ABSORBANCE_BIAS[1]);
         let neg_bias2 = f32x8::splat(NEG_OPSIN_ABSORBANCE_BIAS[2]);
 
-        let mixed_r = gamma_r * gamma_r * gamma_r + neg_bias0;
-        let mixed_g = gamma_g * gamma_g * gamma_g + neg_bias1;
-        let mixed_b = gamma_b * gamma_b * gamma_b + neg_bias2;
+        let tmp_r = gamma_r * gamma_r;
+        let tmp_g = gamma_g * gamma_g;
+        let tmp_b = gamma_b * gamma_b;
+        let mixed_r = tmp_r.mul_add(gamma_r, neg_bias0);
+        let mixed_g = tmp_g.mul_add(gamma_g, neg_bias1);
+        let mixed_b = tmp_b.mul_add(gamma_b, neg_bias2);
 
         // Matrix multiply by inverse matrix
         let im00 = f32x8::splat(INVERSE_OPSIN_ABSORBANCE_MATRIX[0]);
@@ -381,9 +392,10 @@ pub fn xyb_to_linear_rgb_simd_x8(input: &mut [[f32; 3]]) {
         let im21 = f32x8::splat(INVERSE_OPSIN_ABSORBANCE_MATRIX[7]);
         let im22 = f32x8::splat(INVERSE_OPSIN_ABSORBANCE_MATRIX[8]);
 
-        let out_r = im00 * mixed_r + im01 * mixed_g + im02 * mixed_b;
-        let out_g = im10 * mixed_r + im11 * mixed_g + im12 * mixed_b;
-        let out_b = im20 * mixed_r + im21 * mixed_g + im22 * mixed_b;
+        // Use mul_add chain to match scalar FMA precision
+        let out_r = im02.mul_add(mixed_b, im01.mul_add(mixed_g, im00 * mixed_r));
+        let out_g = im12.mul_add(mixed_b, im11.mul_add(mixed_g, im10 * mixed_r));
+        let out_b = im22.mul_add(mixed_b, im21.mul_add(mixed_g, im20 * mixed_r));
 
         // Transpose back to AoS and store
         let r_arr: [f32; 8] = out_r.into();
@@ -395,7 +407,7 @@ pub fn xyb_to_linear_rgb_simd_x8(input: &mut [[f32; 3]]) {
         }
     }
 
-    // Process remaining pixels with scalar code
+    // Process remaining pixels with scalar code (using mul_add to match main scalar)
     let start = chunks_8 * 8;
     for pix in &mut input[start..] {
         let mut gamma_rgb = [pix[1] + pix[0], pix[1] - pix[0], pix[2]];
@@ -406,37 +418,49 @@ pub fn xyb_to_linear_rgb_simd_x8(input: &mut [[f32; 3]]) {
         {
             *rgb -= *bias_cbrt;
             let tmp = (*rgb) * (*rgb);
-            *rgb = tmp * (*rgb) + *neg_bias;
+            *rgb = tmp.mul_add(*rgb, *neg_bias);
         }
 
-        pix[0] = INVERSE_OPSIN_ABSORBANCE_MATRIX[0] * gamma_rgb[0]
-            + INVERSE_OPSIN_ABSORBANCE_MATRIX[1] * gamma_rgb[1]
-            + INVERSE_OPSIN_ABSORBANCE_MATRIX[2] * gamma_rgb[2];
-        pix[1] = INVERSE_OPSIN_ABSORBANCE_MATRIX[3] * gamma_rgb[0]
-            + INVERSE_OPSIN_ABSORBANCE_MATRIX[4] * gamma_rgb[1]
-            + INVERSE_OPSIN_ABSORBANCE_MATRIX[5] * gamma_rgb[2];
-        pix[2] = INVERSE_OPSIN_ABSORBANCE_MATRIX[6] * gamma_rgb[0]
-            + INVERSE_OPSIN_ABSORBANCE_MATRIX[7] * gamma_rgb[1]
-            + INVERSE_OPSIN_ABSORBANCE_MATRIX[8] * gamma_rgb[2];
+        pix[0] = INVERSE_OPSIN_ABSORBANCE_MATRIX[0] * gamma_rgb[0];
+        pix[0] = INVERSE_OPSIN_ABSORBANCE_MATRIX[1].mul_add(gamma_rgb[1], pix[0]);
+        pix[0] = INVERSE_OPSIN_ABSORBANCE_MATRIX[2].mul_add(gamma_rgb[2], pix[0]);
+
+        pix[1] = INVERSE_OPSIN_ABSORBANCE_MATRIX[3] * gamma_rgb[0];
+        pix[1] = INVERSE_OPSIN_ABSORBANCE_MATRIX[4].mul_add(gamma_rgb[1], pix[1]);
+        pix[1] = INVERSE_OPSIN_ABSORBANCE_MATRIX[5].mul_add(gamma_rgb[2], pix[1]);
+
+        pix[2] = INVERSE_OPSIN_ABSORBANCE_MATRIX[6] * gamma_rgb[0];
+        pix[2] = INVERSE_OPSIN_ABSORBANCE_MATRIX[7].mul_add(gamma_rgb[1], pix[2]);
+        pix[2] = INVERSE_OPSIN_ABSORBANCE_MATRIX[8].mul_add(gamma_rgb[2], pix[2]);
     }
 }
 
 // Scalar helper functions for remainder processing
 #[inline]
 fn opsin_absorbance_scalar(rgb: &[f32; 3]) -> [f32; 3] {
+    // Use mul_add chain to match the main scalar implementation
     [
-        OPSIN_ABSORBANCE_MATRIX[0] * rgb[0]
-            + OPSIN_ABSORBANCE_MATRIX[1] * rgb[1]
-            + OPSIN_ABSORBANCE_MATRIX[2] * rgb[2]
-            + OPSIN_ABSORBANCE_BIAS[0],
-        OPSIN_ABSORBANCE_MATRIX[3] * rgb[0]
-            + OPSIN_ABSORBANCE_MATRIX[4] * rgb[1]
-            + OPSIN_ABSORBANCE_MATRIX[5] * rgb[2]
-            + OPSIN_ABSORBANCE_BIAS[1],
-        OPSIN_ABSORBANCE_MATRIX[6] * rgb[0]
-            + OPSIN_ABSORBANCE_MATRIX[7] * rgb[1]
-            + OPSIN_ABSORBANCE_MATRIX[8] * rgb[2]
-            + OPSIN_ABSORBANCE_BIAS[2],
+        OPSIN_ABSORBANCE_MATRIX[0].mul_add(
+            rgb[0],
+            OPSIN_ABSORBANCE_MATRIX[1].mul_add(
+                rgb[1],
+                OPSIN_ABSORBANCE_MATRIX[2].mul_add(rgb[2], OPSIN_ABSORBANCE_BIAS[0]),
+            ),
+        ),
+        OPSIN_ABSORBANCE_MATRIX[3].mul_add(
+            rgb[0],
+            OPSIN_ABSORBANCE_MATRIX[4].mul_add(
+                rgb[1],
+                OPSIN_ABSORBANCE_MATRIX[5].mul_add(rgb[2], OPSIN_ABSORBANCE_BIAS[1]),
+            ),
+        ),
+        OPSIN_ABSORBANCE_MATRIX[6].mul_add(
+            rgb[0],
+            OPSIN_ABSORBANCE_MATRIX[7].mul_add(
+                rgb[1],
+                OPSIN_ABSORBANCE_MATRIX[8].mul_add(rgb[2], OPSIN_ABSORBANCE_BIAS[2]),
+            ),
+        ),
     ]
 }
 
@@ -453,6 +477,87 @@ fn mixed_to_xyb_scalar(mixed: &[f32; 3]) -> [f32; 3] {
 mod tests {
     use super::*;
     use crate::rgb_xyb::{linear_rgb_to_xyb, xyb_to_linear_rgb};
+
+    /// Comprehensive parity test: SIMD must match scalar within tight tolerance.
+    /// Samples RGB cube systematically with ~2M test values.
+    ///
+    /// Uses absolute tolerance (1e-5) for comparison, matching the tolerance-based
+    /// tests. ULP-based comparison is too strict for FMA differences, especially
+    /// for the X channel which is computed as 0.5*(mixed0-mixed1) where small
+    /// FMA differences can result in large ULP when the value is small.
+    #[test]
+    fn test_rgb_to_xyb_simd_matches_scalar_comprehensive() {
+        const STEPS: usize = 128; // 128^3 = ~2M values
+        const TOLERANCE: f32 = 1e-5;
+
+        let mut max_diff = [0.0f32; 3];
+        let mut worst_rgb = [[0.0f32; 3]; 3];
+        let mut worst_scalar = [[0.0f32; 3]; 3];
+        let mut worst_simd = [[0.0f32; 3]; 3];
+        let mut significant_mismatches = 0usize;
+
+        // Build test data: systematic sampling of RGB cube
+        let mut test_data: Vec<[f32; 3]> = Vec::with_capacity(STEPS * STEPS * STEPS);
+        for r in 0..STEPS {
+            for g in 0..STEPS {
+                for b in 0..STEPS {
+                    let rf = r as f32 / (STEPS - 1) as f32;
+                    let gf = g as f32 / (STEPS - 1) as f32;
+                    let bf = b as f32 / (STEPS - 1) as f32;
+                    test_data.push([rf, gf, bf]);
+                }
+            }
+        }
+
+        // Run scalar
+        let scalar_result = linear_rgb_to_xyb(test_data.clone());
+
+        // Run SIMD
+        let mut simd_result = test_data.clone();
+        linear_rgb_to_xyb_simd(&mut simd_result);
+
+        // Compare with absolute tolerance
+        for ((rgb, scalar), simd) in test_data
+            .iter()
+            .zip(scalar_result.iter())
+            .zip(simd_result.iter())
+        {
+            for ch in 0..3 {
+                let diff = (scalar[ch] - simd[ch]).abs();
+
+                if diff > TOLERANCE {
+                    significant_mismatches += 1;
+                }
+
+                if diff > max_diff[ch] {
+                    max_diff[ch] = diff;
+                    worst_rgb[ch] = *rgb;
+                    worst_scalar[ch] = *scalar;
+                    worst_simd[ch] = *simd;
+                }
+            }
+        }
+
+        // Report findings
+        eprintln!("\nSIMD vs Scalar comparison ({} RGB values):", test_data.len());
+        for ch in 0..3 {
+            eprintln!(
+                "  Channel {} max diff: {:.2e} (threshold: {:.0e})",
+                ch, max_diff[ch], TOLERANCE
+            );
+            if max_diff[ch] > TOLERANCE {
+                eprintln!("    Worst case at RGB {:?}", worst_rgb[ch]);
+                eprintln!("    Scalar: {:?}", worst_scalar[ch]);
+                eprintln!("    SIMD:   {:?}", worst_simd[ch]);
+            }
+        }
+
+        assert_eq!(
+            significant_mismatches, 0,
+            "SIMD exceeds {:.0e} tolerance on {} values. See stderr for details.",
+            TOLERANCE, significant_mismatches
+        );
+    }
 
     /// Generate test data with various patterns to exercise edge cases
     fn make_test_data(count: usize) -> Vec<[f32; 3]> {
