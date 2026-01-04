@@ -1,0 +1,105 @@
+name: CI
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+env:
+  CARGO_INCREMENTAL: 0
+  RUSTFLAGS: "-Dwarnings"
+
+jobs:
+  test:
+    name: Test ${{ matrix.os }} ${{ matrix.arch }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Linux
+          - os: linux
+            arch: x64
+            runner: ubuntu-24.04
+          - os: linux
+            arch: arm64
+            runner: ubuntu-24.04-arm
+
+          # macOS
+          - os: macos
+            arch: arm64
+            runner: macos-14
+          - os: macos
+            arch: x64
+            runner: macos-13
+
+          # Windows
+          - os: windows
+            arch: x64
+            runner: windows-latest
+          - os: windows
+            arch: arm64
+            runner: windows-11-arm
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build (default features)
+        run: cargo build --all-targets
+
+      - name: Build (all features)
+        run: cargo build --all-targets --all-features
+
+      - name: Test (default features)
+        run: cargo test
+
+      - name: Test (all features)
+        run: cargo test --all-features
+
+      - name: Test (release, all features)
+        run: cargo test --release --all-features
+
+  clippy:
+    name: Clippy
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - name: Clippy (default features)
+        run: cargo clippy --all-targets -- -D warnings
+      - name: Clippy (all features)
+        run: cargo clippy --all-targets --all-features -- -D warnings
+
+  fmt:
+    name: Format
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: rustfmt
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+
+  msrv:
+    name: MSRV
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install cargo-msrv
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-msrv
+      - name: Validate MSRV
+        run: |
+          mv Cargo.lock.MSRV Cargo.lock
+          cargo msrv verify --path yuvxyb-math
+          cargo msrv verify --path yuvxyb
