@@ -3,6 +3,9 @@
 #[cfg(test)]
 mod tests;
 
+#[cfg(feature = "simd")]
+pub mod simd;
+
 use yuvxyb_math::cbrtf;
 
 const K_M02: f32 = 0.078f32;

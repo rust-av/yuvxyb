@@ -212,6 +212,82 @@ fn bench_hybrid_log_gamma(c: &mut Criterion) {
     });
 }
 
+fn make_linear_rgb_data(count: usize) -> Vec<[f32; 3]> {
+    let mut rng = rand::rng();
+    (0..count)
+        .map(|_| {
+            [
+                rng.random_range(0.0..=1.0),
+                rng.random_range(0.0..=1.0),
+                rng.random_range(0.0..=1.0),
+            ]
+        })
+        .collect()
+}
+
+fn bench_linear_rgb_to_xyb_scalar(c: &mut Criterion) {
+    c.bench_function("linear_rgb_to_xyb scalar (320x240)", |b| {
+        let input = make_linear_rgb_data(320 * 240);
+        b.iter(|| linear_rgb_to_xyb(black_box(input.clone())))
+    });
+}
+
+#[cfg(feature = "simd")]
+fn bench_linear_rgb_to_xyb_simd_x8(c: &mut Criterion) {
+    c.bench_function("linear_rgb_to_xyb SIMD x8 (320x240)", |b| {
+        let input = make_linear_rgb_data(320 * 240);
+        b.iter(|| {
+            let mut data = input.clone();
+            linear_rgb_to_xyb_simd_x8(black_box(&mut data));
+            data
+        })
+    });
+}
+
+#[cfg(feature = "simd")]
+fn bench_linear_rgb_to_xyb_simd_x16(c: &mut Criterion) {
+    c.bench_function("linear_rgb_to_xyb SIMD x16 (320x240)", |b| {
+        let input = make_linear_rgb_data(320 * 240);
+        b.iter(|| {
+            let mut data = input.clone();
+            linear_rgb_to_xyb_simd(black_box(&mut data));
+            data
+        })
+    });
+}
+
+fn bench_xyb_to_linear_rgb_scalar(c: &mut Criterion) {
+    c.bench_function("xyb_to_linear_rgb scalar (320x240)", |b| {
+        let input = linear_rgb_to_xyb(make_linear_rgb_data(320 * 240));
+        b.iter(|| xyb_to_linear_rgb(black_box(input.clone())))
+    });
+}
+
+#[cfg(feature = "simd")]
+fn bench_xyb_to_linear_rgb_simd_x8(c: &mut Criterion) {
+    c.bench_function("xyb_to_linear_rgb SIMD x8 (320x240)", |b| {
+        let input = linear_rgb_to_xyb(make_linear_rgb_data(320 * 240));
+        b.iter(|| {
+            let mut data = input.clone();
+            xyb_to_linear_rgb_simd_x8(black_box(&mut data));
+            data
+        })
+    });
+}
+
+#[cfg(feature = "simd")]
+fn bench_xyb_to_linear_rgb_simd_x16(c: &mut Criterion) {
+    c.bench_function("xyb_to_linear_rgb SIMD x16 (320x240)", |b| {
+        let input = linear_rgb_to_xyb(make_linear_rgb_data(320 * 240));
+        b.iter(|| {
+            let mut data = input.clone();
+            xyb_to_linear_rgb_simd(black_box(&mut data));
+            data
+        })
+    });
+}
+
+#[cfg(not(feature = "simd"))]
 criterion_group!(
     benches,
     bench_yuv_8b_444_full_to_xyb,
@@ -221,5 +297,25 @@ criterion_group!(
     bench_yuv_10b_420_full_to_xyb,
     bench_yuv_10b_420_limited_to_xyb,
     bench_hybrid_log_gamma,
+    bench_linear_rgb_to_xyb_scalar,
+    bench_xyb_to_linear_rgb_scalar,
+);
+
+#[cfg(feature = "simd")]
+criterion_group!(
+    benches,
+    bench_yuv_8b_444_full_to_xyb,
+    bench_yuv_8b_420_full_to_xyb,
+    bench_yuv_8b_420_limited_to_xyb,
+    bench_yuv_10b_444_full_to_xyb,
+    bench_yuv_10b_420_full_to_xyb,
+    bench_yuv_10b_420_limited_to_xyb,
+    bench_hybrid_log_gamma,
+    bench_linear_rgb_to_xyb_scalar,
+    bench_linear_rgb_to_xyb_simd_x8,
+    bench_linear_rgb_to_xyb_simd_x16,
+    bench_xyb_to_linear_rgb_scalar,
+    bench_xyb_to_linear_rgb_simd_x8,
+    bench_xyb_to_linear_rgb_simd_x16,
 );
 criterion_main!(benches);
