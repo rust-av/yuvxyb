@@ -24,3 +24,12 @@ pub use v_frame::{
     plane::Plane,
     prelude::{CastFromPrimitive, Pixel},
 };
+
+// Export low-level RGB <-> XYB conversion functions
+pub use crate::rgb_xyb::{linear_rgb_to_xyb, xyb_to_linear_rgb};
+
+#[cfg(feature = "simd")]
+pub use crate::rgb_xyb::simd::{
+    linear_rgb_to_xyb_simd, linear_rgb_to_xyb_simd_x8, xyb_to_linear_rgb_simd,
+    xyb_to_linear_rgb_simd_x8,
+};

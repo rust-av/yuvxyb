@@ -13,3 +13,7 @@ rust-version = "1.85.0"
 [features]
 default = ["fastmath"]
 fastmath = []
+simd = ["wide"]
+
+[dependencies]
+wide = { version = "1.1", optional = true }
