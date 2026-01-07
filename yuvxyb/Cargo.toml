@@ -12,7 +12,7 @@ exclude = ["test_data", "yuvxyb-dump"]
 rust-version = "1.85.0"
 
 [features]
-default = ["fastmath"]
+default = ["fastmath", "simd"]
 fastmath = ["yuvxyb-math/fastmath"]
 simd = ["yuvxyb-math/simd", "wide"]
 
