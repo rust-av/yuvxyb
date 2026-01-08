@@ -4,7 +4,7 @@ use std::mem::size_of;
 use av_data::pixel::{ColorPrimaries, MatrixCoefficients, TransferCharacteristic};
 use v_frame::{frame::Frame, plane::Plane, prelude::Pixel};
 
-use crate::{yuv_rgb::rgb_to_yuv, ConversionError, LinearRgb, Rgb, Xyb};
+use crate::{ConversionError, LinearRgb, Rgb, Xyb, yuv_rgb::rgb_to_yuv};
 
 /// Contains a YCbCr image in a color space defined by [`YuvConfig`].
 ///

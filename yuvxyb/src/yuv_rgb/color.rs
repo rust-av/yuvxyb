@@ -107,7 +107,7 @@ pub const fn get_yuv_constants(matrix: MatrixCoefficients) -> Result<(f32, f32),
         | MatrixCoefficients::ChromaticityDerivedConstantLuminance
         | MatrixCoefficients::ICtCp => return Err(ConversionError::UnsupportedMatrixCoefficients),
         MatrixCoefficients::Unspecified => {
-            return Err(ConversionError::UnspecifiedMatrixCoefficients)
+            return Err(ConversionError::UnspecifiedMatrixCoefficients);
         }
     })
 }
@@ -139,7 +139,7 @@ pub const fn get_primaries_xy(primaries: ColorPrimaries) -> Result<[[f32; 2]; 3]
         }
         ColorPrimaries::Tech3213 => [[0.630, 0.340], [0.295, 0.605], [0.155, 0.077]],
         ColorPrimaries::Reserved0 | ColorPrimaries::Reserved | ColorPrimaries::ST428 => {
-            return Err(ConversionError::UnsupportedColorPrimaries)
+            return Err(ConversionError::UnsupportedColorPrimaries);
         }
         // SAFETY: We guess any unspecified data when beginning conversion
         ColorPrimaries::Unspecified => return Err(ConversionError::UnspecifiedColorPrimaries),

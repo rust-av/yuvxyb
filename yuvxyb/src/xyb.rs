@@ -1,6 +1,6 @@
 use v_frame::prelude::Pixel;
 
-use crate::{rgb_xyb::linear_rgb_to_xyb, ConversionError, CreationError, LinearRgb, Rgb, Yuv};
+use crate::{ConversionError, CreationError, LinearRgb, Rgb, Yuv, rgb_xyb::linear_rgb_to_xyb};
 
 /// Contains an XYB image.
 ///

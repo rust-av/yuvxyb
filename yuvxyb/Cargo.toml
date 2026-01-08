@@ -2,14 +2,14 @@
 name = "yuvxyb"
 description = "Conversions between YUV (YCbCr), XYB, and other colorspaces"
 version = "0.4.2"
-edition = "2021"
+edition = "2024"
 license = "MIT"
 documentation = "https://docs.rs/yuvxyb"
 homepage = "https://github.com/rust-av/yuvxyb"
 repository = "https://github.com/rust-av/yuvxyb"
 exclude = ["test_data", "yuvxyb-dump"]
 
-rust-version = "1.66.0"
+rust-version = "1.85.0"
 
 [features]
 default = ["fastmath"]

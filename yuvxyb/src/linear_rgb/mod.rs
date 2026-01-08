@@ -5,9 +5,9 @@ use av_data::pixel::ColorPrimaries;
 use v_frame::prelude::Pixel;
 
 use crate::{
-    rgb_xyb::xyb_to_linear_rgb,
-    yuv_rgb::{transform_primaries, TransferFunction},
     ConversionError, CreationError, Hsl, Rgb, Xyb, Yuv,
+    rgb_xyb::xyb_to_linear_rgb,
+    yuv_rgb::{TransferFunction, transform_primaries},
 };
 
 /// Contains an RGB image in a linearized color space.

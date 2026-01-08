@@ -2,13 +2,13 @@
 name = "yuvxyb-math"
 description = "Math abstractions for yuvxyb"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 license = "MIT"
 documentation = "https://docs.rs/yuvxyb-math"
 homepage = "https://github.com/rust-av/yuvxyb"
 repository = "https://github.com/rust-av/yuvxyb"
 
-rust-version = "1.64.0"
+rust-version = "1.85.0"
 
 [features]
 default = ["fastmath"]
