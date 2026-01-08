@@ -118,10 +118,10 @@ impl<T: Pixel> Yuv<T> {
 
         let width = data.planes[0].cfg.width;
         let height = data.planes[0].cfg.height;
-        if width % (1 << config.subsampling_x) != 0 {
+        if !width.is_multiple_of(1 << config.subsampling_x) {
             return Err(YuvError::InvalidLumaWidth);
         }
-        if height % (1 << config.subsampling_y) != 0 {
+        if !height.is_multiple_of(1 << config.subsampling_y) {
             return Err(YuvError::InvalidLumaHeight);
         }
         if size_of::<T>() == 2 && config.bit_depth < 16 {
