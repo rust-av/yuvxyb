@@ -28,7 +28,7 @@ impl TransferFunction for TransferCharacteristic {
             Self::HybridLogGamma => image_arib_b67_gamma_to_lin(input),
             Self::Linear => input,
             Self::Reserved0 | Self::Reserved | Self::BT1361E | Self::ST428 => {
-                return Err(ConversionError::UnsupportedTransferCharacteristic)
+                return Err(ConversionError::UnsupportedTransferCharacteristic);
             }
             Self::Unspecified => return Err(ConversionError::UnspecifiedTransferCharacteristic),
         })
@@ -51,7 +51,7 @@ impl TransferFunction for TransferCharacteristic {
             Self::Linear => input,
             // Unsupported
             Self::Reserved0 | Self::Reserved | Self::BT1361E | Self::ST428 => {
-                return Err(ConversionError::UnsupportedTransferCharacteristic)
+                return Err(ConversionError::UnsupportedTransferCharacteristic);
             }
             Self::Unspecified => return Err(ConversionError::UnspecifiedTransferCharacteristic),
         })
@@ -148,51 +148,27 @@ fn log316_gamma_to_lin(x: f32) -> f32 {
 
 // Ignore the BT.1886 provisions for limited contrast and assume an ideal CRT.
 fn rec_1886_gamma_to_lin(x: f32) -> f32 {
-    if x <= 0.0 {
-        0.0
-    } else {
-        powf(x, 2.4)
-    }
+    if x <= 0.0 { 0.0 } else { powf(x, 2.4) }
 }
 
 fn rec_1886_lin_to_gamma(x: f32) -> f32 {
-    if x <= 0.0 {
-        0.0
-    } else {
-        powf(x, 1.0 / 2.4)
-    }
+    if x <= 0.0 { 0.0 } else { powf(x, 1.0 / 2.4) }
 }
 
 fn rec_470m_gamma_to_lin(x: f32) -> f32 {
-    if x <= 0.0 {
-        0.0
-    } else {
-        powf(x, 2.2)
-    }
+    if x <= 0.0 { 0.0 } else { powf(x, 2.2) }
 }
 
 fn rec_470m_lin_to_gamma(x: f32) -> f32 {
-    if x <= 0.0 {
-        0.0
-    } else {
-        powf(x, 1.0 / 2.2)
-    }
+    if x <= 0.0 { 0.0 } else { powf(x, 1.0 / 2.2) }
 }
 
 fn rec_470bg_gamma_to_lin(x: f32) -> f32 {
-    if x <= 0.0 {
-        0.0
-    } else {
-        powf(x, 2.8)
-    }
+    if x <= 0.0 { 0.0 } else { powf(x, 2.8) }
 }
 
 fn rec_470bg_lin_to_gamma(x: f32) -> f32 {
-    if x <= 0.0 {
-        0.0
-    } else {
-        powf(x, 1.0 / 2.8)
-    }
+    if x <= 0.0 { 0.0 } else { powf(x, 1.0 / 2.8) }
 }
 
 fn rec_709_oetf(x: f32) -> f32 {

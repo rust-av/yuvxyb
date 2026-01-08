@@ -626,29 +626,43 @@ fn test_transfer_characteristic_to_linear() {
     let test_data = vec![[0.5_f32; 3]; 10]; // 10 pixels of test data
 
     // Test supported characteristics don't return errors
-    assert!(TransferCharacteristic::SRGB
-        .to_linear(test_data.clone())
-        .is_ok());
-    assert!(TransferCharacteristic::BT1886
-        .to_linear(test_data.clone())
-        .is_ok());
-    assert!(TransferCharacteristic::PerceptualQuantizer
-        .to_linear(test_data.clone())
-        .is_ok());
-    assert!(TransferCharacteristic::HybridLogGamma
-        .to_linear(test_data.clone())
-        .is_ok());
-    assert!(TransferCharacteristic::Linear
-        .to_linear(test_data.clone())
-        .is_ok());
+    assert!(
+        TransferCharacteristic::SRGB
+            .to_linear(test_data.clone())
+            .is_ok()
+    );
+    assert!(
+        TransferCharacteristic::BT1886
+            .to_linear(test_data.clone())
+            .is_ok()
+    );
+    assert!(
+        TransferCharacteristic::PerceptualQuantizer
+            .to_linear(test_data.clone())
+            .is_ok()
+    );
+    assert!(
+        TransferCharacteristic::HybridLogGamma
+            .to_linear(test_data.clone())
+            .is_ok()
+    );
+    assert!(
+        TransferCharacteristic::Linear
+            .to_linear(test_data.clone())
+            .is_ok()
+    );
 
     // Test unsupported characteristics return errors
-    assert!(TransferCharacteristic::Reserved0
-        .to_linear(test_data.clone())
-        .is_err());
-    assert!(TransferCharacteristic::Unspecified
-        .to_linear(test_data.clone())
-        .is_err());
+    assert!(
+        TransferCharacteristic::Reserved0
+            .to_linear(test_data.clone())
+            .is_err()
+    );
+    assert!(
+        TransferCharacteristic::Unspecified
+            .to_linear(test_data.clone())
+            .is_err()
+    );
 }
 
 #[test]
@@ -656,27 +670,41 @@ fn test_transfer_characteristic_to_gamma() {
     let test_data = vec![[0.5_f32; 3]; 10]; // 10 pixels of test data
 
     // Test supported characteristics don't return errors
-    assert!(TransferCharacteristic::SRGB
-        .to_gamma(test_data.clone())
-        .is_ok());
-    assert!(TransferCharacteristic::BT1886
-        .to_gamma(test_data.clone())
-        .is_ok());
-    assert!(TransferCharacteristic::PerceptualQuantizer
-        .to_gamma(test_data.clone())
-        .is_ok());
-    assert!(TransferCharacteristic::HybridLogGamma
-        .to_gamma(test_data.clone())
-        .is_ok());
-    assert!(TransferCharacteristic::Linear
-        .to_gamma(test_data.clone())
-        .is_ok());
+    assert!(
+        TransferCharacteristic::SRGB
+            .to_gamma(test_data.clone())
+            .is_ok()
+    );
+    assert!(
+        TransferCharacteristic::BT1886
+            .to_gamma(test_data.clone())
+            .is_ok()
+    );
+    assert!(
+        TransferCharacteristic::PerceptualQuantizer
+            .to_gamma(test_data.clone())
+            .is_ok()
+    );
+    assert!(
+        TransferCharacteristic::HybridLogGamma
+            .to_gamma(test_data.clone())
+            .is_ok()
+    );
+    assert!(
+        TransferCharacteristic::Linear
+            .to_gamma(test_data.clone())
+            .is_ok()
+    );
 
     // Test unsupported characteristics return errors
-    assert!(TransferCharacteristic::Reserved0
-        .to_gamma(test_data.clone())
-        .is_err());
-    assert!(TransferCharacteristic::Unspecified
-        .to_gamma(test_data.clone())
-        .is_err());
+    assert!(
+        TransferCharacteristic::Reserved0
+            .to_gamma(test_data.clone())
+            .is_err()
+    );
+    assert!(
+        TransferCharacteristic::Unspecified
+            .to_gamma(test_data.clone())
+            .is_err()
+    );
 }

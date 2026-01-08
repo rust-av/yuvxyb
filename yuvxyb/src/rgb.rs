@@ -2,8 +2,8 @@ use av_data::pixel::{ColorPrimaries, TransferCharacteristic};
 use v_frame::prelude::Pixel;
 
 use crate::{
-    yuv_rgb::{transform_primaries, yuv_to_rgb, TransferFunction},
     ConversionError, CreationError, LinearRgb, Xyb, Yuv,
+    yuv_rgb::{TransferFunction, transform_primaries, yuv_to_rgb},
 };
 
 /// Contains an RGB image.
