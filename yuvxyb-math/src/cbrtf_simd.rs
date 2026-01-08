@@ -3,7 +3,7 @@
 //! This module provides vectorized cube root functions that process
 //! 4, 8, or 16 f32 values at once using SSE/AVX/AVX-512/NEON instructions.
 
-use wide::{f32x16, f32x4, f32x8, f64x2};
+use wide::{f32x4, f32x8, f32x16, f64x2};
 
 /// Vectorized cube root for 4 f32 values.
 ///

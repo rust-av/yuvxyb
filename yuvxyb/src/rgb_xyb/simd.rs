@@ -3,8 +3,8 @@
 //! This module provides vectorized versions of the color space conversion
 //! functions that process multiple pixels at once for improved performance.
 
-use wide::{f32x16, f32x8};
-use yuvxyb_math::{cbrtf_x16, cbrtf_x8};
+use wide::{f32x8, f32x16};
+use yuvxyb_math::{cbrtf_x8, cbrtf_x16};
 
 use super::{
     INVERSE_OPSIN_ABSORBANCE_MATRIX, NEG_OPSIN_ABSORBANCE_BIAS, OPSIN_ABSORBANCE_BIAS,
@@ -539,7 +539,10 @@ mod tests {
         }
 
         // Report findings
-        eprintln!("\nSIMD vs Scalar comparison ({} RGB values):", test_data.len());
+        eprintln!(
+            "\nSIMD vs Scalar comparison ({} RGB values):",
+            test_data.len()
+        );
         for ch in 0..3 {
             eprintln!(
                 "  Channel {} max diff: {:.2e} (threshold: {:.0e})",

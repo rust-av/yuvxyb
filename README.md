@@ -10,4 +10,4 @@ as well as all widely-used matrix coefficients and transfer characteristics.
 
 ## Minimum supported Rust version (MSRV)
 
-This crate requires a Rust version of 1.85.0 or higher. Increases in MSRV will result in a semver PATCH version increase.
+This crate requires a Rust version of 1.89.0 or higher. Increases in MSRV will result in a semver PATCH version increase.

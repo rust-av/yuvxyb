@@ -8,7 +8,7 @@
 
 - Improve speed of FP math on platforms without FMA at the cost of precision
 - Update v_frame dependency to 0.3.8 in order to remove unsound code
-- Increase MSRV to 1.85.0
+- Increase MSRV to 1.89.0
 - Factor out math abstractions into new subcrate [`yuvxyb-math`](https://crates.io/crates/yuvxyb-math)
 - Refactor code to avoid some proc-macro dependencies
 

@@ -12,4 +12,4 @@ pub use mul_add::multiply_add;
 pub use pow_exp::{expf, powf};
 
 #[cfg(feature = "simd")]
-pub use cbrtf_simd::{cbrtf_x16, cbrtf_x4, cbrtf_x8};
+pub use cbrtf_simd::{cbrtf_x4, cbrtf_x8, cbrtf_x16};
