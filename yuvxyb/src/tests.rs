@@ -1,5 +1,5 @@
 use interpolate_name::interpolate_test;
-use rand::Rng;
+use rand::RngExt;
 use v_frame::plane::Plane;
 
 use crate::yuv::YuvConfig;
