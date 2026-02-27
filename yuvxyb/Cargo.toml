@@ -1,7 +1,7 @@
 [package]
 name = "yuvxyb"
 description = "Conversions between YUV (YCbCr), XYB, and other colorspaces"
-version = "0.4.2"
+version = "0.5.0"
 edition = "2024"
 license = "MIT"
 documentation = "https://docs.rs/yuvxyb"
@@ -21,11 +21,11 @@ yuvxyb-math = { version = "0.1.0", path = "../yuvxyb-math" }
 av-data = "0.4.2"
 log = "0.4.17"
 num-traits = "0.2.15"
-v_frame = "0.3.8"
+v_frame = { version = "0.5.1", features = ["padding_api"] }
 wide = { version = "1.1", optional = true }
 
 [dev-dependencies]
-criterion = { version = "0.7", default-features = false }
+criterion = { version = "0.8", default-features = false }
 image = { version = "0.25", default-features = false, features = ["png"] }
 interpolate_name = "0.2.3"
 rand = "0.10"

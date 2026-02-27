@@ -20,9 +20,10 @@ pub use crate::yuv::{Yuv, YuvConfig, YuvError};
 pub use av_data::pixel::{ColorPrimaries, MatrixCoefficients, TransferCharacteristic};
 pub use num_traits::{FromPrimitive, ToPrimitive};
 pub use v_frame::{
-    frame::Frame,
+    chroma::ChromaSubsampling,
+    frame::{Frame, FrameBuilder},
+    pixel::Pixel,
     plane::Plane,
-    prelude::{CastFromPrimitive, Pixel},
 };
 
 // Export low-level RGB <-> XYB conversion functions

@@ -49,11 +49,16 @@ impl fmt::Display for ConversionError {
 ///
 /// # Example
 /// ```
+/// use std::num::NonZeroUsize;
 /// use yuvxyb::{CreationError, LinearRgb};
 ///
 /// // 10 pixels is not enough for the resolution 1920x1080
 /// let float_data = vec![[0f32; 3]; 10];
-/// let result = LinearRgb::new(float_data, 1920, 1080);
+/// let result = LinearRgb::new(
+///     float_data,
+///     NonZeroUsize::new(1920).unwrap(),
+///     NonZeroUsize::new(1080).unwrap(),
+/// );
 ///
 /// assert!(result.is_err());
 /// assert_eq!(result.unwrap_err(), CreationError::ResolutionMismatch);

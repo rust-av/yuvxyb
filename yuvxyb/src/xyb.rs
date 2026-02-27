@@ -1,4 +1,6 @@
-use v_frame::prelude::Pixel;
+use std::num::NonZeroUsize;
+
+use v_frame::pixel::Pixel;
 
 use crate::{ConversionError, CreationError, LinearRgb, Rgb, Yuv, rgb_xyb::linear_rgb_to_xyb};
 
@@ -13,8 +15,8 @@ use crate::{ConversionError, CreationError, LinearRgb, Rgb, Yuv, rgb_xyb::linear
 #[derive(Debug, Clone)]
 pub struct Xyb {
     data: Vec<[f32; 3]>,
-    width: usize,
-    height: usize,
+    width: NonZeroUsize,
+    height: NonZeroUsize,
 }
 
 impl Xyb {
@@ -22,8 +24,12 @@ impl Xyb {
     ///
     /// # Errors
     /// - If data length does not match `width * height`
-    pub fn new(data: Vec<[f32; 3]>, width: usize, height: usize) -> Result<Self, CreationError> {
-        if data.len() != width * height {
+    pub fn new(
+        data: Vec<[f32; 3]>,
+        width: NonZeroUsize,
+        height: NonZeroUsize,
+    ) -> Result<Self, CreationError> {
+        if data.len() != width.saturating_mul(height).get() {
             return Err(CreationError::ResolutionMismatch);
         }
 
@@ -54,13 +60,13 @@ impl Xyb {
 
     #[must_use]
     #[inline]
-    pub const fn width(&self) -> usize {
+    pub const fn width(&self) -> NonZeroUsize {
         self.width
     }
 
     #[must_use]
     #[inline]
-    pub const fn height(&self) -> usize {
+    pub const fn height(&self) -> NonZeroUsize {
         self.height
     }
 }

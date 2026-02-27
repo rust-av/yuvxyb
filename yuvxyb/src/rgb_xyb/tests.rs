@@ -1,5 +1,6 @@
 use std::{
     fs,
+    num::NonZeroUsize,
     path::{Path, PathBuf},
 };
 
@@ -37,8 +38,8 @@ fn rgb_to_xyb_correct() {
         .collect::<Vec<_>>();
     let source = Rgb::new(
         source_data,
-        1448,
-        1080,
+        NonZeroUsize::new(1448).unwrap(),
+        NonZeroUsize::new(1080).unwrap(),
         TransferCharacteristic::SRGB,
         ColorPrimaries::BT709,
     )
@@ -77,7 +78,12 @@ fn xyb_to_rgb_correct() {
         .join("test_data")
         .join("tank_srgb.png");
     let source_data = parse_xyb_txt(&source_path);
-    let source = Xyb::new(source_data, 1448, 1080).unwrap();
+    let source = Xyb::new(
+        source_data,
+        NonZeroUsize::new(1448).unwrap(),
+        NonZeroUsize::new(1080).unwrap(),
+    )
+    .unwrap();
     let expected = image::open(expected_path).unwrap();
 
     // Fixing this would result in worse code, and this

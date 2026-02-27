@@ -1,5 +1,7 @@
+use std::num::NonZeroUsize;
+
 use av_data::pixel::{ColorPrimaries, TransferCharacteristic};
-use v_frame::prelude::Pixel;
+use v_frame::pixel::Pixel;
 
 use crate::{
     ConversionError, CreationError, LinearRgb, Xyb, Yuv,
@@ -13,8 +15,8 @@ use crate::{
 #[derive(Debug, Clone)]
 pub struct Rgb {
     data: Vec<[f32; 3]>,
-    width: usize,
-    height: usize,
+    width: NonZeroUsize,
+    height: NonZeroUsize,
     transfer: TransferCharacteristic,
     primaries: ColorPrimaries,
 }
@@ -29,12 +31,12 @@ impl Rgb {
     /// - If data length does not match `width * height`
     pub fn new(
         data: Vec<[f32; 3]>,
-        width: usize,
-        height: usize,
+        width: NonZeroUsize,
+        height: NonZeroUsize,
         mut transfer: TransferCharacteristic,
         mut primaries: ColorPrimaries,
     ) -> Result<Self, CreationError> {
-        if data.len() != width * height {
+        if data.len() != width.saturating_mul(height).get() {
             return Err(CreationError::ResolutionMismatch);
         }
 
@@ -80,13 +82,13 @@ impl Rgb {
 
     #[must_use]
     #[inline]
-    pub const fn width(&self) -> usize {
+    pub const fn width(&self) -> NonZeroUsize {
         self.width
     }
 
     #[must_use]
     #[inline]
-    pub const fn height(&self) -> usize {
+    pub const fn height(&self) -> NonZeroUsize {
         self.height
     }
 

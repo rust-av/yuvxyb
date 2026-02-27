@@ -1,6 +1,8 @@
 #[cfg(test)]
 mod tests;
 
+use std::num::NonZeroUsize;
+
 use crate::{CreationError, LinearRgb};
 
 /// Contains an HSL image.
@@ -23,8 +25,8 @@ pub struct Hsl {
     // H is a value between 0 and 360 (degrees).
     // S and L are values betwen 0.0 and 1.0.
     data: Vec<[f32; 3]>,
-    width: usize,
-    height: usize,
+    width: NonZeroUsize,
+    height: NonZeroUsize,
 }
 
 impl Hsl {
@@ -32,8 +34,12 @@ impl Hsl {
     ///
     /// # Errors
     /// - If data length does not match `width * height`
-    pub fn new(data: Vec<[f32; 3]>, width: usize, height: usize) -> Result<Self, CreationError> {
-        if data.len() != width * height {
+    pub fn new(
+        data: Vec<[f32; 3]>,
+        width: NonZeroUsize,
+        height: NonZeroUsize,
+    ) -> Result<Self, CreationError> {
+        if data.len() != width.saturating_mul(height).get() {
             return Err(CreationError::ResolutionMismatch);
         }
 
@@ -64,13 +70,13 @@ impl Hsl {
 
     #[must_use]
     #[inline]
-    pub const fn width(&self) -> usize {
+    pub const fn width(&self) -> NonZeroUsize {
         self.width
     }
 
     #[must_use]
     #[inline]
-    pub const fn height(&self) -> usize {
+    pub const fn height(&self) -> NonZeroUsize {
         self.height
     }
 }

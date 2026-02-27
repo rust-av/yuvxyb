@@ -1,6 +1,9 @@
+use std::num::{NonZeroU8, NonZeroUsize};
+
 use interpolate_name::interpolate_test;
 use rand::RngExt;
-use v_frame::plane::Plane;
+use v_frame::chroma::ChromaSubsampling;
+use v_frame::frame::FrameBuilder;
 
 use crate::yuv::YuvConfig;
 
@@ -21,32 +24,24 @@ fn yuv_xyb_yuv_ident_8b(
     ss: (u8, u8),
     full_range: bool,
 ) {
-    let y_dims = (320usize, 240usize);
-    let uv_dims = (y_dims.0 >> ss.0, y_dims.1 >> ss.1);
-    let mut data: Frame<u8> = Frame {
-        planes: [
-            Plane::new(y_dims.0, y_dims.1, 0, 0, 0, 0),
-            Plane::new(
-                uv_dims.0,
-                uv_dims.1,
-                usize::from(ss.0),
-                usize::from(ss.1),
-                0,
-                0,
-            ),
-            Plane::new(
-                uv_dims.0,
-                uv_dims.1,
-                usize::from(ss.0),
-                usize::from(ss.1),
-                0,
-                0,
-            ),
-        ],
+    let chroma = match ss {
+        (1, 1) => ChromaSubsampling::Yuv420,
+        (1, 0) => ChromaSubsampling::Yuv422,
+        (0, 0) => ChromaSubsampling::Yuv444,
+        _ => unreachable!(),
     };
+    let mut data: Frame<u8> = FrameBuilder::new(
+        NonZeroUsize::new(320).unwrap(),
+        NonZeroUsize::new(240).unwrap(),
+        chroma,
+        NonZeroU8::new(8).unwrap(),
+    )
+    .build()
+    .unwrap();
     let mut rng = rand::rng();
-    for (i, plane) in data.planes.iter_mut().enumerate() {
-        for val in plane.data_origin_mut().iter_mut() {
+    for i in 0..3 {
+        let plane = data.plane_mut(i).unwrap();
+        for val in plane.pixels_mut() {
             *val = rng.random_range(if full_range {
                 0..=255
             } else if i == 0 {
@@ -184,32 +179,24 @@ fn yuv_xyb_yuv_ident_10b(
     ss: (u8, u8),
     full_range: bool,
 ) {
-    let y_dims = (320usize, 240usize);
-    let uv_dims = (y_dims.0 >> ss.0, y_dims.1 >> ss.1);
-    let mut data: Frame<u16> = Frame {
-        planes: [
-            Plane::new(y_dims.0, y_dims.1, 0, 0, 0, 0),
-            Plane::new(
-                uv_dims.0,
-                uv_dims.1,
-                usize::from(ss.0),
-                usize::from(ss.1),
-                0,
-                0,
-            ),
-            Plane::new(
-                uv_dims.0,
-                uv_dims.1,
-                usize::from(ss.0),
-                usize::from(ss.1),
-                0,
-                0,
-            ),
-        ],
+    let chroma = match ss {
+        (1, 1) => ChromaSubsampling::Yuv420,
+        (1, 0) => ChromaSubsampling::Yuv422,
+        (0, 0) => ChromaSubsampling::Yuv444,
+        _ => unreachable!(),
     };
+    let mut data: Frame<u16> = FrameBuilder::new(
+        NonZeroUsize::new(320).unwrap(),
+        NonZeroUsize::new(240).unwrap(),
+        chroma,
+        NonZeroU8::new(10).unwrap(),
+    )
+    .build()
+    .unwrap();
     let mut rng = rand::rng();
-    for (i, plane) in data.planes.iter_mut().enumerate() {
-        for val in plane.data_origin_mut().iter_mut() {
+    for i in 0..3 {
+        let plane = data.plane_mut(i).unwrap();
+        for val in plane.pixels_mut() {
             *val = rng.random_range(if full_range {
                 0..=1023
             } else if i == 0 {

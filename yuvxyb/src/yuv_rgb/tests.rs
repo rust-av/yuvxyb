@@ -1,8 +1,12 @@
-use super::*;
-use crate::{ConversionError, Yuv};
+use std::num::{NonZeroU8, NonZeroUsize};
+
 use av_data::pixel::{ColorPrimaries, MatrixCoefficients, TransferCharacteristic};
 use num_traits::clamp;
-use v_frame::{frame::Frame, plane::Plane};
+use v_frame::chroma::ChromaSubsampling;
+use v_frame::frame::{Frame, FrameBuilder};
+
+use super::*;
+use crate::{ConversionError, Pixel, Yuv};
 
 /// Converts 8..=16-bit YUV data to 32-bit floating point Linear RGB
 /// in a range of 0.0..=1.0;
@@ -26,7 +30,45 @@ fn linear_rgb_to_yuv<T: Pixel>(
 ) -> Result<Yuv<T>, ConversionError> {
     let data = transform_primaries(input, ColorPrimaries::BT709, config.color_primaries)?;
     let data = config.transfer_characteristics.to_gamma(data)?;
-    rgb_to_yuv(&data, width, height, config)
+    rgb_to_yuv(
+        &data,
+        NonZeroUsize::new(width).unwrap(),
+        NonZeroUsize::new(height).unwrap(),
+        config,
+    )
+}
+
+fn make_frame_from_pixels<T: Pixel>(
+    yuv_pixels: &[(T, T, T)],
+    width: usize,
+    height: usize,
+    bit_depth: u8,
+) -> Frame<T> {
+    let mut frame: Frame<T> = FrameBuilder::new(
+        NonZeroUsize::new(width).unwrap(),
+        NonZeroUsize::new(height).unwrap(),
+        ChromaSubsampling::Yuv444,
+        NonZeroU8::new(bit_depth).unwrap(),
+    )
+    .build()
+    .unwrap();
+    frame
+        .y_plane
+        .copy_from_slice(&yuv_pixels.iter().map(|p| p.0).collect::<Vec<_>>())
+        .unwrap();
+    frame
+        .u_plane
+        .as_mut()
+        .unwrap()
+        .copy_from_slice(&yuv_pixels.iter().map(|p| p.1).collect::<Vec<_>>())
+        .unwrap();
+    frame
+        .v_plane
+        .as_mut()
+        .unwrap()
+        .copy_from_slice(&yuv_pixels.iter().map(|p| p.2).collect::<Vec<_>>())
+        .unwrap();
+    frame
 }
 
 #[test]
@@ -418,13 +460,7 @@ fn bt601_full_to_rgb_8b() {
         color_primaries: ColorPrimaries::ST170M,
     };
     let input = Yuv::new(
-        Frame {
-            planes: [
-                Plane::from_slice(&yuv_pixels.iter().map(|pix| pix.0).collect::<Vec<_>>(), 2),
-                Plane::from_slice(&yuv_pixels.iter().map(|pix| pix.1).collect::<Vec<_>>(), 2),
-                Plane::from_slice(&yuv_pixels.iter().map(|pix| pix.2).collect::<Vec<_>>(), 2),
-            ],
-        },
+        make_frame_from_pixels(&yuv_pixels, 2, 2, config.bit_depth),
         config,
     )
     .unwrap();
@@ -461,9 +497,9 @@ fn bt601_full_to_rgb_8b() {
     // for y in 0..2 {
     //     for x in 0..2 {
     //         let expected = yuv_pixels[y * 2 + x];
-    //         let dy = yuv.data()[0].p(x, y);
-    //         let du = yuv.data()[1].p(x, y);
-    //         let dv = yuv.data()[2].p(x, y);
+    //         let dy = yuv.data().plane(0).unwrap().pixel(x, y).unwrap();
+    //         let du = yuv.data().plane(1).unwrap().pixel(x, y).unwrap();
+    //         let dv = yuv.data().plane(2).unwrap().pixel(x, y).unwrap();
     //         assert_eq!(dy, expected.0);
     //         assert_eq!(du, expected.1);
     //         assert_eq!(dv, expected.2);
@@ -492,13 +528,7 @@ fn bt601_limited_to_rgb_8b() {
         color_primaries: ColorPrimaries::ST170M,
     };
     let input = Yuv::new(
-        Frame {
-            planes: [
-                Plane::from_slice(&yuv_pixels.iter().map(|pix| pix.0).collect::<Vec<_>>(), 2),
-                Plane::from_slice(&yuv_pixels.iter().map(|pix| pix.1).collect::<Vec<_>>(), 2),
-                Plane::from_slice(&yuv_pixels.iter().map(|pix| pix.2).collect::<Vec<_>>(), 2),
-            ],
-        },
+        make_frame_from_pixels(&yuv_pixels, 2, 2, config.bit_depth),
         config,
     )
     .unwrap();
@@ -535,9 +565,9 @@ fn bt601_limited_to_rgb_8b() {
     // for y in 0..2 {
     //     for x in 0..2 {
     //         let expected = yuv_pixels[y * 2 + x];
-    //         let dy = yuv.data()[0].p(x, y);
-    //         let du = yuv.data()[1].p(x, y);
-    //         let dv = yuv.data()[2].p(x, y);
+    //         let dy = yuv.data().plane(0).unwrap().pixel(x, y).unwrap();
+    //         let du = yuv.data().plane(1).unwrap().pixel(x, y).unwrap();
+    //         let dv = yuv.data().plane(2).unwrap().pixel(x, y).unwrap();
     //         assert_eq!(dy, expected.0);
     //         assert_eq!(du, expected.1);
     //         assert_eq!(dv, expected.2);
@@ -570,13 +600,7 @@ fn bt601_full_to_rgb_10b() {
         color_primaries: ColorPrimaries::ST170M,
     };
     let input = Yuv::new(
-        Frame {
-            planes: [
-                Plane::from_slice(&yuv_pixels.iter().map(|pix| pix.0).collect::<Vec<_>>(), 2),
-                Plane::from_slice(&yuv_pixels.iter().map(|pix| pix.1).collect::<Vec<_>>(), 2),
-                Plane::from_slice(&yuv_pixels.iter().map(|pix| pix.2).collect::<Vec<_>>(), 2),
-            ],
-        },
+        make_frame_from_pixels(&yuv_pixels, 2, 2, config.bit_depth),
         config,
     )
     .unwrap();
@@ -605,9 +629,9 @@ fn bt601_full_to_rgb_10b() {
     for y in 0..2 {
         for x in 0..2 {
             let expected = yuv_pixels[y * 2 + x];
-            let dy = yuv.data()[0].p(x, y);
-            let du = yuv.data()[1].p(x, y);
-            let dv = yuv.data()[2].p(x, y);
+            let dy = yuv.data().plane(0).unwrap().pixel(x, y).unwrap();
+            let du = yuv.data().plane(1).unwrap().pixel(x, y).unwrap();
+            let dv = yuv.data().plane(2).unwrap().pixel(x, y).unwrap();
             assert_eq!(dy, expected.0);
             assert_eq!(du, expected.1);
             assert_eq!(dv, expected.2);
@@ -640,13 +664,7 @@ fn bt601_limited_to_rgb_10b() {
         color_primaries: ColorPrimaries::ST170M,
     };
     let input = Yuv::new(
-        Frame {
-            planes: [
-                Plane::from_slice(&yuv_pixels.iter().map(|pix| pix.0).collect::<Vec<_>>(), 2),
-                Plane::from_slice(&yuv_pixels.iter().map(|pix| pix.1).collect::<Vec<_>>(), 2),
-                Plane::from_slice(&yuv_pixels.iter().map(|pix| pix.2).collect::<Vec<_>>(), 2),
-            ],
-        },
+        make_frame_from_pixels(&yuv_pixels, 2, 2, config.bit_depth),
         config,
     )
     .unwrap();
@@ -675,9 +693,9 @@ fn bt601_limited_to_rgb_10b() {
     for y in 0..2 {
         for x in 0..2 {
             let expected = yuv_pixels[y * 2 + x];
-            let dy = yuv.data()[0].p(x, y);
-            let du = yuv.data()[1].p(x, y);
-            let dv = yuv.data()[2].p(x, y);
+            let dy = yuv.data().plane(0).unwrap().pixel(x, y).unwrap();
+            let du = yuv.data().plane(1).unwrap().pixel(x, y).unwrap();
+            let dv = yuv.data().plane(2).unwrap().pixel(x, y).unwrap();
             assert_eq!(dy, expected.0);
             assert_eq!(du, expected.1);
             assert_eq!(dv, expected.2);
@@ -706,13 +724,7 @@ fn bt709_full_to_rgb_8b() {
         color_primaries: ColorPrimaries::BT709,
     };
     let input = Yuv::new(
-        Frame {
-            planes: [
-                Plane::from_slice(&yuv_pixels.iter().map(|pix| pix.0).collect::<Vec<_>>(), 2),
-                Plane::from_slice(&yuv_pixels.iter().map(|pix| pix.1).collect::<Vec<_>>(), 2),
-                Plane::from_slice(&yuv_pixels.iter().map(|pix| pix.2).collect::<Vec<_>>(), 2),
-            ],
-        },
+        make_frame_from_pixels(&yuv_pixels, 2, 2, config.bit_depth),
         config,
     )
     .unwrap();
@@ -749,9 +761,9 @@ fn bt709_full_to_rgb_8b() {
     // for y in 0..2 {
     //     for x in 0..2 {
     //         let expected = yuv_pixels[y * 2 + x];
-    //         let dy = yuv.data()[0].p(x, y);
-    //         let du = yuv.data()[1].p(x, y);
-    //         let dv = yuv.data()[2].p(x, y);
+    //         let dy = yuv.data().plane(0).unwrap().pixel(x, y).unwrap();
+    //         let du = yuv.data().plane(1).unwrap().pixel(x, y).unwrap();
+    //         let dv = yuv.data().plane(2).unwrap().pixel(x, y).unwrap();
     //         assert_eq!(dy, expected.0);
     //         assert_eq!(du, expected.1);
     //         assert_eq!(dv, expected.2);
@@ -780,13 +792,7 @@ fn bt709_limited_to_rgb_8b() {
         color_primaries: ColorPrimaries::BT709,
     };
     let input = Yuv::new(
-        Frame {
-            planes: [
-                Plane::from_slice(&yuv_pixels.iter().map(|pix| pix.0).collect::<Vec<_>>(), 2),
-                Plane::from_slice(&yuv_pixels.iter().map(|pix| pix.1).collect::<Vec<_>>(), 2),
-                Plane::from_slice(&yuv_pixels.iter().map(|pix| pix.2).collect::<Vec<_>>(), 2),
-            ],
-        },
+        make_frame_from_pixels(&yuv_pixels, 2, 2, config.bit_depth),
         config,
     )
     .unwrap();
@@ -823,9 +829,9 @@ fn bt709_limited_to_rgb_8b() {
     // for y in 0..2 {
     //     for x in 0..2 {
     //         let expected = yuv_pixels[y * 2 + x];
-    //         let dy = yuv.data()[0].p(x, y);
-    //         let du = yuv.data()[1].p(x, y);
-    //         let dv = yuv.data()[2].p(x, y);
+    //         let dy = yuv.data().plane(0).unwrap().pixel(x, y).unwrap();
+    //         let du = yuv.data().plane(1).unwrap().pixel(x, y).unwrap();
+    //         let dv = yuv.data().plane(2).unwrap().pixel(x, y).unwrap();
     //         assert_eq!(dy, expected.0);
     //         assert_eq!(du, expected.1);
     //         assert_eq!(dv, expected.2);
@@ -858,13 +864,7 @@ fn bt709_full_to_rgb_10b() {
         color_primaries: ColorPrimaries::BT709,
     };
     let input = Yuv::new(
-        Frame {
-            planes: [
-                Plane::from_slice(&yuv_pixels.iter().map(|pix| pix.0).collect::<Vec<_>>(), 2),
-                Plane::from_slice(&yuv_pixels.iter().map(|pix| pix.1).collect::<Vec<_>>(), 2),
-                Plane::from_slice(&yuv_pixels.iter().map(|pix| pix.2).collect::<Vec<_>>(), 2),
-            ],
-        },
+        make_frame_from_pixels(&yuv_pixels, 2, 2, config.bit_depth),
         config,
     )
     .unwrap();
@@ -893,9 +893,9 @@ fn bt709_full_to_rgb_10b() {
     for y in 0..2 {
         for x in 0..2 {
             let expected = yuv_pixels[y * 2 + x];
-            let dy = yuv.data()[0].p(x, y);
-            let du = yuv.data()[1].p(x, y);
-            let dv = yuv.data()[2].p(x, y);
+            let dy = yuv.data().plane(0).unwrap().pixel(x, y).unwrap();
+            let du = yuv.data().plane(1).unwrap().pixel(x, y).unwrap();
+            let dv = yuv.data().plane(2).unwrap().pixel(x, y).unwrap();
             assert_eq!(dy, expected.0);
             assert_eq!(du, expected.1);
             assert_eq!(dv, expected.2);
@@ -928,13 +928,7 @@ fn bt709_limited_to_rgb_10b() {
         color_primaries: ColorPrimaries::BT709,
     };
     let input = Yuv::new(
-        Frame {
-            planes: [
-                Plane::from_slice(&yuv_pixels.iter().map(|pix| pix.0).collect::<Vec<_>>(), 2),
-                Plane::from_slice(&yuv_pixels.iter().map(|pix| pix.1).collect::<Vec<_>>(), 2),
-                Plane::from_slice(&yuv_pixels.iter().map(|pix| pix.2).collect::<Vec<_>>(), 2),
-            ],
-        },
+        make_frame_from_pixels(&yuv_pixels, 2, 2, config.bit_depth),
         config,
     )
     .unwrap();
@@ -963,9 +957,9 @@ fn bt709_limited_to_rgb_10b() {
     for y in 0..2 {
         for x in 0..2 {
             let expected = yuv_pixels[y * 2 + x];
-            let dy = yuv.data()[0].p(x, y);
-            let du = yuv.data()[1].p(x, y);
-            let dv = yuv.data()[2].p(x, y);
+            let dy = yuv.data().plane(0).unwrap().pixel(x, y).unwrap();
+            let du = yuv.data().plane(1).unwrap().pixel(x, y).unwrap();
+            let dv = yuv.data().plane(2).unwrap().pixel(x, y).unwrap();
             assert_eq!(dy, expected.0);
             assert_eq!(du, expected.1);
             assert_eq!(dv, expected.2);
@@ -998,13 +992,7 @@ fn bt2020_full_to_rgb_10b() {
         color_primaries: ColorPrimaries::BT2020,
     };
     let input = Yuv::new(
-        Frame {
-            planes: [
-                Plane::from_slice(&yuv_pixels.iter().map(|pix| pix.0).collect::<Vec<_>>(), 2),
-                Plane::from_slice(&yuv_pixels.iter().map(|pix| pix.1).collect::<Vec<_>>(), 2),
-                Plane::from_slice(&yuv_pixels.iter().map(|pix| pix.2).collect::<Vec<_>>(), 2),
-            ],
-        },
+        make_frame_from_pixels(&yuv_pixels, 2, 2, config.bit_depth),
         config,
     )
     .unwrap();
@@ -1033,9 +1021,9 @@ fn bt2020_full_to_rgb_10b() {
     for y in 0..2 {
         for x in 0..2 {
             let expected = yuv_pixels[y * 2 + x];
-            let dy = yuv.data()[0].p(x, y);
-            let du = yuv.data()[1].p(x, y);
-            let dv = yuv.data()[2].p(x, y);
+            let dy = yuv.data().plane(0).unwrap().pixel(x, y).unwrap();
+            let du = yuv.data().plane(1).unwrap().pixel(x, y).unwrap();
+            let dv = yuv.data().plane(2).unwrap().pixel(x, y).unwrap();
             assert_eq!(dy, expected.0);
             assert_eq!(du, expected.1);
             assert_eq!(dv, expected.2);
@@ -1068,13 +1056,7 @@ fn bt2020_limited_to_rgb_10b() {
         color_primaries: ColorPrimaries::BT2020,
     };
     let input = Yuv::new(
-        Frame {
-            planes: [
-                Plane::from_slice(&yuv_pixels.iter().map(|pix| pix.0).collect::<Vec<_>>(), 2),
-                Plane::from_slice(&yuv_pixels.iter().map(|pix| pix.1).collect::<Vec<_>>(), 2),
-                Plane::from_slice(&yuv_pixels.iter().map(|pix| pix.2).collect::<Vec<_>>(), 2),
-            ],
-        },
+        make_frame_from_pixels(&yuv_pixels, 2, 2, config.bit_depth),
         config,
     )
     .unwrap();
@@ -1103,9 +1085,9 @@ fn bt2020_limited_to_rgb_10b() {
     for y in 0..2 {
         for x in 0..2 {
             let expected = yuv_pixels[y * 2 + x];
-            let dy = yuv.data()[0].p(x, y);
-            let du = yuv.data()[1].p(x, y);
-            let dv = yuv.data()[2].p(x, y);
+            let dy = yuv.data().plane(0).unwrap().pixel(x, y).unwrap();
+            let du = yuv.data().plane(1).unwrap().pixel(x, y).unwrap();
+            let dv = yuv.data().plane(2).unwrap().pixel(x, y).unwrap();
             assert_eq!(dy, expected.0);
             assert_eq!(du, expected.1);
             assert_eq!(dv, expected.2);

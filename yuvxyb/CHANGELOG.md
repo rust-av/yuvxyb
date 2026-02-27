@@ -1,5 +1,10 @@
 # Changelog
 
+## Version 0.5.0
+
+- Upgrade `v_frame` to 0.5
+- Various optimizations and improvements
+
 ## Version 0.4.2
 
 - Fix edge case where division by zero may lead to incorrect results
