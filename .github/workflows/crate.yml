@@ -1,4 +1,6 @@
 name: Crate
+permissions:
+  contents: read
 
 on:
   push:
