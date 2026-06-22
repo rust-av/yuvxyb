@@ -13,8 +13,11 @@ mod transfer;
 #[cfg(test)]
 mod tests;
 
+use std::num::NonZeroU8;
+
 use v_frame::chroma::ChromaSubsampling;
-use v_frame::frame::FrameBuilder;
+use v_frame::frame::Frame;
+use v_frame::plane::{Plane, PlaneGeometry};
 
 pub use self::color::{rgb_to_yuv, transform_primaries, yuv_to_rgb};
 pub use self::transfer::TransferFunction;
@@ -91,16 +94,19 @@ fn ypbpr_to_ycbcr<T: Pixel>(
         0 => ChromaSubsampling::Yuv444,
         _ => unreachable!(),
     };
-    let mut output = FrameBuilder::new(width, height, chroma, bd)
-        .build()
-        .expect("should not fail");
+
+    let y_geometry = PlaneGeometry::unpadded(width, height, 1, 1).expect("can construct geometry");
+    let mut y_plane = Plane::new_uninit(y_geometry);
+    let chroma_geometry = y_geometry
+        .for_subsampling(chroma)
+        .expect("can subsample")
+        .expect("has chroma planes");
+    let mut u_plane = Plane::new_uninit(chroma_geometry);
+    let mut v_plane = Plane::new_uninit(chroma_geometry);
 
     // We setup the plane origins as mutable slices outside the loop
     // because `data_origin_mut` is _not_ just a simple array index,
     // so it would optimize poorly if called during each loop iteration.
-    let y_plane = &mut output.y_plane;
-    let u_plane = output.u_plane.as_mut().expect("has 3 planes");
-    let v_plane = output.v_plane.as_mut().expect("has 3 planes");
     let y_stride = y_plane.geometry().stride();
     let u_stride = u_plane.geometry().stride();
     let v_stride = v_plane.geometry().stride();
@@ -120,21 +126,46 @@ fn ypbpr_to_ycbcr<T: Pixel>(
             // SAFETY: The bounds of the YUV data are validated when we construct it.
             unsafe {
                 let pix = input.get_unchecked(input_pos);
-                *y_origin.get_unchecked_mut(y_pos) =
-                    from_f32_luma(pix[0], luma_scale, luma_offset, bd);
+                y_origin.get_unchecked_mut(y_pos).write(from_f32_luma(
+                    pix[0],
+                    luma_scale,
+                    luma_offset,
+                    bd,
+                ));
                 if u_pos != last_uv_pos {
                     // Small optimization to avoid doing unnecessary calculations and writes
                     // We can track this from just `u_pos`. We have `v_pos` separate for indexing
                     // on the off chance that the two planes have different strides.
-                    *u_origin.get_unchecked_mut(u_pos) =
-                        from_f32_chroma(pix[1], chroma_scale, chroma_offset, bd, full_range);
-                    *v_origin.get_unchecked_mut(v_pos) =
-                        from_f32_chroma(pix[2], chroma_scale, chroma_offset, bd, full_range);
+                    u_origin.get_unchecked_mut(u_pos).write(from_f32_chroma(
+                        pix[1],
+                        chroma_scale,
+                        chroma_offset,
+                        bd,
+                        full_range,
+                    ));
+                    v_origin.get_unchecked_mut(v_pos).write(from_f32_chroma(
+                        pix[2],
+                        chroma_scale,
+                        chroma_offset,
+                        bd,
+                        full_range,
+                    ));
                     last_uv_pos = u_pos;
                 }
             }
         }
     }
+
+    // SAFETY: All values of all planes have been initialized in the loop above.
+    let output = unsafe {
+        Frame {
+            y_plane: y_plane.assume_init(),
+            u_plane: Some(u_plane.assume_init()),
+            v_plane: Some(v_plane.assume_init()),
+            subsampling: chroma,
+            bit_depth: NonZeroU8::new(bd).expect("nonzero bitdepth"),
+        }
+    };
 
     Yuv::new(output, config).unwrap()
 }
