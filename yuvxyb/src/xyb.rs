@@ -23,6 +23,7 @@ impl Xyb {
     /// Create a new [`Xyb`] with the given data, width and height.
     ///
     /// # Errors
+    /// - If `width` or `height` are zero
     /// - If data length does not match `width * height`
     pub fn new(data: Vec<[f32; 3]>, width: usize, height: usize) -> Result<Self, CreationError> {
         let Some(width) = NonZeroUsize::new(width) else {
