@@ -18,7 +18,6 @@ pub use crate::rgb::Rgb;
 pub use crate::xyb::Xyb;
 pub use crate::yuv::{Yuv, YuvConfig, YuvError};
 pub use av_data::pixel::{ColorPrimaries, MatrixCoefficients, TransferCharacteristic};
-pub use num_traits::{FromPrimitive, ToPrimitive};
 pub use v_frame::{
     chroma::ChromaSubsampling,
     frame::{Frame, FrameBuilder},
