@@ -13,7 +13,6 @@ mod transfer;
 #[cfg(test)]
 mod tests;
 
-use num_traits::clamp;
 use v_frame::chroma::ChromaSubsampling;
 use v_frame::frame::FrameBuilder;
 
@@ -141,61 +140,43 @@ fn ypbpr_to_ycbcr<T: Pixel>(
 }
 
 fn to_f32_luma<T: Pixel>(val: T, scale: f32, offset: f32) -> f32 {
-    // Converts to a float value in the range 0.0..=1.0
-    let val = val.to_f32().expect("can convert to f32");
-    clamp(val.mul_add(scale, offset), 0.0, 1.0)
+    let val = f32::from(val.into());
+    val.mul_add(scale, offset).clamp(0.0, 1.0)
 }
 
 fn to_f32_chroma<T: Pixel>(val: T, scale: f32, offset: f32) -> f32 {
-    // Converts to a float value in the range -0.5..=0.5
-    let val = val.to_f32().expect("can convert to f32");
-    clamp(val.mul_add(scale, offset), -0.5, 0.5)
+    let val = f32::from(val.into());
+    val.mul_add(scale, offset).clamp(-0.5, 0.5)
 }
 
 fn from_f32_luma<T: Pixel>(val: f32, scale: f32, offset: f32, bd: u8) -> T {
-    // Converts to a float value in the range 0.0..=1.0
-    match size_of::<T>() {
-        1 => T::from(clamp(
-            val.mul_add(scale, offset).round() as u16,
-            0,
-            ((1u32 << bd) - 1) as u16,
-        ) as u8)
-        .expect("T is u8"),
-        2 => T::from(clamp(
-            val.mul_add(scale, offset).round() as u16,
-            0,
-            ((1u32 << bd) - 1) as u16,
-        ) as u16)
-        .expect("T is u16"),
-        _ => unreachable!(),
+    const { assert!(size_of::<T>() <= 2) };
+
+    let val = val.mul_add(scale, offset).round();
+    if size_of::<T>() == 1 {
+        T::from((val as u8).min(u8::MAX >> (8 - bd)))
+    } else {
+        T::try_from((val as u16).min(u16::MAX >> (16 - bd))).expect("T is u16")
     }
 }
 
 fn from_f32_chroma<T: Pixel>(val: f32, scale: f32, offset: f32, bd: u8, full_range: bool) -> T {
+    const { assert!(size_of::<T>() <= 2) };
+
     // Accounts for rounding issues
     if full_range && (val + 0.5).abs() < f32::EPSILON {
-        return match size_of::<T>() {
-            1 => T::from(0u8).expect("T is u8"),
-            2 => T::from(0u16).expect("T is u16"),
-            _ => unreachable!(),
+        return if size_of::<T>() == 1 {
+            T::from(0u8)
+        } else {
+            T::try_from(0u16).expect("T is u16")
         };
     }
 
-    // Converts from a float value in the range -0.5..=0.5
-    match size_of::<T>() {
-        1 => T::from(clamp(
-            val.mul_add(scale, offset).round() as u16,
-            0,
-            ((1u32 << bd) - 1) as u16,
-        ) as u8)
-        .expect("T is u8"),
-        2 => T::from(clamp(
-            val.mul_add(scale, offset).round() as u16,
-            0,
-            ((1u32 << bd) - 1) as u16,
-        ) as u16)
-        .expect("T is u16"),
-        _ => unreachable!(),
+    let val = val.mul_add(scale, offset).round();
+    if size_of::<T>() == 1 {
+        T::from((val as u8).min(u8::MAX >> (8 - bd)))
+    } else {
+        T::try_from((val as u16).min(u16::MAX >> (16 - bd))).expect("T is u16")
     }
 }
 
