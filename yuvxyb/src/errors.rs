@@ -54,11 +54,7 @@ impl fmt::Display for ConversionError {
 ///
 /// // 10 pixels is not enough for the resolution 1920x1080
 /// let float_data = vec![[0f32; 3]; 10];
-/// let result = LinearRgb::new(
-///     float_data,
-///     NonZeroUsize::new(1920).unwrap(),
-///     NonZeroUsize::new(1080).unwrap(),
-/// );
+/// let result = LinearRgb::new(float_data, 1920, 1080);
 ///
 /// assert!(result.is_err());
 /// assert_eq!(result.unwrap_err(), CreationError::ResolutionMismatch);
@@ -68,6 +64,9 @@ impl fmt::Display for ConversionError {
 /// [`YuvError`]: crate::yuv::YuvError
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CreationError {
+    /// The supplied width and/or height is zero, which is unsupported.
+    ZeroResolution,
+
     /// There is a mismatch between the supplied data and the supplied resolution.
     ///
     /// Generally, data.len() should be equal to width * height.
@@ -79,6 +78,9 @@ impl std::error::Error for CreationError {}
 impl fmt::Display for CreationError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
+            Self::ZeroResolution => {
+                write!(f, "The supplied width or height is zero.")
+            }
             Self::ResolutionMismatch => {
                 write!(f, "Data length does not match the specified dimensions.")
             }

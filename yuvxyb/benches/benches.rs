@@ -1,5 +1,4 @@
 use std::hint::black_box;
-use std::num::NonZeroUsize;
 
 use criterion::{Criterion, criterion_group, criterion_main};
 use rand::RngExt;

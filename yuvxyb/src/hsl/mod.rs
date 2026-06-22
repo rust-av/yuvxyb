@@ -34,11 +34,15 @@ impl Hsl {
     ///
     /// # Errors
     /// - If data length does not match `width * height`
-    pub fn new(
-        data: Vec<[f32; 3]>,
-        width: NonZeroUsize,
-        height: NonZeroUsize,
-    ) -> Result<Self, CreationError> {
+    pub fn new(data: Vec<[f32; 3]>, width: usize, height: usize) -> Result<Self, CreationError> {
+        let Some(width) = NonZeroUsize::new(width) else {
+            return Err(CreationError::ZeroResolution);
+        };
+
+        let Some(height) = NonZeroUsize::new(height) else {
+            return Err(CreationError::ZeroResolution);
+        };
+
         if data.len() != width.saturating_mul(height).get() {
             return Err(CreationError::ResolutionMismatch);
         }
@@ -68,23 +72,25 @@ impl Hsl {
         self.data
     }
 
+    /// Guaranteed to be non-zero.
     #[must_use]
     #[inline]
-    pub const fn width(&self) -> NonZeroUsize {
-        self.width
+    pub const fn width(&self) -> usize {
+        self.width.get()
     }
 
+    /// Guaranteed to be non-zero.
     #[must_use]
     #[inline]
-    pub const fn height(&self) -> NonZeroUsize {
-        self.height
+    pub const fn height(&self) -> usize {
+        self.height.get()
     }
 }
 
 impl From<LinearRgb> for Hsl {
     fn from(lrgb: LinearRgb) -> Self {
-        let width = lrgb.width();
-        let height = lrgb.height();
+        let width = NonZeroUsize::new(lrgb.width()).expect("is non-zero");
+        let height = NonZeroUsize::new(lrgb.height()).expect("is non-zero");
         let mut data = lrgb.into_data();
         for pix in &mut data {
             *pix = lrgb_to_hsl(*pix);

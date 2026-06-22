@@ -31,11 +31,19 @@ impl Rgb {
     /// - If data length does not match `width * height`
     pub fn new(
         data: Vec<[f32; 3]>,
-        width: NonZeroUsize,
-        height: NonZeroUsize,
+        width: usize,
+        height: usize,
         mut transfer: TransferCharacteristic,
         mut primaries: ColorPrimaries,
     ) -> Result<Self, CreationError> {
+        let Some(width) = NonZeroUsize::new(width) else {
+            return Err(CreationError::ZeroResolution);
+        };
+
+        let Some(height) = NonZeroUsize::new(height) else {
+            return Err(CreationError::ZeroResolution);
+        };
+
         if data.len() != width.saturating_mul(height).get() {
             return Err(CreationError::ResolutionMismatch);
         }
@@ -80,16 +88,18 @@ impl Rgb {
         self.data
     }
 
+    /// Guaranteed to be non-zero.
     #[must_use]
     #[inline]
-    pub const fn width(&self) -> NonZeroUsize {
-        self.width
+    pub const fn width(&self) -> usize {
+        self.width.get()
     }
 
+    /// Guaranteed to be non-zero.
     #[must_use]
     #[inline]
-    pub const fn height(&self) -> NonZeroUsize {
-        self.height
+    pub const fn height(&self) -> usize {
+        self.height.get()
     }
 
     #[must_use]
@@ -121,8 +131,8 @@ impl<T: Pixel> TryFrom<&Yuv<T>> for Rgb {
 
         Ok(Self {
             data,
-            width: yuv.width(),
-            height: yuv.height(),
+            width: NonZeroUsize::new(yuv.width()).expect("is non-zero1"),
+            height: NonZeroUsize::new(yuv.height()).expect("is non-zero2"),
             transfer: yuv.config().transfer_characteristics,
             primaries: yuv.config().color_primaries,
         })
@@ -160,8 +170,8 @@ impl TryFrom<(LinearRgb, TransferCharacteristic, ColorPrimaries)> for Rgb {
             log::warn!("Color primaries not specified. Guessing {}", primaries);
         }
 
-        let width = lrgb.width();
-        let height = lrgb.height();
+        let width = NonZeroUsize::new(lrgb.width()).expect("is non-zero");
+        let height = NonZeroUsize::new(lrgb.height()).expect("is non-zero");
         let data = transform_primaries(lrgb.into_data(), ColorPrimaries::BT709, primaries)?;
         let data = transfer.to_gamma(data)?;
 

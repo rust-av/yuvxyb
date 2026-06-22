@@ -24,11 +24,15 @@ impl Xyb {
     ///
     /// # Errors
     /// - If data length does not match `width * height`
-    pub fn new(
-        data: Vec<[f32; 3]>,
-        width: NonZeroUsize,
-        height: NonZeroUsize,
-    ) -> Result<Self, CreationError> {
+    pub fn new(data: Vec<[f32; 3]>, width: usize, height: usize) -> Result<Self, CreationError> {
+        let Some(width) = NonZeroUsize::new(width) else {
+            return Err(CreationError::ZeroResolution);
+        };
+
+        let Some(height) = NonZeroUsize::new(height) else {
+            return Err(CreationError::ZeroResolution);
+        };
+
         if data.len() != width.saturating_mul(height).get() {
             return Err(CreationError::ResolutionMismatch);
         }
@@ -99,8 +103,8 @@ impl TryFrom<Rgb> for Xyb {
 
 impl From<LinearRgb> for Xyb {
     fn from(lrgb: LinearRgb) -> Self {
-        let width = lrgb.width();
-        let height = lrgb.height();
+        let width = NonZeroUsize::new(lrgb.width()).expect("is non-zero");
+        let height = NonZeroUsize::new(lrgb.height()).expect("is non-zero");
         let data = linear_rgb_to_xyb(lrgb.into_data());
 
         Self {

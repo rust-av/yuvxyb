@@ -1,5 +1,5 @@
+use std::fmt;
 use std::mem::size_of;
-use std::{fmt, num::NonZeroUsize};
 
 use av_data::pixel::{ColorPrimaries, MatrixCoefficients, TransferCharacteristic};
 use v_frame::{frame::Frame, pixel::Pixel, plane::Plane};
@@ -103,10 +103,6 @@ impl<T: Pixel> Yuv<T> {
     ///   frame data
     /// - If `data` contains values which are not valid for the specified bit
     ///   depth (note: out-of-range values for limited range are allowed)
-    // Clippy complains about T::to_u16 maybe panicking, but it can be assumed
-    // to never panic because the Pixel trait is only implemented by u8 and
-    // u16, both of which will successfully return a u16 from to_u16.
-    #[allow(clippy::missing_panics_doc)]
     pub fn new(data: Frame<T>, config: YuvConfig) -> Result<Self, YuvError> {
         let ss_ratio = data.subsampling.subsample_ratio();
         match ss_ratio {
@@ -155,16 +151,18 @@ impl<T: Pixel> Yuv<T> {
         &self.data
     }
 
+    /// Guaranteed to be non-zero.
     #[must_use]
     #[inline]
-    pub fn width(&self) -> NonZeroUsize {
-        NonZeroUsize::new(self.data.y_plane.width()).expect("is non-zero")
+    pub fn width(&self) -> usize {
+        self.data.y_plane.width()
     }
 
+    /// Guaranteed to be non-zero.
     #[must_use]
     #[inline]
-    pub fn height(&self) -> NonZeroUsize {
-        NonZeroUsize::new(self.data.y_plane.height()).expect("is non-zero")
+    pub fn height(&self) -> usize {
+        self.data.y_plane.height()
     }
 
     #[must_use]
@@ -243,7 +241,7 @@ impl<T: Pixel> TryFrom<(&Rgb, YuvConfig)> for Yuv<T> {
     fn try_from(other: (&Rgb, YuvConfig)) -> Result<Self, Self::Error> {
         let rgb = other.0;
         let config = other.1;
-        rgb_to_yuv(rgb.data(), rgb.width().get(), rgb.height().get(), config)
+        rgb_to_yuv(rgb.data(), rgb.width(), rgb.height(), config)
     }
 }
 

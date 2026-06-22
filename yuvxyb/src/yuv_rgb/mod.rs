@@ -21,8 +21,8 @@ pub use self::transfer::TransferFunction;
 use crate::{Pixel, Yuv, YuvConfig};
 
 fn ycbcr_to_ypbpr<T: Pixel>(input: &Yuv<T>) -> Vec<[f32; 3]> {
-    let w = input.width().get();
-    let h = input.height().get();
+    let w = input.width();
+    let h = input.height();
     let ss_x = input.config().subsampling_x;
     let ss_y = input.config().subsampling_y;
     let bd = input.config().bit_depth;

@@ -31,11 +31,15 @@ impl LinearRgb {
     ///
     /// # Errors
     /// - If data length does not match `width * height`
-    pub fn new(
-        data: Vec<[f32; 3]>,
-        width: NonZeroUsize,
-        height: NonZeroUsize,
-    ) -> Result<Self, CreationError> {
+    pub fn new(data: Vec<[f32; 3]>, width: usize, height: usize) -> Result<Self, CreationError> {
+        let Some(width) = NonZeroUsize::new(width) else {
+            return Err(CreationError::ZeroResolution);
+        };
+
+        let Some(height) = NonZeroUsize::new(height) else {
+            return Err(CreationError::ZeroResolution);
+        };
+
         if data.len() != width.saturating_mul(height).get() {
             return Err(CreationError::ResolutionMismatch);
         }
@@ -65,16 +69,18 @@ impl LinearRgb {
         self.data
     }
 
+    /// Guaranteed to be non-zero.
     #[must_use]
     #[inline]
-    pub const fn width(&self) -> NonZeroUsize {
-        self.width
+    pub const fn width(&self) -> usize {
+        self.width.get()
     }
 
+    /// Guaranteed to be non-zero.
     #[must_use]
     #[inline]
-    pub const fn height(&self) -> NonZeroUsize {
-        self.height
+    pub const fn height(&self) -> usize {
+        self.height.get()
     }
 }
 
@@ -99,8 +105,8 @@ impl TryFrom<Rgb> for LinearRgb {
     type Error = ConversionError;
 
     fn try_from(rgb: Rgb) -> Result<Self, Self::Error> {
-        let width = rgb.width();
-        let height = rgb.height();
+        let width = NonZeroUsize::new(rgb.width()).expect("is non-zero");
+        let height = NonZeroUsize::new(rgb.height()).expect("is non-zero");
         let transfer = rgb.transfer();
         let primaries = rgb.primaries();
 
@@ -131,8 +137,8 @@ impl From<Xyb> for LinearRgb {
 
 impl From<Hsl> for LinearRgb {
     fn from(hsl: Hsl) -> Self {
-        let width = hsl.width();
-        let height = hsl.height();
+        let width = NonZeroUsize::new(hsl.width()).expect("is non-zero");
+        let height = NonZeroUsize::new(hsl.height()).expect("is non-zero");
         let mut data = hsl.into_data();
         for pix in &mut data {
             *pix = hsl_to_lrgb(*pix);
