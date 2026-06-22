@@ -13,8 +13,6 @@ mod transfer;
 #[cfg(test)]
 mod tests;
 
-use std::num::{NonZeroU8, NonZeroUsize};
-
 use num_traits::clamp;
 use v_frame::chroma::ChromaSubsampling;
 use v_frame::frame::FrameBuilder;
@@ -44,12 +42,15 @@ fn ycbcr_to_ypbpr<T: Pixel>(input: &Yuv<T>) -> Vec<[f32; 3]> {
         .v_plane
         .as_ref()
         .expect("monochrome currently unsupported");
-    let y_stride = y_plane.geometry().stride.get();
-    let u_stride = u_plane.geometry().stride.get();
-    let v_stride = v_plane.geometry().stride.get();
-    let y_origin = &y_plane.data()[y_plane.data_origin()..];
-    let u_origin = &u_plane.data()[u_plane.data_origin()..];
-    let v_origin = &v_plane.data()[v_plane.data_origin()..];
+    let y_stride = y_plane.geometry().stride();
+    let u_stride = u_plane.geometry().stride();
+    let v_stride = v_plane.geometry().stride();
+    let y_origin = y_plane.geometry().data_origin();
+    let u_origin = u_plane.geometry().data_origin();
+    let v_origin = v_plane.geometry().data_origin();
+    let y_origin = &y_plane.data()[y_origin..];
+    let u_origin = &u_plane.data()[u_origin..];
+    let v_origin = &v_plane.data()[v_origin..];
     let mut output = vec![[0.0, 0.0, 0.0]; w * h];
     for y in 0..h {
         for x in 0..w {
@@ -73,8 +74,8 @@ fn ycbcr_to_ypbpr<T: Pixel>(input: &Yuv<T>) -> Vec<[f32; 3]> {
 #[allow(clippy::too_many_lines)]
 fn ypbpr_to_ycbcr<T: Pixel>(
     input: &[[f32; 3]],
-    width: NonZeroUsize,
-    height: NonZeroUsize,
+    width: usize,
+    height: usize,
     config: YuvConfig,
 ) -> Yuv<T> {
     let ss_x = config.subsampling_x;
@@ -91,14 +92,9 @@ fn ypbpr_to_ycbcr<T: Pixel>(
         0 => ChromaSubsampling::Yuv444,
         _ => unreachable!(),
     };
-    let mut output = FrameBuilder::new(
-        width,
-        height,
-        chroma,
-        NonZeroU8::new(bd).expect("should not be zero"),
-    )
-    .build()
-    .expect("should not fail");
+    let mut output = FrameBuilder::new(width, height, chroma, bd)
+        .build()
+        .expect("should not fail");
 
     // We setup the plane origins as mutable slices outside the loop
     // because `data_origin_mut` is _not_ just a simple array index,
@@ -106,19 +102,19 @@ fn ypbpr_to_ycbcr<T: Pixel>(
     let y_plane = &mut output.y_plane;
     let u_plane = output.u_plane.as_mut().expect("has 3 planes");
     let v_plane = output.v_plane.as_mut().expect("has 3 planes");
-    let y_stride = y_plane.geometry().stride.get();
-    let u_stride = u_plane.geometry().stride.get();
-    let v_stride = v_plane.geometry().stride.get();
-    let y_origin = y_plane.data_origin();
-    let u_origin = u_plane.data_origin();
-    let v_origin = v_plane.data_origin();
+    let y_stride = y_plane.geometry().stride();
+    let u_stride = u_plane.geometry().stride();
+    let v_stride = v_plane.geometry().stride();
+    let y_origin = y_plane.geometry().data_origin();
+    let u_origin = u_plane.geometry().data_origin();
+    let v_origin = v_plane.geometry().data_origin();
     let y_origin = &mut y_plane.data_mut()[y_origin..];
     let u_origin = &mut u_plane.data_mut()[u_origin..];
     let v_origin = &mut v_plane.data_mut()[v_origin..];
     let mut last_uv_pos = usize::MAX;
-    for y in 0..height.get() {
-        for x in 0..width.get() {
-            let input_pos = y * width.get() + x;
+    for y in 0..height {
+        for x in 0..width {
+            let input_pos = y * width + x;
             let y_pos = y * y_stride + x;
             let u_pos = (y >> ss_y) * u_stride + (x >> ss_x);
             let v_pos = (y >> ss_y) * v_stride + (x >> ss_x);

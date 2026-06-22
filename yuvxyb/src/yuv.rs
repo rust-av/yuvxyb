@@ -125,19 +125,16 @@ impl<T: Pixel> Yuv<T> {
 
         let width = data.y_plane.width();
         let height = data.y_plane.height();
-        if !width.get().is_multiple_of(1 << config.subsampling_x) {
+        if !width.is_multiple_of(1 << config.subsampling_x) {
             return Err(YuvError::InvalidLumaWidth);
         }
-        if !height.get().is_multiple_of(1 << config.subsampling_y) {
+        if !height.is_multiple_of(1 << config.subsampling_y) {
             return Err(YuvError::InvalidLumaHeight);
         }
         if size_of::<T>() == 2 && config.bit_depth < 16 {
             let max_value = u16::MAX >> (16 - config.bit_depth);
-            let plane_data_invalid = |plane: &Plane<T>| -> bool {
-                plane
-                    .pixels()
-                    .any(|pix| pix.to_u16().expect("This is a u16") > max_value)
-            };
+            let plane_data_invalid =
+                |plane: &Plane<T>| plane.pixels().any(|pix| pix.into() > max_value);
             if plane_data_invalid(&data.y_plane)
                 || data.u_plane.as_ref().is_some_and(plane_data_invalid)
                 || data.v_plane.as_ref().is_some_and(plane_data_invalid)
@@ -161,13 +158,13 @@ impl<T: Pixel> Yuv<T> {
     #[must_use]
     #[inline]
     pub fn width(&self) -> NonZeroUsize {
-        self.data.y_plane.width()
+        NonZeroUsize::new(self.data.y_plane.width()).expect("is non-zero")
     }
 
     #[must_use]
     #[inline]
     pub fn height(&self) -> NonZeroUsize {
-        self.data.y_plane.height()
+        NonZeroUsize::new(self.data.y_plane.height()).expect("is non-zero")
     }
 
     #[must_use]
@@ -178,11 +175,7 @@ impl<T: Pixel> Yuv<T> {
 }
 
 impl YuvConfig {
-    pub(crate) fn fix_unspecified_data(
-        mut self,
-        width: NonZeroUsize,
-        height: NonZeroUsize,
-    ) -> Self {
+    pub(crate) fn fix_unspecified_data(mut self, width: usize, height: usize) -> Self {
         if self.matrix_coefficients == MatrixCoefficients::Unspecified {
             self.matrix_coefficients = guess_matrix_coefficients(width, height);
             log::warn!(
@@ -250,18 +243,15 @@ impl<T: Pixel> TryFrom<(&Rgb, YuvConfig)> for Yuv<T> {
     fn try_from(other: (&Rgb, YuvConfig)) -> Result<Self, Self::Error> {
         let rgb = other.0;
         let config = other.1;
-        rgb_to_yuv(rgb.data(), rgb.width(), rgb.height(), config)
+        rgb_to_yuv(rgb.data(), rgb.width().get(), rgb.height().get(), config)
     }
 }
 
 // Heuristic taken from mpv
-const fn guess_matrix_coefficients(
-    width: NonZeroUsize,
-    height: NonZeroUsize,
-) -> MatrixCoefficients {
-    if width.get() >= 1280 || height.get() > 576 {
+const fn guess_matrix_coefficients(width: usize, height: usize) -> MatrixCoefficients {
+    if width >= 1280 || height > 576 {
         MatrixCoefficients::BT709
-    } else if height.get() == 576 {
+    } else if height == 576 {
         MatrixCoefficients::BT470BG
     } else {
         MatrixCoefficients::ST170M
@@ -271,18 +261,18 @@ const fn guess_matrix_coefficients(
 // Heuristic taken from mpv
 fn guess_color_primaries(
     matrix: MatrixCoefficients,
-    width: NonZeroUsize,
-    height: NonZeroUsize,
+    width: usize,
+    height: usize,
 ) -> ColorPrimaries {
     if matrix == MatrixCoefficients::BT2020NonConstantLuminance
         || matrix == MatrixCoefficients::BT2020ConstantLuminance
     {
         ColorPrimaries::BT2020
-    } else if matrix == MatrixCoefficients::BT709 || width.get() >= 1280 || height.get() > 576 {
+    } else if matrix == MatrixCoefficients::BT709 || width >= 1280 || height > 576 {
         ColorPrimaries::BT709
-    } else if height.get() == 576 {
+    } else if height == 576 {
         ColorPrimaries::BT470BG
-    } else if height.get() == 480 || height.get() == 488 {
+    } else if height == 480 || height == 488 {
         ColorPrimaries::ST170M
     } else {
         ColorPrimaries::BT709

@@ -1,5 +1,3 @@
-use std::num::NonZeroUsize;
-
 use av_data::pixel::{ColorPrimaries, MatrixCoefficients};
 
 use super::{ycbcr_to_ypbpr, ypbpr_to_ycbcr};
@@ -187,8 +185,8 @@ pub fn yuv_to_rgb<T: Pixel>(input: &Yuv<T>) -> Result<Vec<[f32; 3]>, ConversionE
 /// - If the `YuvConfig` would produce an invalid image
 pub fn rgb_to_yuv<T: Pixel>(
     input: &[[f32; 3]],
-    width: NonZeroUsize,
-    height: NonZeroUsize,
+    width: usize,
+    height: usize,
     config: YuvConfig,
 ) -> Result<Yuv<T>, ConversionError> {
     let transform = get_rgb_to_yuv_matrix(config)?;

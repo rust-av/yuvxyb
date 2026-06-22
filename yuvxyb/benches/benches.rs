@@ -1,5 +1,5 @@
 use std::hint::black_box;
-use std::num::{NonZeroU8, NonZeroUsize};
+use std::num::NonZeroUsize;
 
 use criterion::{Criterion, criterion_group, criterion_main};
 use rand::RngExt;
@@ -18,14 +18,7 @@ fn make_yuv_8b(
         (0, 0) => ChromaSubsampling::Yuv444,
         _ => unreachable!(),
     };
-    let mut data: Frame<u8> = FrameBuilder::new(
-        NonZeroUsize::new(320).unwrap(),
-        NonZeroUsize::new(240).unwrap(),
-        chroma,
-        NonZeroU8::new(8).unwrap(),
-    )
-    .build()
-    .unwrap();
+    let mut data: Frame<u8> = FrameBuilder::new(320, 240, chroma, 8).build().unwrap();
     let mut rng = rand::rng();
     for i in 0..3 {
         let plane = data.plane_mut(i).unwrap();
@@ -67,14 +60,7 @@ fn make_yuv_10b(
         (0, 0) => ChromaSubsampling::Yuv444,
         _ => unreachable!(),
     };
-    let mut data: Frame<u16> = FrameBuilder::new(
-        NonZeroUsize::new(320).unwrap(),
-        NonZeroUsize::new(240).unwrap(),
-        chroma,
-        NonZeroU8::new(10).unwrap(),
-    )
-    .build()
-    .unwrap();
+    let mut data: Frame<u16> = FrameBuilder::new(320, 240, chroma, 10).build().unwrap();
     let mut rng = rand::rng();
     for i in 0..3 {
         let plane = data.plane_mut(i).unwrap();
