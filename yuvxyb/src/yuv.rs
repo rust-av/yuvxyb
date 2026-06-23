@@ -276,3 +276,98 @@ fn guess_color_primaries(
         ColorPrimaries::BT709
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use v_frame::{chroma::ChromaSubsampling, frame::FrameBuilder};
+
+    use super::*;
+
+    #[test]
+    fn yuverror_fmt() {
+        let errors = &[
+            YuvError::SubsamplingMismatch,
+            YuvError::InvalidLumaWidth,
+            YuvError::InvalidLumaHeight,
+            YuvError::InvalidData,
+        ];
+
+        for err in errors {
+            let msg = format!("{err}");
+            // exact message is not important
+            assert!(!msg.is_empty());
+        }
+    }
+
+    fn make_simple_yuvconfig(bit_depth: u8, subsampling_x: u8, subsampling_y: u8) -> YuvConfig {
+        YuvConfig {
+            bit_depth,
+            subsampling_x,
+            subsampling_y,
+            full_range: false,
+            matrix_coefficients: MatrixCoefficients::BT709,
+            transfer_characteristics: TransferCharacteristic::BT1886,
+            color_primaries: ColorPrimaries::BT709,
+        }
+    }
+
+    #[test]
+    fn yuv_new_subsample_mismatch() {
+        let data: Frame<u8> = FrameBuilder::new(320, 240, ChromaSubsampling::Yuv444, 8)
+            .build()
+            .unwrap();
+
+        let cfg = make_simple_yuvconfig(8, 0, 1);
+
+        assert!(matches!(
+            Yuv::new(data, cfg),
+            Err(YuvError::SubsamplingMismatch)
+        ));
+    }
+
+    #[test]
+    fn yuv_new_no_monochrome() {
+        let data: Frame<u8> = FrameBuilder::new(320, 240, ChromaSubsampling::Monochrome, 8)
+            .build()
+            .unwrap();
+
+        let cfg = make_simple_yuvconfig(8, 0, 0);
+
+        assert!(matches!(
+            Yuv::new(data, cfg),
+            Err(YuvError::SubsamplingMismatch)
+        ));
+    }
+
+    #[test]
+    fn yuvconfig_fix_unspecified() {
+        use ColorPrimaries as CP;
+        use MatrixCoefficients as MC;
+        use TransferCharacteristic as TC;
+
+        let config = YuvConfig {
+            bit_depth: 8,
+            subsampling_x: 0,
+            subsampling_y: 0,
+            full_range: false,
+            matrix_coefficients: MC::Unspecified,
+            transfer_characteristics: TC::Unspecified,
+            color_primaries: CP::Unspecified,
+        };
+
+        let fixed = config.fix_unspecified_data(640, 480);
+        assert_ne!(fixed.matrix_coefficients, MC::Unspecified);
+        assert_ne!(fixed.transfer_characteristics, TC::Unspecified);
+        assert_ne!(fixed.color_primaries, CP::Unspecified);
+
+        let fixed = config.fix_unspecified_data(1920, 1080);
+        assert_ne!(fixed.matrix_coefficients, MC::Unspecified);
+        assert_ne!(fixed.transfer_characteristics, TC::Unspecified);
+        assert_ne!(fixed.color_primaries, CP::Unspecified);
+
+        let fixed = config.fix_unspecified_data(3840, 2160);
+        assert_ne!(fixed.matrix_coefficients, MC::Unspecified);
+        assert_ne!(fixed.transfer_characteristics, TC::Unspecified);
+        assert_ne!(fixed.color_primaries, CP::Unspecified);
+    }
+}

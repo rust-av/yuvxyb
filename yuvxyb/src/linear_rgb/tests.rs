@@ -1,5 +1,32 @@
 use super::*;
 
+#[test]
+fn linear_rgb_new_zero_res() {
+    assert!(matches!(
+        LinearRgb::new(vec![], 0, 1),
+        Err(CreationError::ZeroResolution)
+    ));
+
+    assert!(matches!(
+        LinearRgb::new(vec![], 1, 0),
+        Err(CreationError::ZeroResolution)
+    ));
+}
+
+#[test]
+fn linear_rgb_new_res_mismatch() {
+    assert!(matches!(
+        LinearRgb::new(vec![], 320, 240),
+        Err(CreationError::ResolutionMismatch)
+    ));
+}
+
+#[test]
+fn linear_rgb_new_ok() {
+    let data = vec![[1., 1., 1.]; 4];
+    assert!(LinearRgb::new(data, 2, 2).is_ok())
+}
+
 const TOLERANCE: f32 = 1e-5;
 
 fn assert_close(actual: [f32; 3], expected: [f32; 3], description: &str) {

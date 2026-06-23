@@ -1,3 +1,6 @@
+#[cfg(test)]
+mod tests;
+
 use std::num::NonZeroUsize;
 
 use v_frame::pixel::Pixel;

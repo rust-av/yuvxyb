@@ -87,3 +87,40 @@ impl fmt::Display for CreationError {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // Just make sure formatting doesn't panic and returns a non-empty message.
+
+    #[test]
+    fn conversion_error_fmt() {
+        let errors = &[
+            ConversionError::UnsupportedMatrixCoefficients,
+            ConversionError::UnspecifiedMatrixCoefficients,
+            ConversionError::UnsupportedColorPrimaries,
+            ConversionError::UnspecifiedColorPrimaries,
+            ConversionError::UnsupportedTransferCharacteristic,
+            ConversionError::UnspecifiedTransferCharacteristic,
+        ];
+
+        for err in errors {
+            let msg = format!("{err}");
+            assert!(!msg.is_empty());
+        }
+    }
+
+    #[test]
+    fn creation_error_fmt() {
+        let errors = &[
+            CreationError::ZeroResolution,
+            CreationError::ResolutionMismatch,
+        ];
+
+        for err in errors {
+            let msg = format!("{err}");
+            assert!(!msg.is_empty());
+        }
+    }
+}
