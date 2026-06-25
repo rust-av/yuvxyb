@@ -1,5 +1,5 @@
+use std::fmt;
 use std::mem::size_of;
-use std::{fmt, num::NonZeroUsize};
 
 use av_data::pixel::{ColorPrimaries, MatrixCoefficients, TransferCharacteristic};
 use v_frame::{frame::Frame, pixel::Pixel, plane::Plane};
@@ -103,10 +103,6 @@ impl<T: Pixel> Yuv<T> {
     ///   frame data
     /// - If `data` contains values which are not valid for the specified bit
     ///   depth (note: out-of-range values for limited range are allowed)
-    // Clippy complains about T::to_u16 maybe panicking, but it can be assumed
-    // to never panic because the Pixel trait is only implemented by u8 and
-    // u16, both of which will successfully return a u16 from to_u16.
-    #[allow(clippy::missing_panics_doc)]
     pub fn new(data: Frame<T>, config: YuvConfig) -> Result<Self, YuvError> {
         let ss_ratio = data.subsampling.subsample_ratio();
         match ss_ratio {
@@ -125,19 +121,16 @@ impl<T: Pixel> Yuv<T> {
 
         let width = data.y_plane.width();
         let height = data.y_plane.height();
-        if !width.get().is_multiple_of(1 << config.subsampling_x) {
+        if !width.is_multiple_of(1 << config.subsampling_x) {
             return Err(YuvError::InvalidLumaWidth);
         }
-        if !height.get().is_multiple_of(1 << config.subsampling_y) {
+        if !height.is_multiple_of(1 << config.subsampling_y) {
             return Err(YuvError::InvalidLumaHeight);
         }
         if size_of::<T>() == 2 && config.bit_depth < 16 {
             let max_value = u16::MAX >> (16 - config.bit_depth);
-            let plane_data_invalid = |plane: &Plane<T>| -> bool {
-                plane
-                    .pixels()
-                    .any(|pix| pix.to_u16().expect("This is a u16") > max_value)
-            };
+            let plane_data_invalid =
+                |plane: &Plane<T>| plane.pixels().any(|pix| pix.into() > max_value);
             if plane_data_invalid(&data.y_plane)
                 || data.u_plane.as_ref().is_some_and(plane_data_invalid)
                 || data.v_plane.as_ref().is_some_and(plane_data_invalid)
@@ -158,15 +151,17 @@ impl<T: Pixel> Yuv<T> {
         &self.data
     }
 
+    /// Guaranteed to be non-zero.
     #[must_use]
     #[inline]
-    pub fn width(&self) -> NonZeroUsize {
+    pub fn width(&self) -> usize {
         self.data.y_plane.width()
     }
 
+    /// Guaranteed to be non-zero.
     #[must_use]
     #[inline]
-    pub fn height(&self) -> NonZeroUsize {
+    pub fn height(&self) -> usize {
         self.data.y_plane.height()
     }
 
@@ -178,11 +173,7 @@ impl<T: Pixel> Yuv<T> {
 }
 
 impl YuvConfig {
-    pub(crate) fn fix_unspecified_data(
-        mut self,
-        width: NonZeroUsize,
-        height: NonZeroUsize,
-    ) -> Self {
+    pub(crate) fn fix_unspecified_data(mut self, width: usize, height: usize) -> Self {
         if self.matrix_coefficients == MatrixCoefficients::Unspecified {
             self.matrix_coefficients = guess_matrix_coefficients(width, height);
             log::warn!(
@@ -255,13 +246,10 @@ impl<T: Pixel> TryFrom<(&Rgb, YuvConfig)> for Yuv<T> {
 }
 
 // Heuristic taken from mpv
-const fn guess_matrix_coefficients(
-    width: NonZeroUsize,
-    height: NonZeroUsize,
-) -> MatrixCoefficients {
-    if width.get() >= 1280 || height.get() > 576 {
+const fn guess_matrix_coefficients(width: usize, height: usize) -> MatrixCoefficients {
+    if width >= 1280 || height > 576 {
         MatrixCoefficients::BT709
-    } else if height.get() == 576 {
+    } else if height == 576 {
         MatrixCoefficients::BT470BG
     } else {
         MatrixCoefficients::ST170M
@@ -271,20 +259,115 @@ const fn guess_matrix_coefficients(
 // Heuristic taken from mpv
 fn guess_color_primaries(
     matrix: MatrixCoefficients,
-    width: NonZeroUsize,
-    height: NonZeroUsize,
+    width: usize,
+    height: usize,
 ) -> ColorPrimaries {
     if matrix == MatrixCoefficients::BT2020NonConstantLuminance
         || matrix == MatrixCoefficients::BT2020ConstantLuminance
     {
         ColorPrimaries::BT2020
-    } else if matrix == MatrixCoefficients::BT709 || width.get() >= 1280 || height.get() > 576 {
+    } else if matrix == MatrixCoefficients::BT709 || width >= 1280 || height > 576 {
         ColorPrimaries::BT709
-    } else if height.get() == 576 {
+    } else if height == 576 {
         ColorPrimaries::BT470BG
-    } else if height.get() == 480 || height.get() == 488 {
+    } else if height == 480 || height == 488 {
         ColorPrimaries::ST170M
     } else {
         ColorPrimaries::BT709
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use v_frame::{chroma::ChromaSubsampling, frame::FrameBuilder};
+
+    use super::*;
+
+    #[test]
+    fn yuverror_fmt() {
+        let errors = &[
+            YuvError::SubsamplingMismatch,
+            YuvError::InvalidLumaWidth,
+            YuvError::InvalidLumaHeight,
+            YuvError::InvalidData,
+        ];
+
+        for err in errors {
+            let msg = format!("{err}");
+            // exact message is not important
+            assert!(!msg.is_empty());
+        }
+    }
+
+    fn make_simple_yuvconfig(bit_depth: u8, subsampling_x: u8, subsampling_y: u8) -> YuvConfig {
+        YuvConfig {
+            bit_depth,
+            subsampling_x,
+            subsampling_y,
+            full_range: false,
+            matrix_coefficients: MatrixCoefficients::BT709,
+            transfer_characteristics: TransferCharacteristic::BT1886,
+            color_primaries: ColorPrimaries::BT709,
+        }
+    }
+
+    #[test]
+    fn yuv_new_subsample_mismatch() {
+        let data: Frame<u8> = FrameBuilder::new(320, 240, ChromaSubsampling::Yuv444, 8)
+            .build()
+            .unwrap();
+
+        let cfg = make_simple_yuvconfig(8, 0, 1);
+
+        assert!(matches!(
+            Yuv::new(data, cfg),
+            Err(YuvError::SubsamplingMismatch)
+        ));
+    }
+
+    #[test]
+    fn yuv_new_no_monochrome() {
+        let data: Frame<u8> = FrameBuilder::new(320, 240, ChromaSubsampling::Monochrome, 8)
+            .build()
+            .unwrap();
+
+        let cfg = make_simple_yuvconfig(8, 0, 0);
+
+        assert!(matches!(
+            Yuv::new(data, cfg),
+            Err(YuvError::SubsamplingMismatch)
+        ));
+    }
+
+    #[test]
+    fn yuvconfig_fix_unspecified() {
+        use ColorPrimaries as CP;
+        use MatrixCoefficients as MC;
+        use TransferCharacteristic as TC;
+
+        let config = YuvConfig {
+            bit_depth: 8,
+            subsampling_x: 0,
+            subsampling_y: 0,
+            full_range: false,
+            matrix_coefficients: MC::Unspecified,
+            transfer_characteristics: TC::Unspecified,
+            color_primaries: CP::Unspecified,
+        };
+
+        let fixed = config.fix_unspecified_data(640, 480);
+        assert_ne!(fixed.matrix_coefficients, MC::Unspecified);
+        assert_ne!(fixed.transfer_characteristics, TC::Unspecified);
+        assert_ne!(fixed.color_primaries, CP::Unspecified);
+
+        let fixed = config.fix_unspecified_data(1920, 1080);
+        assert_ne!(fixed.matrix_coefficients, MC::Unspecified);
+        assert_ne!(fixed.transfer_characteristics, TC::Unspecified);
+        assert_ne!(fixed.color_primaries, CP::Unspecified);
+
+        let fixed = config.fix_unspecified_data(3840, 2160);
+        assert_ne!(fixed.matrix_coefficients, MC::Unspecified);
+        assert_ne!(fixed.transfer_characteristics, TC::Unspecified);
+        assert_ne!(fixed.color_primaries, CP::Unspecified);
     }
 }

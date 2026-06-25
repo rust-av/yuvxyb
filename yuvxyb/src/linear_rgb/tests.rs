@@ -1,6 +1,31 @@
-use std::num::NonZeroUsize;
-
 use super::*;
+
+#[test]
+fn linear_rgb_new_zero_res() {
+    assert!(matches!(
+        LinearRgb::new(vec![], 0, 1),
+        Err(CreationError::ZeroResolution)
+    ));
+
+    assert!(matches!(
+        LinearRgb::new(vec![], 1, 0),
+        Err(CreationError::ZeroResolution)
+    ));
+}
+
+#[test]
+fn linear_rgb_new_res_mismatch() {
+    assert!(matches!(
+        LinearRgb::new(vec![], 320, 240),
+        Err(CreationError::ResolutionMismatch)
+    ));
+}
+
+#[test]
+fn linear_rgb_new_ok() {
+    let data = vec![[1., 1., 1.]; 4];
+    assert!(LinearRgb::new(data, 2, 2).is_ok())
+}
 
 const TOLERANCE: f32 = 1e-5;
 
@@ -21,12 +46,7 @@ fn assert_close(actual: [f32; 3], expected: [f32; 3], description: &str) {
 fn test_hsl_to_linear_rgb_black() {
     // HSL: Hue=0°, Saturation=0%, Lightness=0% -> Linear RGB: (0, 0, 0)
     let hsl_data = vec![[0.0, 0.0, 0.0]];
-    let hsl = Hsl::new(
-        hsl_data,
-        NonZeroUsize::new(1).unwrap(),
-        NonZeroUsize::new(1).unwrap(),
-    )
-    .unwrap();
+    let hsl = Hsl::new(hsl_data, 1, 1).unwrap();
     let linear_rgb = LinearRgb::from(hsl);
 
     let result = linear_rgb.data()[0];
@@ -38,12 +58,7 @@ fn test_hsl_to_linear_rgb_black() {
 fn test_hsl_to_linear_rgb_white() {
     // HSL: Hue=0°, Saturation=0%, Lightness=100% -> Linear RGB: (1, 1, 1)
     let hsl_data = vec![[0.0, 0.0, 1.0]];
-    let hsl = Hsl::new(
-        hsl_data,
-        NonZeroUsize::new(1).unwrap(),
-        NonZeroUsize::new(1).unwrap(),
-    )
-    .unwrap();
+    let hsl = Hsl::new(hsl_data, 1, 1).unwrap();
     let linear_rgb = LinearRgb::from(hsl);
 
     let result = linear_rgb.data()[0];
@@ -55,12 +70,7 @@ fn test_hsl_to_linear_rgb_white() {
 fn test_hsl_to_linear_rgb_red() {
     // HSL: Hue=0°, Saturation=100%, Lightness=50% -> Linear RGB: (1, 0, 0)
     let hsl_data = vec![[0.0, 1.0, 0.5]];
-    let hsl = Hsl::new(
-        hsl_data,
-        NonZeroUsize::new(1).unwrap(),
-        NonZeroUsize::new(1).unwrap(),
-    )
-    .unwrap();
+    let hsl = Hsl::new(hsl_data, 1, 1).unwrap();
     let linear_rgb = LinearRgb::from(hsl);
 
     let result = linear_rgb.data()[0];
@@ -72,12 +82,7 @@ fn test_hsl_to_linear_rgb_red() {
 fn test_hsl_to_linear_rgb_green() {
     // HSL: Hue=120°, Saturation=100%, Lightness=50% -> Linear RGB: (0, 1, 0)
     let hsl_data = vec![[120.0, 1.0, 0.5]];
-    let hsl = Hsl::new(
-        hsl_data,
-        NonZeroUsize::new(1).unwrap(),
-        NonZeroUsize::new(1).unwrap(),
-    )
-    .unwrap();
+    let hsl = Hsl::new(hsl_data, 1, 1).unwrap();
     let linear_rgb = LinearRgb::from(hsl);
 
     let result = linear_rgb.data()[0];
@@ -89,12 +94,7 @@ fn test_hsl_to_linear_rgb_green() {
 fn test_hsl_to_linear_rgb_blue() {
     // HSL: Hue=240°, Saturation=100%, Lightness=50% -> Linear RGB: (0, 0, 1)
     let hsl_data = vec![[240.0, 1.0, 0.5]];
-    let hsl = Hsl::new(
-        hsl_data,
-        NonZeroUsize::new(1).unwrap(),
-        NonZeroUsize::new(1).unwrap(),
-    )
-    .unwrap();
+    let hsl = Hsl::new(hsl_data, 1, 1).unwrap();
     let linear_rgb = LinearRgb::from(hsl);
 
     let result = linear_rgb.data()[0];
@@ -106,12 +106,7 @@ fn test_hsl_to_linear_rgb_blue() {
 fn test_hsl_to_linear_rgb_cyan() {
     // HSL: Hue=180°, Saturation=100%, Lightness=50% -> Linear RGB: (0, 1, 1)
     let hsl_data = vec![[180.0, 1.0, 0.5]];
-    let hsl = Hsl::new(
-        hsl_data,
-        NonZeroUsize::new(1).unwrap(),
-        NonZeroUsize::new(1).unwrap(),
-    )
-    .unwrap();
+    let hsl = Hsl::new(hsl_data, 1, 1).unwrap();
     let linear_rgb = LinearRgb::from(hsl);
 
     let result = linear_rgb.data()[0];
@@ -123,12 +118,7 @@ fn test_hsl_to_linear_rgb_cyan() {
 fn test_hsl_to_linear_rgb_magenta() {
     // HSL: Hue=300°, Saturation=100%, Lightness=50% -> Linear RGB: (1, 0, 1)
     let hsl_data = vec![[300.0, 1.0, 0.5]];
-    let hsl = Hsl::new(
-        hsl_data,
-        NonZeroUsize::new(1).unwrap(),
-        NonZeroUsize::new(1).unwrap(),
-    )
-    .unwrap();
+    let hsl = Hsl::new(hsl_data, 1, 1).unwrap();
     let linear_rgb = LinearRgb::from(hsl);
 
     let result = linear_rgb.data()[0];
@@ -140,12 +130,7 @@ fn test_hsl_to_linear_rgb_magenta() {
 fn test_hsl_to_linear_rgb_yellow() {
     // HSL: Hue=60°, Saturation=100%, Lightness=50% -> Linear RGB: (1, 1, 0)
     let hsl_data = vec![[60.0, 1.0, 0.5]];
-    let hsl = Hsl::new(
-        hsl_data,
-        NonZeroUsize::new(1).unwrap(),
-        NonZeroUsize::new(1).unwrap(),
-    )
-    .unwrap();
+    let hsl = Hsl::new(hsl_data, 1, 1).unwrap();
     let linear_rgb = LinearRgb::from(hsl);
 
     let result = linear_rgb.data()[0];
@@ -157,12 +142,7 @@ fn test_hsl_to_linear_rgb_yellow() {
 fn test_hsl_to_linear_rgb_gray() {
     // HSL: Hue=any, Saturation=0%, Lightness=50% -> Linear RGB: (0.5, 0.5, 0.5)
     let hsl_data = vec![[180.0, 0.0, 0.5]];
-    let hsl = Hsl::new(
-        hsl_data,
-        NonZeroUsize::new(1).unwrap(),
-        NonZeroUsize::new(1).unwrap(),
-    )
-    .unwrap();
+    let hsl = Hsl::new(hsl_data, 1, 1).unwrap();
     let linear_rgb = LinearRgb::from(hsl);
 
     let result = linear_rgb.data()[0];
@@ -174,12 +154,7 @@ fn test_hsl_to_linear_rgb_gray() {
 fn test_hsl_to_linear_rgb_partial_saturation() {
     // HSL: Hue=120°, Saturation=50%, Lightness=50% -> Linear RGB: (0.25, 0.75, 0.25)
     let hsl_data = vec![[120.0, 0.5, 0.5]];
-    let hsl = Hsl::new(
-        hsl_data,
-        NonZeroUsize::new(1).unwrap(),
-        NonZeroUsize::new(1).unwrap(),
-    )
-    .unwrap();
+    let hsl = Hsl::new(hsl_data, 1, 1).unwrap();
     let linear_rgb = LinearRgb::from(hsl);
 
     let result = linear_rgb.data()[0];
@@ -191,12 +166,7 @@ fn test_hsl_to_linear_rgb_partial_saturation() {
 fn test_hsl_to_linear_rgb_low_lightness() {
     // HSL: Hue=0°, Saturation=100%, Lightness=25% -> Linear RGB: (0.5, 0, 0)
     let hsl_data = vec![[0.0, 1.0, 0.25]];
-    let hsl = Hsl::new(
-        hsl_data,
-        NonZeroUsize::new(1).unwrap(),
-        NonZeroUsize::new(1).unwrap(),
-    )
-    .unwrap();
+    let hsl = Hsl::new(hsl_data, 1, 1).unwrap();
     let linear_rgb = LinearRgb::from(hsl);
 
     let result = linear_rgb.data()[0];
@@ -208,12 +178,7 @@ fn test_hsl_to_linear_rgb_low_lightness() {
 fn test_hsl_to_linear_rgb_high_lightness() {
     // HSL: Hue=0°, Saturation=100%, Lightness=75% -> Linear RGB: (1, 0.5, 0.5)
     let hsl_data = vec![[0.0, 1.0, 0.75]];
-    let hsl = Hsl::new(
-        hsl_data,
-        NonZeroUsize::new(1).unwrap(),
-        NonZeroUsize::new(1).unwrap(),
-    )
-    .unwrap();
+    let hsl = Hsl::new(hsl_data, 1, 1).unwrap();
     let linear_rgb = LinearRgb::from(hsl);
 
     let result = linear_rgb.data()[0];
@@ -286,12 +251,7 @@ fn test_hsl_to_linear_rgb_edge_hue_values() {
 
     for (hsl_values, expected_rgb, description) in test_cases {
         let hsl_data = vec![hsl_values];
-        let hsl = Hsl::new(
-            hsl_data,
-            NonZeroUsize::new(1).unwrap(),
-            NonZeroUsize::new(1).unwrap(),
-        )
-        .unwrap();
+        let hsl = Hsl::new(hsl_data, 1, 1).unwrap();
         let linear_rgb = LinearRgb::from(hsl);
 
         let result = linear_rgb.data()[0];
@@ -309,12 +269,7 @@ fn test_hsl_to_linear_rgb_multiple_pixels() {
         [120.0, 1.0, 0.5], // Green
         [240.0, 1.0, 0.5], // Blue
     ];
-    let hsl = Hsl::new(
-        hsl_data,
-        NonZeroUsize::new(5).unwrap(),
-        NonZeroUsize::new(1).unwrap(),
-    )
-    .unwrap();
+    let hsl = Hsl::new(hsl_data, 5, 1).unwrap();
     let linear_rgb = LinearRgb::from(hsl);
 
     let expected_results = [
@@ -331,8 +286,8 @@ fn test_hsl_to_linear_rgb_multiple_pixels() {
     }
 
     // Verify dimensions are preserved
-    assert_eq!(linear_rgb.width(), NonZeroUsize::new(5).unwrap());
-    assert_eq!(linear_rgb.height(), NonZeroUsize::new(1).unwrap());
+    assert_eq!(linear_rgb.width(), 5);
+    assert_eq!(linear_rgb.height(), 1);
 }
 
 #[test]
@@ -347,12 +302,7 @@ fn test_hsl_to_linear_rgb_zero_saturation() {
 
     for (hsl_values, expected_rgb) in test_cases {
         let hsl_data = vec![hsl_values];
-        let hsl = Hsl::new(
-            hsl_data,
-            NonZeroUsize::new(1).unwrap(),
-            NonZeroUsize::new(1).unwrap(),
-        )
-        .unwrap();
+        let hsl = Hsl::new(hsl_data, 1, 1).unwrap();
         let linear_rgb = LinearRgb::from(hsl);
 
         let result = linear_rgb.data()[0];
@@ -380,12 +330,7 @@ fn test_hsl_to_linear_rgb_boundary_lightness() {
 
     for (hsl_values, expected_rgb) in test_cases {
         let hsl_data = vec![hsl_values];
-        let hsl = Hsl::new(
-            hsl_data,
-            NonZeroUsize::new(1).unwrap(),
-            NonZeroUsize::new(1).unwrap(),
-        )
-        .unwrap();
+        let hsl = Hsl::new(hsl_data, 1, 1).unwrap();
         let linear_rgb = LinearRgb::from(hsl);
 
         let result = linear_rgb.data()[0];

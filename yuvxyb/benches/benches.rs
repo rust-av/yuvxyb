@@ -1,5 +1,4 @@
 use std::hint::black_box;
-use std::num::{NonZeroU8, NonZeroUsize};
 
 use criterion::{Criterion, criterion_group, criterion_main};
 use rand::RngExt;
@@ -18,14 +17,7 @@ fn make_yuv_8b(
         (0, 0) => ChromaSubsampling::Yuv444,
         _ => unreachable!(),
     };
-    let mut data: Frame<u8> = FrameBuilder::new(
-        NonZeroUsize::new(320).unwrap(),
-        NonZeroUsize::new(240).unwrap(),
-        chroma,
-        NonZeroU8::new(8).unwrap(),
-    )
-    .build()
-    .unwrap();
+    let mut data: Frame<u8> = FrameBuilder::new(320, 240, chroma, 8).build().unwrap();
     let mut rng = rand::rng();
     for i in 0..3 {
         let plane = data.plane_mut(i).unwrap();
@@ -67,14 +59,7 @@ fn make_yuv_10b(
         (0, 0) => ChromaSubsampling::Yuv444,
         _ => unreachable!(),
     };
-    let mut data: Frame<u16> = FrameBuilder::new(
-        NonZeroUsize::new(320).unwrap(),
-        NonZeroUsize::new(240).unwrap(),
-        chroma,
-        NonZeroU8::new(10).unwrap(),
-    )
-    .build()
-    .unwrap();
+    let mut data: Frame<u16> = FrameBuilder::new(320, 240, chroma, 10).build().unwrap();
     let mut rng = rand::rng();
     for i in 0..3 {
         let plane = data.plane_mut(i).unwrap();
@@ -101,6 +86,26 @@ fn make_yuv_10b(
         },
     )
     .unwrap()
+}
+
+fn make_rgb(width: usize, height: usize) -> Rgb {
+    let len = width * height;
+    let mut data = vec![[0f32; 3]; len];
+
+    let mut rng = rand::rng();
+
+    for pix in &mut data {
+        *pix = rng.random();
+    }
+
+    Rgb::new(
+        data,
+        width,
+        height,
+        TransferCharacteristic::BT1886,
+        ColorPrimaries::BT709,
+    )
+    .expect("can build Rgb")
 }
 
 fn bench_yuv_8b_444_full_to_xyb(c: &mut Criterion) {
@@ -198,6 +203,23 @@ fn bench_hybrid_log_gamma(c: &mut Criterion) {
     });
 }
 
+fn bench_rgb_to_yuv(c: &mut Criterion) {
+    c.bench_function("rgb to yuv 4:2:0 8-bit full", |b| {
+        let input = make_rgb(320, 240);
+        let config = YuvConfig {
+            bit_depth: 8,
+            subsampling_x: 1,
+            subsampling_y: 1,
+            full_range: true,
+            matrix_coefficients: MatrixCoefficients::BT709,
+            transfer_characteristics: TransferCharacteristic::BT1886,
+            color_primaries: ColorPrimaries::BT709,
+        };
+
+        b.iter(|| Yuv::<u8>::try_from((black_box(&input), config)));
+    });
+}
+
 fn make_linear_rgb_data(count: usize) -> Vec<[f32; 3]> {
     let mut rng = rand::rng();
     (0..count)
@@ -283,6 +305,7 @@ criterion_group!(
     bench_yuv_10b_420_full_to_xyb,
     bench_yuv_10b_420_limited_to_xyb,
     bench_hybrid_log_gamma,
+    bench_rgb_to_yuv,
     bench_linear_rgb_to_xyb_scalar,
     bench_xyb_to_linear_rgb_scalar,
 );
@@ -297,6 +320,7 @@ criterion_group!(
     bench_yuv_10b_420_full_to_xyb,
     bench_yuv_10b_420_limited_to_xyb,
     bench_hybrid_log_gamma,
+    bench_rgb_to_yuv,
     bench_linear_rgb_to_xyb_scalar,
     bench_linear_rgb_to_xyb_simd_x8,
     bench_linear_rgb_to_xyb_simd_x16,

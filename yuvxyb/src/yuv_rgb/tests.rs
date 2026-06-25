@@ -1,7 +1,4 @@
-use std::num::{NonZeroU8, NonZeroUsize};
-
 use av_data::pixel::{ColorPrimaries, MatrixCoefficients, TransferCharacteristic};
-use num_traits::clamp;
 use v_frame::chroma::ChromaSubsampling;
 use v_frame::frame::{Frame, FrameBuilder};
 
@@ -30,12 +27,7 @@ fn linear_rgb_to_yuv<T: Pixel>(
 ) -> Result<Yuv<T>, ConversionError> {
     let data = transform_primaries(input, ColorPrimaries::BT709, config.color_primaries)?;
     let data = config.transfer_characteristics.to_gamma(data)?;
-    rgb_to_yuv(
-        &data,
-        NonZeroUsize::new(width).unwrap(),
-        NonZeroUsize::new(height).unwrap(),
-        config,
-    )
+    rgb_to_yuv(&data, width, height, config)
 }
 
 fn make_frame_from_pixels<T: Pixel>(
@@ -44,14 +36,10 @@ fn make_frame_from_pixels<T: Pixel>(
     height: usize,
     bit_depth: u8,
 ) -> Frame<T> {
-    let mut frame: Frame<T> = FrameBuilder::new(
-        NonZeroUsize::new(width).unwrap(),
-        NonZeroUsize::new(height).unwrap(),
-        ChromaSubsampling::Yuv444,
-        NonZeroU8::new(bit_depth).unwrap(),
-    )
-    .build()
-    .unwrap();
+    let mut frame: Frame<T> =
+        FrameBuilder::new(width, height, ChromaSubsampling::Yuv444, bit_depth)
+            .build()
+            .unwrap();
     frame
         .y_plane
         .copy_from_slice(&yuv_pixels.iter().map(|p| p.0).collect::<Vec<_>>())
@@ -144,7 +132,7 @@ fn to_f32_luma_limited() {
         );
         let (scale, offset) = get_scale_offset::<false>(bd, full_range, false);
         let result: u8 = from_f32_luma(result, scale, offset, bd);
-        let expected = clamp(input, 16, 235);
+        let expected = input.clamp(16, 235);
         assert!(
             expected == result,
             "Result {result} differed from expected {input}"
@@ -225,7 +213,7 @@ fn to_f32_chroma_limited() {
         );
         let (scale, offset) = get_scale_offset::<false>(bd, full_range, true);
         let result: u8 = from_f32_chroma(result, scale, offset, bd, full_range);
-        let expected = clamp(input, 16, 240);
+        let expected = input.clamp(16, 240);
         assert!(
             expected == result,
             "Result {result} differed from expected {input}"
@@ -328,7 +316,7 @@ fn to_f32_luma_limited_10b() {
         );
         let (scale, offset) = get_scale_offset::<false>(bd, full_range, false);
         let result: u16 = from_f32_luma(result, scale, offset, bd);
-        let expected = clamp(input, 16 << 2u8, 235 << 2u8);
+        let expected = input.clamp(16 << 2u8, 235 << 2u8);
         assert!(
             expected == result,
             "Result {result} differed from expected {input}"
@@ -431,7 +419,7 @@ fn to_f32_chroma_limited_10b() {
         );
         let (scale, offset) = get_scale_offset::<false>(bd, full_range, true);
         let result: u16 = from_f32_chroma(result, scale, offset, bd, full_range);
-        let expected = clamp(input, 16 << 2u8, 240 << 2u8);
+        let expected = input.clamp(16 << 2u8, 240 << 2u8);
         assert!(
             expected == result,
             "Result {result} differed from expected {input}"

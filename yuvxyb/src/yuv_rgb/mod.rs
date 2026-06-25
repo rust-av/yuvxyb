@@ -13,19 +13,19 @@ mod transfer;
 #[cfg(test)]
 mod tests;
 
-use std::num::{NonZeroU8, NonZeroUsize};
+use std::num::NonZeroU8;
 
-use num_traits::clamp;
 use v_frame::chroma::ChromaSubsampling;
-use v_frame::frame::FrameBuilder;
+use v_frame::frame::Frame;
+use v_frame::plane::{Plane, PlaneGeometry};
 
 pub use self::color::{rgb_to_yuv, transform_primaries, yuv_to_rgb};
 pub use self::transfer::TransferFunction;
 use crate::{Pixel, Yuv, YuvConfig};
 
 fn ycbcr_to_ypbpr<T: Pixel>(input: &Yuv<T>) -> Vec<[f32; 3]> {
-    let w = input.width().get();
-    let h = input.height().get();
+    let w = input.width();
+    let h = input.height();
     let ss_x = input.config().subsampling_x;
     let ss_y = input.config().subsampling_y;
     let bd = input.config().bit_depth;
@@ -44,12 +44,15 @@ fn ycbcr_to_ypbpr<T: Pixel>(input: &Yuv<T>) -> Vec<[f32; 3]> {
         .v_plane
         .as_ref()
         .expect("monochrome currently unsupported");
-    let y_stride = y_plane.geometry().stride.get();
-    let u_stride = u_plane.geometry().stride.get();
-    let v_stride = v_plane.geometry().stride.get();
-    let y_origin = &y_plane.data()[y_plane.data_origin()..];
-    let u_origin = &u_plane.data()[u_plane.data_origin()..];
-    let v_origin = &v_plane.data()[v_plane.data_origin()..];
+    let y_stride = y_plane.geometry().stride();
+    let u_stride = u_plane.geometry().stride();
+    let v_stride = v_plane.geometry().stride();
+    let y_origin = y_plane.geometry().data_origin();
+    let u_origin = u_plane.geometry().data_origin();
+    let v_origin = v_plane.geometry().data_origin();
+    let y_origin = &y_plane.data()[y_origin..];
+    let u_origin = &u_plane.data()[u_origin..];
+    let v_origin = &v_plane.data()[v_origin..];
     let mut output = vec![[0.0, 0.0, 0.0]; w * h];
     for y in 0..h {
         for x in 0..w {
@@ -73,8 +76,8 @@ fn ycbcr_to_ypbpr<T: Pixel>(input: &Yuv<T>) -> Vec<[f32; 3]> {
 #[allow(clippy::too_many_lines)]
 fn ypbpr_to_ycbcr<T: Pixel>(
     input: &[[f32; 3]],
-    width: NonZeroUsize,
-    height: NonZeroUsize,
+    width: usize,
+    height: usize,
     config: YuvConfig,
 ) -> Yuv<T> {
     let ss_x = config.subsampling_x;
@@ -91,115 +94,120 @@ fn ypbpr_to_ycbcr<T: Pixel>(
         0 => ChromaSubsampling::Yuv444,
         _ => unreachable!(),
     };
-    let mut output = FrameBuilder::new(
-        width,
-        height,
-        chroma,
-        NonZeroU8::new(bd).expect("should not be zero"),
-    )
-    .build()
-    .expect("should not fail");
+
+    let y_geometry = PlaneGeometry::unpadded(width, height, 1, 1).expect("can construct geometry");
+    let mut y_plane = Plane::new_uninit(y_geometry);
+    let chroma_geometry = y_geometry
+        .for_subsampling(chroma)
+        .expect("can subsample")
+        .expect("has chroma planes");
+    let mut u_plane = Plane::new_uninit(chroma_geometry);
+    let mut v_plane = Plane::new_uninit(chroma_geometry);
 
     // We setup the plane origins as mutable slices outside the loop
     // because `data_origin_mut` is _not_ just a simple array index,
     // so it would optimize poorly if called during each loop iteration.
-    let y_plane = &mut output.y_plane;
-    let u_plane = output.u_plane.as_mut().expect("has 3 planes");
-    let v_plane = output.v_plane.as_mut().expect("has 3 planes");
-    let y_stride = y_plane.geometry().stride.get();
-    let u_stride = u_plane.geometry().stride.get();
-    let v_stride = v_plane.geometry().stride.get();
-    let y_origin = y_plane.data_origin();
-    let u_origin = u_plane.data_origin();
-    let v_origin = v_plane.data_origin();
+    let y_stride = y_plane.geometry().stride();
+    let u_stride = u_plane.geometry().stride();
+    let v_stride = v_plane.geometry().stride();
+    let y_origin = y_plane.geometry().data_origin();
+    let u_origin = u_plane.geometry().data_origin();
+    let v_origin = v_plane.geometry().data_origin();
     let y_origin = &mut y_plane.data_mut()[y_origin..];
     let u_origin = &mut u_plane.data_mut()[u_origin..];
     let v_origin = &mut v_plane.data_mut()[v_origin..];
     let mut last_uv_pos = usize::MAX;
-    for y in 0..height.get() {
-        for x in 0..width.get() {
-            let input_pos = y * width.get() + x;
+    for y in 0..height {
+        for x in 0..width {
+            let input_pos = y * width + x;
             let y_pos = y * y_stride + x;
             let u_pos = (y >> ss_y) * u_stride + (x >> ss_x);
             let v_pos = (y >> ss_y) * v_stride + (x >> ss_x);
             // SAFETY: The bounds of the YUV data are validated when we construct it.
             unsafe {
                 let pix = input.get_unchecked(input_pos);
-                *y_origin.get_unchecked_mut(y_pos) =
-                    from_f32_luma(pix[0], luma_scale, luma_offset, bd);
+                y_origin.get_unchecked_mut(y_pos).write(from_f32_luma(
+                    pix[0],
+                    luma_scale,
+                    luma_offset,
+                    bd,
+                ));
                 if u_pos != last_uv_pos {
                     // Small optimization to avoid doing unnecessary calculations and writes
                     // We can track this from just `u_pos`. We have `v_pos` separate for indexing
                     // on the off chance that the two planes have different strides.
-                    *u_origin.get_unchecked_mut(u_pos) =
-                        from_f32_chroma(pix[1], chroma_scale, chroma_offset, bd, full_range);
-                    *v_origin.get_unchecked_mut(v_pos) =
-                        from_f32_chroma(pix[2], chroma_scale, chroma_offset, bd, full_range);
+                    u_origin.get_unchecked_mut(u_pos).write(from_f32_chroma(
+                        pix[1],
+                        chroma_scale,
+                        chroma_offset,
+                        bd,
+                        full_range,
+                    ));
+                    v_origin.get_unchecked_mut(v_pos).write(from_f32_chroma(
+                        pix[2],
+                        chroma_scale,
+                        chroma_offset,
+                        bd,
+                        full_range,
+                    ));
                     last_uv_pos = u_pos;
                 }
             }
         }
     }
 
+    // SAFETY: All values of all planes have been initialized in the loop above.
+    let output = unsafe {
+        Frame {
+            y_plane: y_plane.assume_init(),
+            u_plane: Some(u_plane.assume_init()),
+            v_plane: Some(v_plane.assume_init()),
+            subsampling: chroma,
+            bit_depth: NonZeroU8::new(bd).expect("nonzero bitdepth"),
+        }
+    };
+
     Yuv::new(output, config).unwrap()
 }
 
 fn to_f32_luma<T: Pixel>(val: T, scale: f32, offset: f32) -> f32 {
-    // Converts to a float value in the range 0.0..=1.0
-    let val = val.to_f32().expect("can convert to f32");
-    clamp(val.mul_add(scale, offset), 0.0, 1.0)
+    let val = f32::from(val.into());
+    val.mul_add(scale, offset).clamp(0.0, 1.0)
 }
 
 fn to_f32_chroma<T: Pixel>(val: T, scale: f32, offset: f32) -> f32 {
-    // Converts to a float value in the range -0.5..=0.5
-    let val = val.to_f32().expect("can convert to f32");
-    clamp(val.mul_add(scale, offset), -0.5, 0.5)
+    let val = f32::from(val.into());
+    val.mul_add(scale, offset).clamp(-0.5, 0.5)
 }
 
 fn from_f32_luma<T: Pixel>(val: f32, scale: f32, offset: f32, bd: u8) -> T {
-    // Converts to a float value in the range 0.0..=1.0
-    match size_of::<T>() {
-        1 => T::from(clamp(
-            val.mul_add(scale, offset).round() as u16,
-            0,
-            ((1u32 << bd) - 1) as u16,
-        ) as u8)
-        .expect("T is u8"),
-        2 => T::from(clamp(
-            val.mul_add(scale, offset).round() as u16,
-            0,
-            ((1u32 << bd) - 1) as u16,
-        ) as u16)
-        .expect("T is u16"),
-        _ => unreachable!(),
+    const { assert!(size_of::<T>() <= 2) };
+
+    let val = val.mul_add(scale, offset).round();
+    if size_of::<T>() == 1 {
+        T::from((val as u8).min(u8::MAX >> (8 - bd)))
+    } else {
+        T::try_from((val as u16).min(u16::MAX >> (16 - bd))).expect("T is u16")
     }
 }
 
 fn from_f32_chroma<T: Pixel>(val: f32, scale: f32, offset: f32, bd: u8, full_range: bool) -> T {
+    const { assert!(size_of::<T>() <= 2) };
+
     // Accounts for rounding issues
     if full_range && (val + 0.5).abs() < f32::EPSILON {
-        return match size_of::<T>() {
-            1 => T::from(0u8).expect("T is u8"),
-            2 => T::from(0u16).expect("T is u16"),
-            _ => unreachable!(),
+        return if size_of::<T>() == 1 {
+            T::from(0u8)
+        } else {
+            T::try_from(0u16).expect("T is u16")
         };
     }
 
-    // Converts from a float value in the range -0.5..=0.5
-    match size_of::<T>() {
-        1 => T::from(clamp(
-            val.mul_add(scale, offset).round() as u16,
-            0,
-            ((1u32 << bd) - 1) as u16,
-        ) as u8)
-        .expect("T is u8"),
-        2 => T::from(clamp(
-            val.mul_add(scale, offset).round() as u16,
-            0,
-            ((1u32 << bd) - 1) as u16,
-        ) as u16)
-        .expect("T is u16"),
-        _ => unreachable!(),
+    let val = val.mul_add(scale, offset).round();
+    if size_of::<T>() == 1 {
+        T::from((val as u8).min(u8::MAX >> (8 - bd)))
+    } else {
+        T::try_from((val as u16).min(u16::MAX >> (16 - bd))).expect("T is u16")
     }
 }
 
