@@ -53,7 +53,10 @@ fn ycbcr_to_ypbpr<T: Pixel>(input: &Yuv<T>) -> Vec<[f32; 3]> {
     let y_origin = &y_plane.data()[y_origin..];
     let u_origin = &u_plane.data()[u_origin..];
     let v_origin = &v_plane.data()[v_origin..];
-    let mut output = vec![[0.0, 0.0, 0.0]; w * h];
+
+    // Empty, but with enough capacity
+    let mut output = Vec::with_capacity(w * h);
+    let uninit_output = output.spare_capacity_mut();
     for y in 0..h {
         for x in 0..w {
             let output_pos = y * w + x;
@@ -62,14 +65,18 @@ fn ycbcr_to_ypbpr<T: Pixel>(input: &Yuv<T>) -> Vec<[f32; 3]> {
             let v_pos = (y >> ss_y) * v_stride + (x >> ss_x);
             // SAFETY: The bounds of the YUV data are validated when we construct it.
             unsafe {
-                *output.get_unchecked_mut(output_pos) = [
+                uninit_output.get_unchecked_mut(output_pos).write([
                     to_f32_luma(*y_origin.get_unchecked(y_pos), luma_scale, luma_offset),
                     to_f32_chroma(*u_origin.get_unchecked(u_pos), chroma_scale, chroma_offset),
                     to_f32_chroma(*v_origin.get_unchecked(v_pos), chroma_scale, chroma_offset),
-                ];
+                ]);
             }
         }
     }
+    // SAFETY:
+    // - Ensured enough capacity in Vec::with_capacity
+    // - Initialized everything from 0..w * h in the loop
+    unsafe { output.set_len(w * h) };
     output
 }
 

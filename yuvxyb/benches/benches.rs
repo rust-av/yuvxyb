@@ -220,6 +220,34 @@ fn bench_rgb_to_yuv(c: &mut Criterion) {
     });
 }
 
+fn bench_yuv_8b_420_limited_to_rgb(c: &mut Criterion) {
+    c.bench_function("yuv 4:2:0 8-bit to rgb", |b| {
+        let input = make_yuv_8b(
+            (1, 1),
+            false,
+            MatrixCoefficients::BT709,
+            TransferCharacteristic::BT1886,
+            ColorPrimaries::BT709,
+        );
+
+        b.iter(|| Rgb::try_from(black_box(&input)).unwrap())
+    });
+}
+
+fn bench_yuv_10b_420_limited_to_rgb(c: &mut Criterion) {
+    c.bench_function("yuv 4:2:0 10-bit to rgb", |b| {
+        let input = make_yuv_10b(
+            (1, 1),
+            false,
+            MatrixCoefficients::BT709,
+            TransferCharacteristic::BT1886,
+            ColorPrimaries::BT709,
+        );
+
+        b.iter(|| Rgb::try_from(black_box(&input)).unwrap())
+    });
+}
+
 fn make_linear_rgb_data(count: usize) -> Vec<[f32; 3]> {
     let mut rng = rand::rng();
     (0..count)
@@ -306,6 +334,8 @@ criterion_group!(
     bench_yuv_10b_420_limited_to_xyb,
     bench_hybrid_log_gamma,
     bench_rgb_to_yuv,
+    bench_yuv_8b_420_limited_to_rgb,
+    bench_yuv_10b_420_limited_to_rgb,
     bench_linear_rgb_to_xyb_scalar,
     bench_xyb_to_linear_rgb_scalar,
 );
@@ -321,6 +351,8 @@ criterion_group!(
     bench_yuv_10b_420_limited_to_xyb,
     bench_hybrid_log_gamma,
     bench_rgb_to_yuv,
+    bench_yuv_8b_420_limited_to_rgb,
+    bench_yuv_10b_420_limited_to_rgb,
     bench_linear_rgb_to_xyb_scalar,
     bench_linear_rgb_to_xyb_simd_x8,
     bench_linear_rgb_to_xyb_simd_x16,
