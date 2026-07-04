@@ -1,5 +1,10 @@
 # Changelog
 
+## Version 0.6.0
+
+- Upgrade `v_frame` to 0.7
+- Add small optimization to Yuv <-> Rgb conversions
+
 ## Version 0.5.0
 
 - Upgrade `v_frame` to 0.5
