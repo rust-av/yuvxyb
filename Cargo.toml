@@ -1,6 +1,5 @@
 [workspace]
 members = ["yuvxyb", "yuvxyb-math"]
-resolver = "2"
 
 [profile.release]
 lto = "thin"
